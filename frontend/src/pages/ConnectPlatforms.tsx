@@ -3,9 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { platformsAPI } from '@/lib/api';
+import { Youtube, Instagram, Facebook, Linkedin, Twitter } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { staggerContainer, staggerItem, rotate360 } from '@/lib/animations';
+import { staggerContainer, staggerItem } from '@/lib/animations';
 import { triggerConfetti } from '@/lib/confetti';
 import { PLATFORMS } from '@/lib/constants';
 
@@ -100,65 +102,58 @@ export const ConnectPlatforms = () => {
                     initial="hidden"
                     animate="visible"
                 >
-                    {Object.values(PLATFORMS).map((platform, index) => {
+                    {Object.values(PLATFORMS).map((platform) => {
                         const platformStatus = platforms.find((p) => p.id === platform.id);
                         const isConnected = platformStatus?.status === 'connected';
                         const isConnecting = connectingPlatform === platform.id;
+
+                        const Icon =
+                            platform.id === 'youtube' ? Youtube :
+                                platform.id === 'instagram' ? Instagram :
+                                    platform.id === 'facebook' ? Facebook :
+                                        platform.id === 'linkedin' ? Linkedin : Twitter;
 
                         return (
                             <motion.div key={platform.id} variants={staggerItem}>
                                 <Card
                                     hover={platform.enabled && !isConnected}
-                                    glow={isConnected}
-                                    className={`relative ${!platform.enabled ? 'opacity-50' : ''}`}
+                                    className={cn(
+                                        "relative h-full flex flex-col",
+                                        !platform.enabled && "opacity-50"
+                                    )}
                                 >
                                     {/* Platform Icon/Name */}
-                                    <div className="text-center mb-4">
-                                        <div className="text-6xl mb-3">
-                                            {platform.id === 'youtube' && '📺'}
-                                            {platform.id === 'instagram' && '📷'}
-                                            {platform.id === 'facebook' && '👥'}
-                                            {platform.id === 'x' && '🐦'}
-                                            {platform.id === 'linkedin' && '💼'}
+                                    <div className="flex flex-col items-center mb-6">
+                                        <div className={cn(
+                                            "w-16 h-16 rounded-2xl flex items-center justify-center mb-4 transition-colors",
+                                            isConnected ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground"
+                                        )}>
+                                            <Icon size={32} />
                                         </div>
-                                        <h3 className="text-2xl font-semibold">{platform.name}</h3>
+                                        <h3 className="text-xl font-semibold mb-1">{platform.name}</h3>
+                                        <span className="text-sm text-muted-foreground">
+                                            {isConnected ? 'Connected' : platform.enabled ? 'Not connected' : 'Coming soon'}
+                                        </span>
                                     </div>
 
-                                    {/* Status Badge */}
-                                    {isConnected && (
-                                        <motion.div
-                                            className="flex items-center justify-center gap-2 mb-4 text-primary"
-                                            variants={rotate360}
-                                            initial="initial"
-                                            animate="animate"
-                                        >
-                                            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
-                                                <path
-                                                    fillRule="evenodd"
-                                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                                                    clipRule="evenodd"
-                                                />
-                                            </svg>
-                                            <span className="font-medium">Connected</span>
-                                        </motion.div>
-                                    )}
-
-                                    {/* Connect Button */}
-                                    {!platform.enabled ? (
-                                        <div className="text-center text-sm text-gray-500">Coming Soon</div>
-                                    ) : isConnected ? (
-                                        <Button variant="secondary" fullWidth disabled>
-                                            Connected
-                                        </Button>
-                                    ) : (
-                                        <Button
-                                            fullWidth
-                                            onClick={() => handleConnect(platform.id)}
-                                            disabled={isConnecting}
-                                        >
-                                            {isConnecting ? 'Connecting...' : 'Connect'}
-                                        </Button>
-                                    )}
+                                    {/* Actions */}
+                                    <div className="mt-auto">
+                                        {isConnected ? (
+                                            <div className="flex items-center justify-center gap-2 text-primary bg-primary/5 py-2 rounded-lg text-sm font-medium">
+                                                <div className="w-2 h-2 rounded-full bg-primary" />
+                                                Active
+                                            </div>
+                                        ) : (
+                                            <Button
+                                                variant={platform.enabled ? "default" : "secondary"}
+                                                onClick={() => handleConnect(platform.id)}
+                                                disabled={isConnecting || !platform.enabled}
+                                                className="w-full"
+                                            >
+                                                {isConnecting ? 'Connecting...' : 'Connect'}
+                                            </Button>
+                                        )}
+                                    </div>
                                 </Card>
                             </motion.div>
                         );

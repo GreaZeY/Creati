@@ -5,7 +5,9 @@ import { motion } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth.tsx';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
 import { slideInBottom } from '@/lib/animations';
+import { useUI } from '@/context/UIContext'; // Import context
 
 export const Login = () => {
     const [email, setEmail] = useState('');
@@ -15,6 +17,11 @@ export const Login = () => {
 
     const { login } = useAuth();
     const navigate = useNavigate();
+    const { setInputFocused } = useUI();
+
+    // Handlers for Bloom Effect
+    const handleFocus = () => setInputFocused(true);
+    const handleBlur = () => setInputFocused(false);
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -48,23 +55,33 @@ export const Login = () => {
 
                 <div className="bg-dark-card p-8 rounded-xl border border-gray-800">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        <Input
-                            type="email"
-                            label="Email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="you@example.com"
-                            required
-                        />
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Email</Label>
+                            <Input
+                                id="email"
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="you@example.com"
+                                required
+                                onFocus={handleFocus}
+                                onBlur={handleBlur}
+                            />
+                        </div>
 
-                        <Input
-                            type="password"
-                            label="Password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="••••••••"
-                            required
-                        />
+                        <div className="space-y-2">
+                            <Label htmlFor="password">Password</Label>
+                            <Input
+                                id="password"
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                                required
+                                onFocus={handleFocus}
+                                onBlur={handleBlur}
+                            />
+                        </div>
 
                         {error && (
                             <motion.div
@@ -76,7 +93,7 @@ export const Login = () => {
                             </motion.div>
                         )}
 
-                        <Button type="submit" fullWidth disabled={loading}>
+                        <Button type="submit" className="w-full" disabled={loading}>
                             {loading ? 'Signing in...' : 'Sign In'}
                         </Button>
                     </form>

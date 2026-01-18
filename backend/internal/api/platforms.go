@@ -3,9 +3,10 @@ package api
 import (
 	"database/sql"
 
-	"github.com/creati/backend/internal/middleware"
-	"github.com/creati/backend/internal/services"
-	"github.com/creati/backend/internal/utils"
+	"example.com/creati/backend/internal/middleware"
+	"example.com/creati/backend/internal/services"
+	"example.com/creati/backend/internal/utils"
+
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -93,7 +94,8 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 func (h *PlatformHandler) HandleCallback(c *fiber.Ctx) error {
 	platform := c.Params("platform")
 	code := c.Query("code")
-	state := c.Query("state") // Contains userID in simplified version
+	// state := c.Query("state") // Contains userID in simplified version
+	// Verify state usually here (omitted for brevity/MVP)
 
 	if code == "" {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "missing authorization code")

@@ -3,13 +3,12 @@ package services
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 
-	"github.com/creati/backend/internal/db/models"
+	"example.com/creati/backend/internal/db/models"
+
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"

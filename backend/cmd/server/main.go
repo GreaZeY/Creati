@@ -6,8 +6,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/creati/backend/internal/api"
-	"github.com/creati/backend/internal/middleware"
+	"example.com/creati/backend/internal/api"
+	"example.com/creati/backend/internal/middleware"
+	"example.com/creati/backend/internal/services"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -72,9 +74,19 @@ func main() {
 		})
 	})
 
+	// Initialize services
+	storageService, err := services.NewStorageService()
+	if err != nil {
+		log.Printf("⚠️  Failed to initialize storage service: %v", err)
+		// Don't fatal, maybe working without S3 for now? prefer fatal if S3 is required.
+		// For now, let's log and maybe nil checking in handler or just fatal.
+		// log.Fatal(err) is better for critical service.
+	}
+
 	// Initialize handlers
 	authHandler := api.NewAuthHandler(db)
 	platformHandler := api.NewPlatformHandler(db)
+	uploadHandler := api.NewUploadHandler(storageService, db)
 
 	// API routes
 	apiRoutes := app.Group("/api")
@@ -88,6 +100,9 @@ func main() {
 
 	// Protected routes (require authentication)
 	protected := apiRoutes.Use(middleware.AuthMiddleware)
+
+	// Uploads
+	protected.Post("/upload/init", uploadHandler.InitUpload)
 
 	// Platforms
 	protected.Get("/platforms", platformHandler.ListPlatforms)

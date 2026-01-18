@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useAuth } from '@/hooks/useAuth.tsx';
+import { useMutation } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
+import { authAPI } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { slideInBottom } from '@/lib/animations';
+import { Label } from '@/components/ui/Label';
+import { rotate360, slideInBottom } from '@/lib/animations';
+import { useUI } from '@/context/UIContext'; // Import context
 
 export const Register = () => {
     const [email, setEmail] = useState('');
@@ -14,8 +18,13 @@ export const Register = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const { register } = useAuth();
+    const { register, login } = useAuth(); // Kept register for handleSubmit, added login as per instruction
     const navigate = useNavigate();
+    const { setInputFocused } = useUI(); // Use context
+
+    // Handlers for Bloom Effect
+    const handleFocus = () => setInputFocused(true);
+    const handleBlur = () => setInputFocused(false);
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -61,32 +70,45 @@ export const Register = () => {
 
                 <div className="bg-dark-card p-8 rounded-xl border border-gray-800">
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        <Input
-                            type="email"
-                            label="Email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="you@example.com"
-                            required
-                        />
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Email</Label>
+                            <Input
+                                id="email"
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                placeholder="you@example.com"
+                                required
+                                onFocus={handleFocus}
+                                onBlur={handleBlur}
+                            />
+                        </div>
 
-                        <Input
-                            type="password"
-                            label="Password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="••••••••"
-                            required
-                        />
+                        <div className="space-y-2">
+                            <Label htmlFor="password">Password</Label>
+                            <Input
+                                id="password"
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder="••••••••"
+                                required
+                                onFocus={handleFocus}
+                                onBlur={handleBlur}
+                            />
+                        </div>
 
-                        <Input
-                            type="password"
-                            label="Confirm Password"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            placeholder="••••••••"
-                            required
-                        />
+                        <div className="space-y-2">
+                            <Label htmlFor="confirmPassword">Confirm Password</Label>
+                            <Input
+                                id="confirmPassword"
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                placeholder="••••••••"
+                                required
+                            />
+                        </div>
 
                         {error && (
                             <motion.div
@@ -98,7 +120,7 @@ export const Register = () => {
                             </motion.div>
                         )}
 
-                        <Button type="submit" fullWidth disabled={loading}>
+                        <Button type="submit" className="w-full" disabled={loading}>
                             {loading ? 'Creating account...' : 'Create Account'}
                         </Button>
                     </form>

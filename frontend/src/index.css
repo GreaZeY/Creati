@@ -2,60 +2,96 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
+@layer base {
+  :root {
+    /* Adaptive Neutral Theme - Locked (No Light/Dark toggle needed) */
 
-  color-scheme: light dark;
-  
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
+    /* Base Background: #0E1116 */
+    --background: 218 22% 7%;
 
-/* Default dark mode variables */
-body {
-  margin: 0;
-  min-height: 100vh;
-  @apply bg-dark-bg text-white transition-colors duration-300;
-}
+    /* Primary Text: #E6EAF0 */
+    --foreground: 216 20% 92%;
 
-/* Light mode override */
-body.light {
-  @apply bg-light-bg text-gray-900;
-}
+    /* Cards: #151A21 */
+    --card: 215 22% 11%;
+    --card-foreground: 216 20% 92%;
 
-/* Reduce motion for accessibility */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    /* Popovers: #1B2230 (Elevated surface) */
+    --popover: 219 28% 15%;
+    --popover-foreground: 216 20% 92%;
+
+    /* Accent: #6AE3B4 (Mint-Teal) */
+    --primary: 157 69% 65%;
+    /* Primary text on accent: Dark Bg Color (#0E1116) */
+    --primary-foreground: 218 22% 7%;
+
+    /* Secondary: Transparent/Bordered usually, but mapping slate for support */
+    --secondary: 215 25% 27%;
+    --secondary-foreground: 216 20% 92%;
+
+    /* Muted Text: #6B7280 */
+    --muted: 215 25% 27%;
+    --muted-foreground: 220 9% 46%;
+
+    /* Accent/Ring */
+    --accent: 157 69% 65%;
+    --accent-foreground: 218 22% 7%;
+
+    /* Error: #F87171 */
+    --destructive: 0 91% 71%;
+    --destructive-foreground: 216 20% 92%;
+
+    /* Borders: Subtle */
+    --border: 216 20% 20%;
+    --input: 216 20% 20%;
+    --ring: 157 69% 65%;
+
+    /* Radius: 12px default for buttons */
+    --radius: 0.75rem;
   }
 }
 
-/* Custom scrollbar */
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground selection:bg-primary/20 selection:text-primary;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .bg-noise {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.5'/%3E%3C/svg%3E");
+  }
+}
+
+/* Custom Scrollbar & Layout Stability */
+html {
+  scrollbar-gutter: stable;
+}
+
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-dark-bg;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-700 rounded-full;
+  background: hsl(var(--muted) / 0.5);
+  border-radius: 9999px;
+  border: 2px solid hsl(var(--background));
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-primary;
-}
-
-/* Focus visible for accessibility */
-:focus-visible {
-  @apply outline-2 outline-offset-2 outline-primary;
+  background: hsl(var(--muted));
 }

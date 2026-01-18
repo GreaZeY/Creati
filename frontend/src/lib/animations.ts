@@ -1,6 +1,6 @@
-import { Variants } from 'framer-motion';
-import { ANIMATION } from './constants';
 
+import { ANIMATION } from './constants';
+type Variants = any
 // Reusable animation variants following DRY principle
 
 /**

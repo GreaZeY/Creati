@@ -5,8 +5,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/creati/backend/internal/db/models"
-	"github.com/creati/backend/internal/utils"
+	"example.com/creati/backend/internal/db/models"
+	"example.com/creati/backend/internal/utils"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"

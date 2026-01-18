@@ -1,11 +1,11 @@
 package services
 
-import "github.com/creati/backend/internal/db/models"
+import "example.com/creati/backend/internal/db/models"
 
 /**
  * Platform interface - the contract all platforms must implement
  * Following Interface Segregation and Dependency Inversion principles
- * 
+ *
  * Adding a new platform ONLY requires:
  * 1. Creating a new struct that implements this interface
  * 2. Registering it in the platform factory
