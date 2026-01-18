@@ -54,7 +54,13 @@ export const Login = () => {
                 </div>
 
                 <div className="bg-dark-card p-8 rounded-xl border border-gray-800">
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Event Delegation: Handle focus/blur on the form container */}
+                    <form
+                        onSubmit={handleSubmit}
+                        className="space-y-6"
+                        onFocus={handleFocus}
+                        onBlur={handleBlur}
+                    >
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
                             <Input
@@ -64,8 +70,6 @@ export const Login = () => {
                                 onChange={(e) => setEmail(e.target.value)}
                                 placeholder="you@example.com"
                                 required
-                                onFocus={handleFocus}
-                                onBlur={handleBlur}
                             />
                         </div>
 
@@ -78,8 +82,6 @@ export const Login = () => {
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="••••••••"
                                 required
-                                onFocus={handleFocus}
-                                onBlur={handleBlur}
                             />
                         </div>
 

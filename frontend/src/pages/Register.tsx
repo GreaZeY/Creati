@@ -69,7 +69,12 @@ export const Register = () => {
                 </div>
 
                 <div className="bg-dark-card p-8 rounded-xl border border-gray-800">
-                    <form onSubmit={handleSubmit} className="space-y-6">
+                    <form
+                        onSubmit={handleSubmit}
+                        className="space-y-6"
+                        onFocus={handleFocus}
+                        onBlur={handleBlur}
+                    >
                         <div className="space-y-2">
                             <Label htmlFor="email">Email</Label>
                             <Input
@@ -79,8 +84,6 @@ export const Register = () => {
                                 onChange={(e) => setEmail(e.target.value)}
                                 placeholder="you@example.com"
                                 required
-                                onFocus={handleFocus}
-                                onBlur={handleBlur}
                             />
                         </div>
 
@@ -93,8 +96,6 @@ export const Register = () => {
                                 onChange={(e) => setPassword(e.target.value)}
                                 placeholder="••••••••"
                                 required
-                                onFocus={handleFocus}
-                                onBlur={handleBlur}
                             />
                         </div>
 

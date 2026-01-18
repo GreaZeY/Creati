@@ -8,9 +8,7 @@ export function BackgroundEffect() {
     const { isInputFocused } = useUI();
 
     if (pathname === '/') return <LivingGradientMesh />;
-    if (['/login', '/register'].includes(pathname)) return <DepthFog isFocused={isInputFocused && pathname === '/register'} />;
-
-    // Dashboard / Interior: Stable, focused background
+    if (['/login', '/register'].includes(pathname)) return <DepthFog isFocused={isInputFocused} />;
     return <div className="fixed inset-0 bg-background z-[-1]" />;
 }
 
@@ -34,10 +32,14 @@ function LivingGradientMesh() {
         let height = window.innerHeight;
 
         const handleResize = () => {
+            const dpr = window.devicePixelRatio || 1;
             width = window.innerWidth;
             height = window.innerHeight;
-            canvas.width = width;
-            canvas.height = height;
+
+            // Fix: Scale canvas for High DPI displays to prevent pixelation
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
+            ctx.scale(dpr, dpr);
         };
         window.addEventListener('resize', handleResize);
         handleResize();
@@ -90,8 +92,7 @@ function LivingGradientMesh() {
                 ctx.fill();
             });
 
-            // Noise texture overlay
-            ctx.fillStyle = 'rgba(0,0,0,0.02)'; // Just a hint
+            // Noise texture is handled by CSS overlay now
 
             animationFrameId = requestAnimationFrame(animate);
         };
@@ -111,7 +112,7 @@ function LivingGradientMesh() {
             {/* Darken slightly on scroll could go here via overlay opacity */}
             <div className="absolute inset-0 bg-background/0 transition-colors" style={{ backgroundColor: `rgba(14,17,22, ${Math.min(scrollRef.current / 5000, 0.3)})` }} />
 
-            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full opacity-100" />
+            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full opacity-100" style={{ width: '100%', height: '100%' }} />
             {/* Cinematic Noise Overlay CSS */}
             <div className="absolute inset-0 bg-noise opacity-[0.03] pointer-events-none mix-blend-overlay" />
         </div>
@@ -137,12 +138,12 @@ function DepthFog({ isFocused }: { isFocused: boolean }) {
                 )}
             </AnimatePresence>
 
-            {/* Base Noise */}
-            <div className="absolute inset-0 bg-noise opacity-[0.03] pointer-events-none mix-blend-overlay" />
+            {/* Base Noise layer - High Fidelity */}
+            <div className="absolute inset-0 bg-noise opacity-[0.05] pointer-events-none mix-blend-overlay" />
 
-            {/* Fog Layer - Slow moving blobs */}
+            {/* Fog Layer - Hardware Accelerated */}
             <motion.div
-                className="absolute top-[-20%] left-[-20%] w-[80vw] h-[80vw] bg-accent/5 rounded-full blur-[120px]"
+                className="absolute top-[-20%] left-[-20%] w-[80vw] h-[80vw] bg-accent/5 rounded-full blur-[120px] will-change-transform"
                 animate={{
                     x: [0, 50, 0],
                     y: [0, 30, 0],
@@ -151,7 +152,7 @@ function DepthFog({ isFocused }: { isFocused: boolean }) {
                 transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
             />
             <motion.div
-                className="absolute bottom-[-10%] right-[-10%] w-[60vw] h-[60vw] bg-primary/5 rounded-full blur-[100px]"
+                className="absolute bottom-[-10%] right-[-10%] w-[60vw] h-[60vw] bg-primary/5 rounded-full blur-[100px] will-change-transform"
                 animate={{
                     x: [0, -40, 0],
                     y: [0, -20, 0],
@@ -159,25 +160,26 @@ function DepthFog({ isFocused }: { isFocused: boolean }) {
                 transition={{ duration: 25, repeat: Infinity, ease: "easeInOut", delay: 2 }}
             />
 
-            {/* Light Threads - Thin glowing lines */}
-            {[...Array(3)].map((_, i) => (
+            {/* Light Threads Removed as per feedback (floating lines issue) */}
+
+            {/* Particles - Floating Specks */}
+            {[...Array(20)].map((_, i) => (
                 <motion.div
-                    key={i}
-                    className="absolute h-[1px] w-[300px] bg-gradient-to-r from-transparent via-primary/20 to-transparent"
+                    key={`particle-${i}`}
+                    className="absolute w-1 h-1 bg-white/20 rounded-full"
                     style={{
-                        top: `${20 + i * 30}%`,
-                        left: -300,
-                        rotate: -15,
+                        top: `${Math.random() * 100}%`,
+                        left: `${Math.random() * 100}%`,
                     }}
                     animate={{
-                        x: ['0vw', '120vw'],
-                        opacity: [0, 0.5, 0],
+                        y: [0, -20, 0],
+                        opacity: [0, 0.6, 0],
                     }}
                     transition={{
-                        duration: 15 + i * 5,
+                        duration: 3 + Math.random() * 5,
                         repeat: Infinity,
-                        ease: "linear",
-                        delay: i * 8,
+                        ease: "easeInOut",
+                        delay: Math.random() * 2,
                     }}
                 />
             ))}
