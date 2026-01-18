@@ -1,0 +1,135 @@
+package api
+
+import (
+	"database/sql"
+
+	"github.com/creati/backend/internal/middleware"
+	"github.com/creati/backend/internal/services"
+	"github.com/creati/backend/internal/utils"
+	"github.com/gofiber/fiber/v2"
+)
+
+/**
+ * Platform API handlers
+ * Following Single Responsibility: ONLY handles platform connection endpoints
+ * Uses Platform interface - doesn't know platform implementation details
+ */
+
+type PlatformHandler struct {
+	db *sql.DB
+}
+
+func NewPlatformHandler(db *sql.DB) *PlatformHandler {
+	return &PlatformHandler{db: db}
+}
+
+// ListPlatforms returns list of available platforms and connection status
+func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	// Get connected platforms for user
+	rows, err := h.db.Query(`
+		SELECT platform, status FROM platform_accounts WHERE user_id = $1
+	`, userID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+	}
+	defer rows.Close()
+
+	connected := make(map[string]string)
+	for rows.Next() {
+		var platform, status string
+		if err := rows.Scan(&platform, &status); err != nil {
+			continue
+		}
+		connected[platform] = status
+	}
+
+	// Build response with all supported platforms
+	platforms := []map[string]interface{}{}
+	for _, platform := range services.GetSupportedPlatforms() {
+		status, ok := connected[platform]
+		if !ok {
+			status = "disconnected"
+		}
+		platforms = append(platforms, map[string]interface{}{
+			"id":     platform,
+			"name":   platform,
+			"status": status,
+		})
+	}
+
+	return utils.SuccessResponse(c, platforms, "")
+}
+
+// InitiateConnection returns OAuth URL for platform connection
+func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
+	platform := c.Params("platform")
+	userID := middleware.GetUserID(c)
+
+	// Get platform service using factory (Open/Closed principle)
+	platformService, err := services.GetPlatformService(platform, h.db)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, err.Error())
+	}
+
+	// Type assertion to get auth URL (YouTube-specific for now)
+	// In production, add GetAuthURL to Platform interface
+	youtubeService, ok := platformService.(*services.YouTubeService)
+	if !ok {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "platform service error")
+	}
+
+	// Generate state token for security (should include userID)
+	state := string(userID) // Simplified - use secure state generation in production
+
+	authURL := youtubeService.GetAuthURL(state)
+	return utils.SuccessResponse(c, map[string]string{
+		"auth_url": authURL,
+	}, "")
+}
+
+// HandleCallback processes OAuth callback
+func (h *PlatformHandler) HandleCallback(c *fiber.Ctx) error {
+	platform := c.Params("platform")
+	code := c.Query("code")
+	state := c.Query("state") // Contains userID in simplified version
+
+	if code == "" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "missing authorization code")
+	}
+
+	// In production: validate state token and extract userID securely
+	userID := 1 // Simplified - extract from state
+
+	// Get platform service
+	platformService, err := services.GetPlatformService(platform, h.db)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, err.Error())
+	}
+
+	// Authenticate using platform service
+	err = platformService.Authenticate(code, userID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "authentication failed: "+err.Error())
+	}
+
+	// Redirect to frontend success page
+	return c.Redirect("http://localhost:5173/connect?status=success&platform=" + platform)
+}
+
+// DisconnectPlatform removes platform connection
+func (h *PlatformHandler) DisconnectPlatform(c *fiber.Ctx) error {
+	platform := c.Params("platform")
+	userID := middleware.GetUserID(c)
+
+	_, err := h.db.Exec(`
+		DELETE FROM platform_accounts WHERE user_id = $1 AND platform = $2
+	`, userID, platform)
+
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to disconnect")
+	}
+
+	return utils.SuccessResponse(c, nil, "platform disconnected")
+}
