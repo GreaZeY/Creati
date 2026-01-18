@@ -71,13 +71,15 @@ export const platformsAPI = {
         api.delete(`/platforms/${platform}`),
 };
 
+export const uploadAPI = {
+    init: (data: { filename: string; contentType: string; size: number }) =>
+        api.post<{ uploadUrl: string; key: string }>('/upload/init', data),
+
+    confirm: (key: string) =>
+        api.post('/upload/confirm', { key }),
+};
+
 export const videosAPI = {
-    initUpload: (metadata: Record<string, unknown>) =>
-        api.post('/videos/init', metadata),
-
-    confirmUpload: (videoId: string, platforms: string[]) =>
-        api.post('/videos/confirm', { videoId, platforms }),
-
     list: () =>
         api.get('/videos'),
 
