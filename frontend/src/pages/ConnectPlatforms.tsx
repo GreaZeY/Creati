@@ -53,11 +53,11 @@ export const ConnectPlatforms = () => {
     const connectMutation = useMutation({
         mutationFn: async (platformId: string) => {
             const response = await platformsAPI.connect(platformId);
-            return response.data.auth_url;
+            return response.data.data.authUrl;
         },
         onSuccess: (authUrl: string) => {
             // Redirect to OAuth page
-            window.location.href = authUrl;
+            if (authUrl) window.location.assign(authUrl);
         },
         onError: (error: Error) => {
             // Toast handled by global event bus now
@@ -71,11 +71,6 @@ export const ConnectPlatforms = () => {
         connectMutation.mutate(platformId);
     };
 
-    const handleContinue = () => {
-
-        navigate('/dashboard');
-
-    };
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">

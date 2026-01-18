@@ -84,7 +84,7 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 
 	authURL := youtubeService.GetAuthURL(state)
 	return utils.SuccessResponse(c, map[string]string{
-		"auth_url": authURL,
+		"authUrl": authURL,
 	}, "")
 }
 
