@@ -41,11 +41,11 @@ export const ConnectPlatforms = () => {
     }, [searchParams, queryClient]);
 
     // Fetch platforms and their connection status
-    const { data: platforms = [], isLoading } = useQuery({
+    const { data: platformStats = {}, isLoading } = useQuery({
         queryKey: ['platforms'],
         queryFn: async () => {
             const response = await platformsAPI.list();
-            return response.data as PlatformStatus[];
+            return response.data as Record<string, boolean>;
         },
     });
 
@@ -60,7 +60,8 @@ export const ConnectPlatforms = () => {
             window.location.href = authUrl;
         },
         onError: (error: Error) => {
-            alert('Connection failed: ' + error.message);
+            // Toast handled by global event bus now
+            // alert('Connection failed: ' + error.message);
             setConnectingPlatform(null);
         },
     });
@@ -71,10 +72,9 @@ export const ConnectPlatforms = () => {
     };
 
     const handleContinue = () => {
-        const hasConnected = platforms.some((p) => p.status === 'connected');
-        if (hasConnected) {
-            navigate('/dashboard');
-        }
+
+        navigate('/dashboard');
+
     };
 
     return (
@@ -103,8 +103,7 @@ export const ConnectPlatforms = () => {
                     animate="visible"
                 >
                     {Object.values(PLATFORMS).map((platform) => {
-                        const platformStatus = platforms.find((p) => p.id === platform.id);
-                        const isConnected = platformStatus?.status === 'connected';
+                        const isConnected = platformStats[platform.id] || false;
                         const isConnecting = connectingPlatform === platform.id;
 
                         const Icon =
@@ -161,29 +160,6 @@ export const ConnectPlatforms = () => {
                 </motion.div>
             )}
 
-            {/* Continue Button */}
-            {platforms.some((p) => p.status === 'connected') && (
-                <motion.div
-                    className="mt-12"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                >
-                    <Button size="lg" onClick={handleContinue}>
-                        Continue to Dashboard →
-                    </Button>
-                </motion.div>
-            )}
-
-            {/* Skip Option */}
-            <div className="mt-6 text-center">
-                <button
-                    onClick={() => navigate('/dashboard')}
-                    className="text-gray-400 hover:text-primary transition-colors"
-                >
-                    Skip for now
-                </button>
-            </div>
         </div>
     );
 };

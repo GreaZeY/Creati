@@ -47,17 +47,15 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 	}
 
 	// Build response with all supported platforms
-	platforms := []map[string]interface{}{}
+	// Build response: keys = platform ID, value = is connected
+	platforms := make(map[string]bool)
 	for _, platform := range services.GetSupportedPlatforms() {
 		status, ok := connected[platform]
-		if !ok {
-			status = "disconnected"
+		if ok && status == "connected" {
+			platforms[platform] = true
+		} else {
+			platforms[platform] = false
 		}
-		platforms = append(platforms, map[string]interface{}{
-			"id":     platform,
-			"name":   platform,
-			"status": status,
-		})
 	}
 
 	return utils.SuccessResponse(c, platforms, "")
