@@ -12,6 +12,7 @@ import { AnimatePresence } from 'framer-motion';
 import { PageTransition } from './components/layout/PageTransition';
 import { UIProvider } from './context/UIContext';
 import { BackgroundEffect } from './components/ui/BackgroundEffect';
+import { Toaster } from './components/ui/Toaster'; // Import Toaster
 import './index.css';
 
 // Create React Query client
@@ -76,6 +77,7 @@ function App() {
         <UIProvider>
           <BrowserRouter>
             <BackgroundEffect />
+            <Toaster /> {/* Mount global toaster */}
             <AnimatedRoutes />
           </BrowserRouter>
         </UIProvider>

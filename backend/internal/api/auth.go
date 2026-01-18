@@ -62,7 +62,6 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	).Scan(&userID)
 
 	if err != nil {
-		// Check for duplicate email
 		if err.Error() == "pq: duplicate key value violates unique constraint \"users_email_key\"" {
 			return utils.ErrorResponse(c, fiber.StatusConflict, "email already exists")
 		}
@@ -75,8 +74,10 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate token")
 	}
 
+	// Set Cookies
+	setAuthCookies(c, token)
+
 	return utils.CreatedResponse(c, AuthResponse{
-		Token: token,
 		User: models.User{
 			ID:    userID,
 			Email: req.Email,
@@ -117,10 +118,81 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate token")
 	}
 
+	// Set Cookies
+	setAuthCookies(c, token)
+
 	return utils.SuccessResponse(c, AuthResponse{
-		Token: token,
-		User:  user,
+		User: user,
 	}, "login successful")
+}
+
+// CheckAuth verifies the current session
+func (h *AuthHandler) CheckAuth(c *fiber.Ctx) error {
+	// Middleware has already validated the token, we just return the user info
+	userID := c.Locals("userID").(int)
+
+	var user models.User
+	err := h.db.QueryRow("SELECT id, email FROM users WHERE id = $1", userID).Scan(&user.ID, &user.Email)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "user not found")
+	}
+
+	return utils.SuccessResponse(c, AuthResponse{User: user}, "authenticated")
+}
+
+// Logout clears the auth cookies
+func (h *AuthHandler) Logout(c *fiber.Ctx) error {
+	// Clear JWT
+	c.Cookie(&fiber.Cookie{
+		Name:     "jwt",
+		Value:    "",
+		Expires:  time.Now().Add(-1 * time.Hour), // Expire immediately
+		HTTPOnly: true,
+		Secure:   false, // Set to true in production
+		SameSite: "Lax",
+		Path:     "/",
+	})
+
+	// Clear CSRF
+	c.Cookie(&fiber.Cookie{
+		Name:     "csrf_token",
+		Value:    "",
+		Expires:  time.Now().Add(-1 * time.Hour),
+		HTTPOnly: false,
+		Secure:   false,
+		SameSite: "Lax",
+		Path:     "/",
+	})
+
+	return utils.SuccessResponse(c, nil, "logged out")
+}
+
+// Helper to set JWT and CSRF cookies
+func setAuthCookies(c *fiber.Ctx, token string) {
+	// 1. JWT (HttpOnly)
+	c.Cookie(&fiber.Cookie{
+		Name:     "jwt",
+		Value:    token,
+		Expires:  time.Now().Add(24 * 7 * time.Hour),
+		HTTPOnly: true,
+		Secure:   false, // TODO: True in prod
+		SameSite: "Lax", // Lax needed for some redirects, strict is better but can be tricky
+		Path:     "/",
+	})
+
+	// 2. CSRF Token (Readable by JS)
+	// In a real app, use a proper CSPRNG. Here using a simple UUID-like approach for MVP.
+	csrfToken, _ := generateToken(0)
+
+	c.Cookie(&fiber.Cookie{
+		Name:     "csrf_token",
+		Value:    csrfToken,
+		Expires:  time.Now().Add(24 * 7 * time.Hour),
+		HTTPOnly: false, // JS must read this
+		Secure:   false,
+		SameSite: "Lax",
+		Path:     "/",
+	})
 }
 
 // Helper function to generate JWT token (DRY principle)

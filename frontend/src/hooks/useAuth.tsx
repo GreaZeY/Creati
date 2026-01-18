@@ -10,48 +10,61 @@ interface AuthContextType {
     loading: boolean;
 }
 
+// ... imports logic fixed
+
 const AuthContext = createContext<AuthContextType | null>(null);
 
 /**
  * Auth provider component
- * Manages authentication state globally
+ * Manages authentication state globally via Secure Cookies
  */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Check for existing token on mount
-        const token = localStorage.getItem('auth_token');
-        setIsAuthenticated(!!token);
-        setLoading(false);
+        // Check session with backend on mount
+        const checkAuth = async () => {
+            try {
+                await authAPI.check();
+                setIsAuthenticated(true);
+            } catch (error) {
+                setIsAuthenticated(false);
+            } finally {
+                setLoading(false);
+            }
+        };
+        checkAuth();
     }, []);
 
     const login = async (email: string, password: string) => {
-        const response = await authAPI.login(email, password);
-        const { token } = response.data;
-        localStorage.setItem('auth_token', token);
+        await authAPI.login(email, password);
+        // Cookie is set by backend
         setIsAuthenticated(true);
     };
 
     const register = async (email: string, password: string) => {
-        const response = await authAPI.register(email, password);
-        const { token } = response.data;
-        localStorage.setItem('auth_token', token);
+        await authAPI.register(email, password);
+        // Cookie is set by backend
         setIsAuthenticated(true);
     };
 
-    const logout = () => {
-        authAPI.logout();
+    const logout = async () => {
+        try {
+            await authAPI.logout();
+        } catch (error) {
+            console.error("Logout failed", error);
+        }
         setIsAuthenticated(false);
+        // Let the router handle redirect if needed, or api.ts interceptor
+        window.location.href = '/login';
     };
 
     return (
-        <AuthContext.Provider value= {{ isAuthenticated, login, register, logout, loading }
-}>
-    { children }
-    </AuthContext.Provider>
-  );
+        <AuthContext.Provider value={{ isAuthenticated, login, register, logout, loading }}>
+            {children}
+        </AuthContext.Provider>
+    );
 };
 
 /**

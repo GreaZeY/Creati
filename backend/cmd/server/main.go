@@ -61,7 +61,7 @@ func main() {
 
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     frontendURL,
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-CSRF-Token",
 		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS",
 		AllowCredentials: true,
 	}))
@@ -94,12 +94,16 @@ func main() {
 	// Public routes
 	apiRoutes.Post("/auth/register", authHandler.Register)
 	apiRoutes.Post("/auth/login", authHandler.Login)
+	apiRoutes.Post("/auth/logout", authHandler.Logout) // Logout can be public or protected, technically public to clear cookie is fine
 
 	// OAuth callback (public)
 	apiRoutes.Get("/platforms/:platform/callback", platformHandler.HandleCallback)
 
 	// Protected routes (require authentication)
 	protected := apiRoutes.Use(middleware.AuthMiddleware)
+
+	// Auth Check
+	protected.Get("/auth/me", authHandler.CheckAuth)
 
 	// Uploads
 	protected.Post("/upload/init", uploadHandler.InitUpload)

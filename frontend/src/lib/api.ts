@@ -1,22 +1,44 @@
 import axios, { AxiosError } from 'axios';
 import { API_BASE_URL } from './constants';
+import { toast } from '@/lib/events';
 
+// Extend Axios config to support 'enableAlerts'
+declare module 'axios' {
+    export interface AxiosRequestConfig {
+        enableAlerts?: boolean;
+    }
+}
+
+// Create axios instance with defaults
 // Create axios instance with defaults
 export const api = axios.create({
     baseURL: API_BASE_URL,
     headers: {
         'Content-Type': 'application/json',
     },
+    withCredentials: true, // IMPORTANT: Send cookies
     timeout: 15000,
 });
 
-// Request interceptor - add auth token
+// Helper to read cookie by name
+const getCookie = (name: string): string | null => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+    return null;
+};
+
+// Request interceptor - add CSRF token
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('auth_token');
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+        // We no longer attach Authorization: Bearer. Cookies handle JWT.
+
+        // Anti-CSRF: Read token from cookie and send in header
+        const csrfToken = getCookie('csrf_token');
+        if (csrfToken) {
+            config.headers['X-CSRF-Token'] = csrfToken;
         }
+
         return config;
     },
     (error) => Promise.reject(error)
@@ -28,12 +50,23 @@ api.interceptors.response.use(
     (error: AxiosError<{ message: string }>) => {
         // Logout on 401
         if (error.response?.status === 401) {
-            localStorage.removeItem('auth_token');
-            window.location.href = '/login';
+            // No local storage to clear, just redirect
+            // Prevent loop if already on login
+            if (!window.location.pathname.includes('/login')) {
+                window.location.href = '/login';
+            }
         }
 
-        // Return user-friendly error message
-        const message = error.response?.data?.message || 'An error occurred';
+        const message = error.response?.data?.message || error.message || 'An error occurred';
+
+        // Check config to see if alerts should be shown (default: true)
+        // Note: config might be undefined if error happened before request
+        const shouldShowAlert = error.config?.enableAlerts !== false;
+
+        if (shouldShowAlert && error.response?.status !== 401) {
+            toast.error(message);
+        }
+
         return Promise.reject(new Error(message));
     }
 );
@@ -47,9 +80,12 @@ export const authAPI = {
     register: (email: string, password: string) =>
         api.post('/auth/register', { email, password }),
 
-    logout: () => {
-        localStorage.removeItem('auth_token');
-    },
+    // Check session on load
+    check: () =>
+        api.get('/auth/me'),
+
+    logout: () =>
+        api.post('/auth/logout'),
 };
 
 export const preferencesAPI = {

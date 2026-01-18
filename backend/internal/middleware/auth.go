@@ -21,19 +21,19 @@ type Claims struct {
 }
 
 // AuthMiddleware validates JWT token and sets user context
+// AuthMiddleware validates JWT token from Cookie and enforces CSRF
 func AuthMiddleware(c *fiber.Ctx) error {
-	authHeader := c.Get("Authorization")
-	if authHeader == "" {
-		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "missing authorization header")
+	// 1. JWT Validation (from Cookie)
+	tokenString := c.Cookies("jwt")
+	if tokenString == "" {
+		// Fallback to Bearer header for API clients (optional, but good for testing)
+		authHeader := c.Get("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			tokenString = strings.TrimPrefix(authHeader, "Bearer ")
+		} else {
+			return utils.ErrorResponse(c, fiber.StatusUnauthorized, "missing authentication")
+		}
 	}
-
-	// Extract token from "Bearer <token>"
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || parts[0] != "Bearer" {
-		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "invalid authorization format")
-	}
-
-	tokenString := parts[1]
 
 	// Parse and validate token
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
@@ -41,12 +41,24 @@ func AuthMiddleware(c *fiber.Ctx) error {
 	})
 
 	if err != nil || !token.Valid {
-		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "invalid token")
+		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "invalid or expired session")
 	}
 
 	// Extract claims and set in context
 	if claims, ok := token.Claims.(*Claims); ok {
 		c.Locals("userID", claims.UserID)
+	}
+
+	// 2. CSRF Protection (Double Submit Cookie Pattern)
+	// Only check on unsafe methods
+	method := c.Method()
+	if method == "POST" || method == "PUT" || method == "DELETE" || method == "PATCH" {
+		csrfCookie := c.Cookies("csrf_token")
+		csrfHeader := c.Get("X-CSRF-Token")
+
+		if csrfCookie == "" || csrfHeader == "" || csrfCookie != csrfHeader {
+			return utils.ErrorResponse(c, fiber.StatusForbidden, "invalid csrf token")
+		}
 	}
 
 	return c.Next()
