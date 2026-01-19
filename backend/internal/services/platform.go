@@ -32,7 +32,7 @@ type Analytics struct {
 	Likes        int64 `json:"likes"`
 	Comments     int64 `json:"comments"`
 	Shares       int64 `json:"shares"`
-	watchTimeMin int64 `json:"watch_time_minutes"`
+	WatchTimeMin int64 `json:"watch_time_minutes"`
 }
 
 // VideoUploadRequest - standardized upload request

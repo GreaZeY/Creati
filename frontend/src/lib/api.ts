@@ -121,4 +121,8 @@ export const videosAPI = {
 
     getStatus: (videoId: string) =>
         api.get(`/videos/${videoId}/status`),
+
+    getAnalytics: (videoId: string) =>
+        api.get(`/videos/${videoId}/analytics`),
 };
+

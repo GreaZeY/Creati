@@ -55,3 +55,23 @@ func (q *QueueService) EnqueueUpload(ctx context.Context, job UploadJob) error {
 	// Push to 'upload_queue'
 	return q.Client.LPush(ctx, "upload_queue", data).Err()
 }
+
+// DequeueUpload waits for a job from the queue (blocking)
+func (q *QueueService) DequeueUpload(ctx context.Context) (*UploadJob, error) {
+	// BRPOP returns [key, value]
+	results, err := q.Client.BRPop(ctx, 0, "upload_queue").Result()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(results) < 2 {
+		return nil, fmt.Errorf("invalid response from redis")
+	}
+
+	var job UploadJob
+	if err := json.Unmarshal([]byte(results[1]), &job); err != nil {
+		return nil, err
+	}
+
+	return &job, nil
+}

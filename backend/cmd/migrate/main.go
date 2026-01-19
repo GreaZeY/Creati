@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -28,16 +29,30 @@ func main() {
 	}
 	defer db.Close()
 
-	// Read migration file
-	content, err := os.ReadFile("internal/db/migrations/002_add_profile_name.sql")
+	// Read migration files
+	files, err := os.ReadDir("internal/db/migrations")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	_, err = db.Exec(string(content))
-	if err != nil {
-		log.Fatal("Migration failed:", err)
+	for _, file := range files {
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".sql") {
+			continue
+		}
+
+		fmt.Printf("Running migration: %s... ", file.Name())
+		content, err := os.ReadFile("internal/db/migrations/" + file.Name())
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		_, err = db.Exec(string(content))
+		if err != nil {
+			log.Printf("❌ Migration %s failed: %v", file.Name(), err)
+			continue
+		}
+		fmt.Println("✅")
 	}
 
-	fmt.Println("Migration successful!")
+	fmt.Println("\nAll migrations processed!")
 }

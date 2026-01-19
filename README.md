@@ -130,8 +130,12 @@ psql -U your_user -d creati -f internal/db/migrations/001_init.sql
 #### 4. Run Backend
 
 ```bash
-cd cmd/server
-go run main.go
+cd backend
+go mod download
+go run cmd/server/main.go
+
+# Or with hot-reloading (Recommended)
+air
 ```
 
 Backend will run at `http://localhost:8080`
@@ -194,11 +198,12 @@ VITE_API_BASE_URL=http://localhost:8080/api
 - `GET /api/platforms/:platform/callback` - OAuth callback
 - `DELETE /api/platforms/:platform` - Disconnect platform
 
-### Videos (Coming Soon)
-- `POST /api/videos/init` - Initialize upload
-- `POST /api/videos/confirm` - Confirm upload
-- `GET /api/videos` - List videos
-- `GET /api/videos/:id/status` - Get upload status
+### Videos & Dashboard
+- `POST /api/upload/init` - Initialize S3 upload (returns presigned URL)
+- `POST /api/upload/confirm` - Save metadata and queue platform jobs
+- `GET /api/videos` - List user videos with aggregated status
+- `GET /api/videos/:id/status` - Get platform-specific job details
+- `GET /api/videos/:id/analytics` - Get platform metrics (views, likes, comments)
 
 ---
 
@@ -216,6 +221,8 @@ npm run preview  # Preview production build
 
 ```bash
 go run cmd/server/main.go  # Run server
+go run cmd/worker/main.go  # Run background worker
+air                        # Hot reload (if installed)
 go test ./...              # Run tests
 ```
 

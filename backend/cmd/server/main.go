@@ -74,24 +74,34 @@ func main() {
 		})
 	})
 
-	// Initialize services
+	// Pre-flight check
+	fmt.Println("\n📋 Pre-flight Checks:")
+
 	storageService, err := services.NewStorageService()
 	if err != nil {
-		log.Printf("⚠️  Failed to initialize storage service: %v", err)
-		// Don't fatal, maybe working without S3 for now? prefer fatal if S3 is required.
-		// For now, let's log and maybe nil checking in handler or just fatal.
-		// log.Fatal(err) is better for critical service.
+		fmt.Printf("  ❌ S3 Storage: Failed (%v)\n", err)
+	} else {
+		fmt.Println("  ✅ S3 Storage: Initialized")
 	}
 
 	queueService, err := services.NewQueueService()
 	if err != nil {
-		log.Printf("⚠️  Failed to initialize queue service (Redis): %v", err)
+		fmt.Printf("  ❌ Redis Queue: Failed (%v)\n", err)
+	} else {
+		fmt.Println("  ✅ Redis Queue: Initialized")
+	}
+
+	if os.Getenv("YOUTUBE_CLIENT_ID") == "" {
+		fmt.Println("  ⚠️  YouTube API: Credentials missing")
+	} else {
+		fmt.Println("  ✅ YouTube API: Credentials found")
 	}
 
 	// Initialize handlers
 	authHandler := api.NewAuthHandler(db)
 	platformHandler := api.NewPlatformHandler(db)
 	uploadHandler := api.NewUploadHandler(storageService, queueService, db)
+	videosHandler := api.NewVideosHandler(db)
 
 	// API routes
 	apiRoutes := app.Group("/api")
@@ -118,6 +128,11 @@ func main() {
 	protected.Get("/platforms", platformHandler.ListPlatforms)
 	protected.Get("/platforms/:platform/connect", platformHandler.InitiateConnection)
 	protected.Delete("/platforms/:platform", platformHandler.DisconnectPlatform)
+
+	// Videos & Dashboard
+	protected.Get("/videos", videosHandler.ListVideos)
+	protected.Get("/videos/:id/status", videosHandler.GetVideoStatus)
+	protected.Get("/videos/:id/analytics", videosHandler.GetVideoAnalytics)
 
 	// Start server
 	port := os.Getenv("PORT")

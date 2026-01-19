@@ -48,6 +48,9 @@ func (h *UploadHandler) InitUpload(c *fiber.Ctx) error {
 	key := fmt.Sprintf("uploads/%d/%d_%s", userID, time.Now().Unix(), req.Filename)
 
 	// Generate presigned URL
+	if h.Storage == nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Storage service not initialized. Check AWS credentials.")
+	}
 	url, err := h.Storage.GeneratePresignedURL(key, req.ContentType)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to generate upload URL")

@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"strconv"
 
 	"example.com/creati/backend/internal/middleware"
 	"example.com/creati/backend/internal/services"
@@ -99,7 +100,7 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 	}
 
 	// Generate state token for security (should include userID)
-	state := string(userID) // Simplified - use secure state generation in production
+	state := strconv.Itoa(userID) // Simplified - use secure state generation in production
 
 	authURL := youtubeService.GetAuthURL(state)
 	return utils.SuccessResponse(c, map[string]string{

@@ -150,11 +150,42 @@ func (y *YouTubeService) GetStatus(platformVideoID string) (string, error) {
 
 // FetchAnalytics implements Platform interface
 func (y *YouTubeService) FetchAnalytics(platformVideoID string) (*Analytics, error) {
-	// TODO: Implement YouTube Analytics API integration
-	// For now, return placeholder
+	// Get any connected account's tokens (analytics is generally readonly)
+	// For production, ensure we use the specific user's token
+	var accessToken, refreshToken string
+	err := y.db.QueryRow(
+		"SELECT access_token, refresh_token FROM platform_accounts WHERE platform = 'youtube' LIMIT 1",
+	).Scan(&accessToken, &refreshToken)
+	if err != nil {
+		return nil, fmt.Errorf("no youtube account found: %w", err)
+	}
+
+	token := &oauth2.Token{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}
+
+	ctx := context.Background()
+	client := y.oauthConfig.Client(ctx, token)
+	service, err := youtube.NewService(ctx, option.WithHTTPClient(client))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create youtube service: %w", err)
+	}
+
+	call := service.Videos.List([]string{"statistics"}).Id(platformVideoID)
+	response, err := call.Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch youtube statistics: %w", err)
+	}
+
+	if len(response.Items) == 0 {
+		return nil, fmt.Errorf("video not found")
+	}
+
+	stats := response.Items[0].Statistics
 	return &Analytics{
-		Views:    0,
-		Likes:    0,
-		Comments: 0,
+		Views:    int64(stats.ViewCount),
+		Likes:    int64(stats.LikeCount),
+		Comments: int64(stats.CommentCount),
 	}, nil
 }

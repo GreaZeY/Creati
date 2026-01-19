@@ -41,15 +41,15 @@ type Video struct {
 
 // VideoPlatformJob model
 type VideoPlatformJob struct {
-	ID          int       `json:"id" db:"id"`
-	VideoID     int       `json:"video_id" db:"video_id"`
-	Platform    string    `json:"platform" db:"platform"`
-	Status      string    `json:"status" db:"status"`
-	PlatformID  string    `json:"platform_id,omitempty" db:"platform_id"` // Platform's video ID after upload
-	RetryCount  int       `json:"retry_count" db:"retry_count"`
-	ErrorMsg    string    `json:"error_msg,omitempty" db:"error_msg"`
-	CreatedAt   time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
+	ID         int       `json:"id" db:"id"`
+	VideoID    int       `json:"video_id" db:"video_id"`
+	Platform   string    `json:"platform" db:"platform"`
+	Status     string    `json:"status" db:"status"`
+	PlatformID string    `json:"platform_id,omitempty" db:"platform_id"` // Platform's video ID after upload
+	RetryCount int       `json:"retry_count" db:"retry_count"`
+	ErrorMsg   string    `json:"error_msg,omitempty" db:"error_msg"`
+	CreatedAt  time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // Job statuses
@@ -59,3 +59,16 @@ const (
 	JobStatusCompleted  = "completed"
 	JobStatusFailed     = "failed"
 )
+
+// VideoAnalytics model
+type VideoAnalytics struct {
+	ID               int       `json:"id" db:"id"`
+	VideoID          int       `json:"video_id" db:"video_id"`
+	Platform         string    `json:"platform" db:"platform"`
+	Views            int64     `json:"views" db:"views"`
+	Likes            int64     `json:"likes" db:"likes"`
+	Comments         int64     `json:"comments" db:"comments"`
+	Shares           int64     `json:"shares" db:"shares"`
+	WatchTimeMinutes int64     `json:"watchTimeMinutes" db:"watch_time_minutes"`
+	FetchedAt        time.Time `json:"fetchedAt" db:"fetched_at"`
+}
