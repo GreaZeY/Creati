@@ -27,46 +27,50 @@ export const VideoCard = ({ video }: VideoCardProps) => {
     });
 
     return (
-        <Card className="flex flex-col overflow-hidden group">
-            <div className="aspect-video bg-secondary/50 relative overflow-hidden">
-                {/* Thumbnail placeholder */}
-                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/20">
-                    <span className="text-4xl font-bold italic tracking-tighter opacity-10 uppercase">Creati</span>
+        <Card className="flex flex-col border-0 bg-card/40 backdrop-blur-xl group h-full relative overflow-hidden rounded-[2rem] ring-1 ring-white/10 hover:ring-primary/30 transition-all duration-500 shadow-xl hover:shadow-primary/5">
+            <div className="aspect-video bg-secondary/30 relative overflow-hidden">
+                {/* Thumbnail placeholder with a subtle gradient */}
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-cyan-500/5 flex items-center justify-center text-muted-foreground/10 group-hover:scale-105 transition-transform duration-700">
+                    <span className="text-5xl font-black italic tracking-tighter uppercase select-none">Creati</span>
                 </div>
-                <div className="absolute top-3 right-3">
+
+                <div className="absolute top-4 right-4 z-10">
                     <StatusBadge status={video.jobStatus} />
                 </div>
+
+                {/* Overlay glow on hover */}
+                <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             </div>
 
-            <div className="p-5 flex flex-col flex-1 gap-4">
-                <div className="space-y-1">
-                    <h3 className="font-semibold text-lg line-clamp-1 group-hover:text-primary transition-colors">
+            <div className="p-6 flex flex-col flex-1 gap-5 relative z-10">
+                <div className="space-y-2">
+                    <h3 className="font-black text-xl line-clamp-1 group-hover:text-primary transition-colors tracking-tight">
                         {video.title}
                     </h3>
-                    <p className="text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem]">
+                    <p className="text-sm text-muted-foreground/80 line-clamp-2 min-h-[2.5rem] font-medium leading-relaxed">
                         {video.description || 'No description provided.'}
                     </p>
                 </div>
 
-                <div className="flex items-center gap-4 text-xs text-muted-foreground mt-auto">
-                    <div className="flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mt-auto">
+                    <div className="flex items-center gap-2 px-3 py-1 bg-secondary/50 rounded-lg ring-1 ring-white/5">
+                        <Calendar className="w-3 h-3 text-primary" />
                         {date}
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                <div className="flex items-center gap-3 pt-4 border-t border-white/5">
                     <Button
                         variant="ghost"
                         size="sm"
-                        className="flex-1 h-9 gap-2"
+                        className="flex-1 h-11 gap-2 rounded-xl font-black transition-all hover:bg-primary/10 hover:text-primary text-xs"
                         onClick={() => setIsAnalyticsOpen(true)}
                         disabled={video.jobStatus !== 'completed'}
                     >
                         <BarChart2 className="w-4 h-4" />
                         Analytics
                     </Button>
-                    <Button variant="outline" size="sm" className="w-9 h-9 p-0" asChild>
+                    <Button variant="outline" size="sm" className="w-11 h-11 p-0 rounded-xl bg-secondary/30 border-white/5 hover:border-primary/30 transition-all" asChild>
                         <a href={video.s3URL} target="_blank" rel="noopener noreferrer">
                             <ExternalLink className="w-4 h-4" />
                         </a>

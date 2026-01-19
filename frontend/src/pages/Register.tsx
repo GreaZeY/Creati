@@ -1,15 +1,13 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { authAPI } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
-import { rotate360, slideInBottom } from '@/lib/animations';
-import { useUI } from '@/context/UIContext'; // Import context
+import { slideInBottom } from '@/lib/animations';
+import { useUI } from '@/context/UIContext';
 
 export const Register = () => {
     const [email, setEmail] = useState('');
@@ -18,11 +16,10 @@ export const Register = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const { register, login } = useAuth(); // Kept register for handleSubmit, added login as per instruction
+    const { register } = useAuth();
     const navigate = useNavigate();
-    const { setInputFocused } = useUI(); // Use context
+    const { setInputFocused } = useUI();
 
-    // Handlers for Bloom Effect
     const handleFocus = () => setInputFocused(true);
     const handleBlur = () => setInputFocused(false);
 
@@ -30,7 +27,6 @@ export const Register = () => {
         e.preventDefault();
         setError('');
 
-        // Validation
         if (password !== confirmPassword) {
             setError('Passwords do not match');
             return;
@@ -46,7 +42,7 @@ export const Register = () => {
         try {
             await register(email, password);
             navigate('/connect');
-        } catch (err) {
+        } catch (err: any) {
             setError(err instanceof Error ? err.message : 'Registration failed');
         } finally {
             setLoading(false);
@@ -54,7 +50,7 @@ export const Register = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="flex items-center justify-center p-4 min-h-[70vh]">
             <motion.div
                 className="w-full max-w-md"
                 variants={slideInBottom}
@@ -65,10 +61,10 @@ export const Register = () => {
                     <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary to-cyan-400 bg-clip-text text-transparent">
                         Get Started
                     </h1>
-                    <p className="text-gray-400">Create your account and start uploading</p>
+                    <p className="text-muted-foreground">Create your account and start uploading</p>
                 </div>
 
-                <div className="bg-dark-card p-8 rounded-xl border border-gray-800">
+                <div className="bg-card p-8 rounded-2xl border border-border shadow-2xl">
                     <form
                         onSubmit={handleSubmit}
                         className="space-y-6"
@@ -113,7 +109,7 @@ export const Register = () => {
 
                         {error && (
                             <motion.div
-                                className="p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-500 text-sm"
+                                className="p-3 bg-destructive/10 border border-destructive/50 rounded-lg text-destructive text-sm"
                                 initial={{ opacity: 0, y: -10 }}
                                 animate={{ opacity: 1, y: 0 }}
                             >
@@ -127,9 +123,9 @@ export const Register = () => {
                     </form>
 
                     <div className="mt-6 text-center">
-                        <p className="text-gray-400">
+                        <p className="text-muted-foreground">
                             Already have an account?{' '}
-                            <a href="/login" className="text-primary hover:underline">
+                            <a href="/login" className="text-primary hover:underline font-medium">
                                 Sign in
                             </a>
                         </p>

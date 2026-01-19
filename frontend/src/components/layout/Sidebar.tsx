@@ -15,7 +15,7 @@ const NAV_ITEMS = [
     { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
     { label: 'Upload', icon: UploadCloud, href: '/upload' },
     { label: 'Analytics', icon: BarChart2, href: '/analytics' },
-    { label: 'Platforms', icon: Link2, href: '/connect' },
+    { label: 'Platforms', icon: Link2, href: '/platforms' },
     { label: 'Settings', icon: Settings, href: '/settings' },
 ];
 
@@ -33,7 +33,7 @@ export function Sidebar() {
             {/* Nav */}
             <nav className="flex-1 px-3 space-y-1 py-4">
                 {NAV_ITEMS.map((item) => {
-                    const isActive = pathname === item.href;
+                    const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/'));
                     const Icon = item.icon;
 
                     return (
