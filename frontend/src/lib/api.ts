@@ -111,8 +111,8 @@ export const uploadAPI = {
     init: (data: { filename: string; contentType: string; size: number }) =>
         api.post<{ uploadUrl: string; key: string }>('/upload/init', data),
 
-    confirm: (key: string) =>
-        api.post('/upload/confirm', { key }),
+    confirm: (data: { key: string; title: string; description: string; platforms: string[] }) =>
+        api.post('/upload/confirm', data),
 };
 
 export const videosAPI = {

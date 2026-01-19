@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -25,7 +26,10 @@ func NewStorageService() (*StorageService, error) {
 	presignClient := s3.NewPresignClient(client)
 
 	// In a real app, load from env
-	bucket := "creati-uploads-dev"
+	bucket := os.Getenv("AWS_S3_BUCKET")
+	if bucket == "" {
+		bucket = "creati-uploads-dev"
+	}
 
 	return &StorageService{
 		Client:        client,

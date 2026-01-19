@@ -6,10 +6,15 @@ import { Button } from '@/components/ui/Button';
 import { uploadAPI } from '@/lib/api';
 import { AnimatePresence, motion } from 'framer-motion';
 import { UploadCloud, FileVideo, X, AlertCircle } from 'lucide-react';
+import { PLATFORMS } from '@/lib/constants';
+import { cn } from '@/lib/utils';
 import axios from 'axios';
 
 export const Upload = () => {
     const [file, setFile] = useState<File | null>(null);
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['youtube']);
     const [uploading, setUploading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -54,12 +59,19 @@ export const Upload = () => {
                 },
             });
 
-            // 3. Confirm (Optional)
-            // await uploadAPI.confirm(data.key);
+            // 3. Confirm with metadata
+            await uploadAPI.confirm({
+                key: data.key,
+                title: title || file.name,
+                description: description,
+                platforms: selectedPlatforms
+            });
 
             setSuccess(true);
             setTimeout(() => {
                 setFile(null);
+                setTitle('');
+                setDescription('');
                 setSuccess(false);
             }, 3000);
 
@@ -140,6 +152,67 @@ export const Upload = () => {
                                             <X className="w-5 h-5" />
                                         </Button>
                                     )}
+                                </div>
+
+                                {/* Metadata Form */}
+                                <div className="space-y-6 mb-8">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Video Title</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Enter video title"
+                                            value={title}
+                                            onChange={(e) => setTitle(e.target.value)}
+                                            disabled={uploading || success}
+                                            className="w-full px-4 py-2 rounded-lg bg-secondary border border-border focus:border-primary outline-none transition-all"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Description</label>
+                                        <textarea
+                                            placeholder="Enter video description"
+                                            value={description}
+                                            onChange={(e) => setDescription(e.target.value)}
+                                            disabled={uploading || success}
+                                            rows={4}
+                                            className="w-full px-4 py-2 rounded-lg bg-secondary border border-border focus:border-primary outline-none transition-all resize-none"
+                                        />
+                                    </div>
+
+                                    {/* Platform Selection */}
+                                    <div className="space-y-3">
+                                        <label className="text-sm font-medium">Publish to Platforms</label>
+                                        <div className="flex gap-4">
+                                            {Object.values(PLATFORMS).map((p) => {
+                                                const isSelected = selectedPlatforms.includes(p.id);
+                                                return (
+                                                    <button
+                                                        key={p.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (isSelected) {
+                                                                setSelectedPlatforms(selectedPlatforms.filter(id => id !== p.id));
+                                                            } else {
+                                                                setSelectedPlatforms([...selectedPlatforms, p.id]);
+                                                            }
+                                                        }}
+                                                        disabled={uploading || success || !p.enabled}
+                                                        className={cn(
+                                                            "flex items-center gap-2 px-4 py-2 rounded-lg border transition-all",
+                                                            isSelected
+                                                                ? "bg-primary/10 border-primary text-primary"
+                                                                : "bg-secondary border-transparent text-muted-foreground opacity-50 grayscale",
+                                                            p.enabled && !isSelected && "hover:border-border grayscale-0 opacity-100",
+                                                            !p.enabled && "cursor-not-allowed"
+                                                        )}
+                                                    >
+                                                        <div className={cn("w-2 h-2 rounded-full", isSelected ? "bg-primary" : "bg-muted-foreground")} />
+                                                        {p.name}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {error && (

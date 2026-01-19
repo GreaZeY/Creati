@@ -11,10 +11,9 @@ import { staggerContainer, staggerItem } from '@/lib/animations';
 import { triggerConfetti } from '@/lib/confetti';
 import { PLATFORMS } from '@/lib/constants';
 
-interface PlatformStatus {
-    id: string;
-    name: string;
-    status: 'connected' | 'disconnected';
+interface PlatformData {
+    connected: boolean;
+    profileName?: string;
 }
 
 export const ConnectPlatforms = () => {
@@ -45,7 +44,7 @@ export const ConnectPlatforms = () => {
         queryKey: ['platforms'],
         queryFn: async () => {
             const response = await platformsAPI.list();
-            return response.data as Record<string, boolean>;
+            return response.data as Record<string, PlatformData>;
         },
     });
 
@@ -53,17 +52,29 @@ export const ConnectPlatforms = () => {
     const connectMutation = useMutation({
         mutationFn: async (platformId: string) => {
             const response = await platformsAPI.connect(platformId);
-            return response.data.data.authUrl;
+            return response.data.authUrl;
         },
         onSuccess: (authUrl: string) => {
             // Redirect to OAuth page
             if (authUrl) window.location.assign(authUrl);
         },
-        onError: (error: Error) => {
+        onError: () => {
             // Toast handled by global event bus now
-            // alert('Connection failed: ' + error.message);
             setConnectingPlatform(null);
         },
+    });
+
+    // Disconnect mutation
+    const disconnectMutation = useMutation({
+        mutationFn: async (platformId: string) => {
+            await platformsAPI.disconnect(platformId);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['platforms'] });
+        },
+        onError: () => {
+            // Toast handled globally
+        }
     });
 
     const handleConnect = (platformId: string) => {
@@ -71,6 +82,18 @@ export const ConnectPlatforms = () => {
         connectMutation.mutate(platformId);
     };
 
+    const handleDisconnect = (platformId: string) => {
+        if (confirm('Are you sure you want to disconnect?')) {
+            disconnectMutation.mutate(platformId);
+        }
+    };
+
+    const handleContinue = () => {
+        const hasConnected = Object.values(platformStats).some((s) => s.connected);
+        if (hasConnected) {
+            navigate('/dashboard');
+        }
+    };
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
@@ -98,8 +121,10 @@ export const ConnectPlatforms = () => {
                     animate="visible"
                 >
                     {Object.values(PLATFORMS).map((platform) => {
-                        const isConnected = platformStats[platform.id] || false;
+                        const stats = platformStats[platform.id] || { connected: false, profileName: '' };
+                        const isConnected = stats.connected;
                         const isConnecting = connectingPlatform === platform.id;
+                        const profileName = stats.profileName || 'Connected';
 
                         const Icon =
                             platform.id === 'youtube' ? Youtube :
@@ -126,16 +151,26 @@ export const ConnectPlatforms = () => {
                                         </div>
                                         <h3 className="text-xl font-semibold mb-1">{platform.name}</h3>
                                         <span className="text-sm text-muted-foreground">
-                                            {isConnected ? 'Connected' : platform.enabled ? 'Not connected' : 'Coming soon'}
+                                            {isConnected ? profileName : platform.enabled ? 'Not connected' : 'Coming soon'}
                                         </span>
                                     </div>
 
                                     {/* Actions */}
                                     <div className="mt-auto">
                                         {isConnected ? (
-                                            <div className="flex items-center justify-center gap-2 text-primary bg-primary/5 py-2 rounded-lg text-sm font-medium">
-                                                <div className="w-2 h-2 rounded-full bg-primary" />
-                                                Active
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex items-center justify-center gap-2 text-primary bg-primary/5 py-2 rounded-lg text-sm font-medium">
+                                                    <div className="w-2 h-2 rounded-full bg-primary" />
+                                                    Active
+                                                </div>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive border-transparent"
+                                                    onClick={() => handleDisconnect(platform.id)}
+                                                >
+                                                    Disconnect
+                                                </Button>
                                             </div>
                                         ) : (
                                             <Button
@@ -155,6 +190,29 @@ export const ConnectPlatforms = () => {
                 </motion.div>
             )}
 
+            {/* Continue Button */}
+            {Object.values(platformStats).some((s) => s.connected) && (
+                <motion.div
+                    className="mt-12"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                >
+                    <Button size="lg" onClick={handleContinue}>
+                        Continue to Dashboard →
+                    </Button>
+                </motion.div>
+            )}
+
+            {/* Skip Option */}
+            <div className="mt-6 text-center">
+                <button
+                    onClick={() => navigate('/dashboard')}
+                    className="text-gray-400 hover:text-primary transition-colors"
+                >
+                    Skip for now
+                </button>
+            </div>
         </div>
     );
 };

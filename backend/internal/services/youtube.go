@@ -55,15 +55,34 @@ func (y *YouTubeService) Authenticate(code string, userID int) error {
 		return fmt.Errorf("oauth exchange failed: %w", err)
 	}
 
-	// Store tokens in database (encrypted)
-	// TODO: Add encryption before storing
+	// Create service to fetch channel details
+	ctx := context.Background()
+	client := y.oauthConfig.Client(ctx, token)
+	service, err := youtube.NewService(ctx, option.WithHTTPClient(client))
+	if err != nil {
+		return fmt.Errorf("failed to create youtube client: %w", err)
+	}
+
+	// Get channel info (mine=true)
+	call := service.Channels.List([]string{"snippet"}).Mine(true)
+	conn, err := call.Do()
+	if err != nil {
+		return fmt.Errorf("failed to fetch channel info: %w", err)
+	}
+
+	channelName := "Unknown Channel"
+	if len(conn.Items) > 0 {
+		channelName = conn.Items[0].Snippet.Title
+	}
+
+	// Store tokens in database using 'connected' status to match list logic
 	query := `
-		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, status)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, status, profile_name)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (user_id, platform) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, connected_at = NOW()
+		DO UPDATE SET access_token = $3, refresh_token = $4, status = $5, profile_name = $6, connected_at = NOW()
 	`
-	_, err = y.db.Exec(query, userID, "youtube", token.AccessToken, token.RefreshToken, "active")
+	_, err = y.db.Exec(query, userID, "youtube", token.AccessToken, token.RefreshToken, "connected", channelName)
 	return err
 }
 

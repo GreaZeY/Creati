@@ -30,31 +30,50 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 
 	// Get connected platforms for user
 	rows, err := h.db.Query(`
-		SELECT platform, status FROM platform_accounts WHERE user_id = $1
+		SELECT platform, status, COALESCE(profile_name, '') as profile_name FROM platform_accounts WHERE user_id = $1
 	`, userID)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
 	}
 	defer rows.Close()
 
-	connected := make(map[string]string)
+	type PlatformInfo struct {
+		Status      string
+		ProfileName string
+	}
+	connected := make(map[string]PlatformInfo)
+
 	for rows.Next() {
-		var platform, status string
-		if err := rows.Scan(&platform, &status); err != nil {
+		var platform, status, profileName string
+		if err := rows.Scan(&platform, &status, &profileName); err != nil {
 			continue
 		}
-		connected[platform] = status
+		connected[platform] = PlatformInfo{Status: status, ProfileName: profileName}
 	}
 
 	// Build response with all supported platforms
 	// Build response: keys = platform ID, value = is connected
-	platforms := make(map[string]bool)
+	// Build response
+	type PlatformData struct {
+		Connected   bool   `json:"connected"`
+		ProfileName string `json:"profileName,omitempty"`
+	}
+	platforms := make(map[string]PlatformData)
+
 	for _, platform := range services.GetSupportedPlatforms() {
-		status, ok := connected[platform]
-		if ok && status == "connected" {
-			platforms[platform] = true
-		} else {
-			platforms[platform] = false
+		info, ok := connected[platform]
+
+		isConnected := false
+		profileName := ""
+
+		if ok && (info.Status == "connected" || info.Status == "active") {
+			isConnected = true
+			profileName = info.ProfileName
+		}
+
+		platforms[platform] = PlatformData{
+			Connected:   isConnected,
+			ProfileName: profileName,
 		}
 	}
 

@@ -83,10 +83,15 @@ func main() {
 		// log.Fatal(err) is better for critical service.
 	}
 
+	queueService, err := services.NewQueueService()
+	if err != nil {
+		log.Printf("⚠️  Failed to initialize queue service (Redis): %v", err)
+	}
+
 	// Initialize handlers
 	authHandler := api.NewAuthHandler(db)
 	platformHandler := api.NewPlatformHandler(db)
-	uploadHandler := api.NewUploadHandler(storageService, db)
+	uploadHandler := api.NewUploadHandler(storageService, queueService, db)
 
 	// API routes
 	apiRoutes := app.Group("/api")
@@ -107,6 +112,7 @@ func main() {
 
 	// Uploads
 	protected.Post("/upload/init", uploadHandler.InitUpload)
+	protected.Post("/upload/confirm", uploadHandler.ConfirmUpload)
 
 	// Platforms
 	protected.Get("/platforms", platformHandler.ListPlatforms)
@@ -125,8 +131,7 @@ func main() {
 	fmt.Println("Frontend: " + frontendURL)
 	fmt.Println("API: http://localhost:" + port)
 	fmt.Println("Health: http://localhost:" + port + "/health")
-	fmt.Println("========================================\n")
-
+	fmt.Println("========================================")
 	log.Fatal(app.Listen(":" + port))
 }
 
