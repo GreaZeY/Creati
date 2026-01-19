@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { platformsAPI } from '@/lib/api';
-import { ArrowLeft, CheckCheck, Link as LinkIcon, Sparkles } from 'lucide-react';
+import { ArrowLeft, CheckCheck, Link as LinkIcon, Network, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -47,8 +47,14 @@ export const ConnectPlatforms = () => {
                         </Link>
                     </Button>
                     <div>
-                        <h1 className="text-4xl font-black tracking-tight bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent">Expand Your Network</h1>
-                        <p className="text-muted-foreground mt-2 text-lg font-medium">Choose a platform to link your account and start distributing.</p>
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                                <Network size={18} />
+                            </span>
+                            <span className="text-xs font-black uppercase tracking-[0.3em] text-primary">Ecosystem Expansion</span>
+                        </div>
+                        <h1 className="text-4xl font-black tracking-tight bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent italic">Global Node Connection</h1>
+                        <p className="text-muted-foreground mt-2 text-lg font-medium opacity-80">Link new delivery nodes to broadcast your message across the digital fabric.</p>
                     </div>
                 </div>
             </div>
@@ -76,7 +82,7 @@ export const ConnectPlatforms = () => {
             </AnimatePresence>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-                {Object.values(PLATFORMS).map((platform, i) => {
+                {Object.values(PLATFORMS).map((platform: any, i: number) => {
                     const status = getPlatformStatus(platform.id);
                     const isConnected = status?.connected;
                     const isSyncing = connectMutation.isPending && connectMutation.variables === platform.id;
@@ -129,9 +135,9 @@ export const ConnectPlatforms = () => {
                                             </Button>
 
                                             {!isConnected && platform.enabled && (
-                                                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 font-black uppercase tracking-[0.2em]">
-                                                    <Sparkles size={14} className="text-primary animate-pulse" />
-                                                    Instant
+                                                <div className="flex items-center gap-1.5 text-[10px] text-primary/60 font-black uppercase tracking-[0.2em]">
+                                                    <Zap size={14} className="text-primary fill-primary" />
+                                                    One-Tap
                                                 </div>
                                             )}
                                         </div>

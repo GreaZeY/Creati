@@ -104,6 +104,9 @@ export const platformsAPI = {
         api.get(`/platforms/${platform}/connect`),
 
     disconnect: (platform: string) =>
+        api.put(`/platforms/${platform}/disconnect`),
+
+    remove: (platform: string) =>
         api.delete(`/platforms/${platform}`),
 };
 

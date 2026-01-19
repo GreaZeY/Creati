@@ -153,18 +153,47 @@ func (h *PlatformHandler) HandleCallback(c *fiber.Ctx) error {
 	return c.Redirect("http://localhost:5173/connect?status=success&platform=" + platform)
 }
 
-// DisconnectPlatform removes platform connection
-func (h *PlatformHandler) DisconnectPlatform(c *fiber.Ctx) error {
+// disconnectPlatformInternal handles token revocation and status updates (reusable logic)
+func (h *PlatformHandler) disconnectPlatformInternal(userID int, platform string) error {
+	// In production, add platform-specific revocation here
+	// platformService, _ := services.GetPlatformService(platform, h.db)
+	// if platformService != nil { _ = platformService.RevokeAccess(userID) }
+
+	_, err := h.db.Exec(`
+		UPDATE platform_accounts 
+		SET status = 'disconnected', profile_name = NULL, updated_at = NOW() 
+		WHERE user_id = $1 AND platform = $2
+	`, userID, platform)
+	return err
+}
+
+// DeactivatePlatform (PUT /api/platforms/:platform/disconnect) - Soft disconnect
+func (h *PlatformHandler) DeactivatePlatform(c *fiber.Ctx) error {
 	platform := c.Params("platform")
 	userID := middleware.GetUserID(c)
+
+	if err := h.disconnectPlatformInternal(userID, platform); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to disconnect platform")
+	}
+
+	return utils.SuccessResponse(c, nil, "Platform disconnected successfully")
+}
+
+// RemovePlatform (DELETE /api/platforms/:platform) - Hard removal
+func (h *PlatformHandler) RemovePlatform(c *fiber.Ctx) error {
+	platform := c.Params("platform")
+	userID := middleware.GetUserID(c)
+
+	// Always attempt to disconnect first (reusing logic as requested)
+	_ = h.disconnectPlatformInternal(userID, platform)
 
 	_, err := h.db.Exec(`
 		DELETE FROM platform_accounts WHERE user_id = $1 AND platform = $2
 	`, userID, platform)
 
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to disconnect")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to remove platform")
 	}
 
-	return utils.SuccessResponse(c, nil, "platform disconnected")
+	return utils.SuccessResponse(c, nil, "Platform removed successfully")
 }

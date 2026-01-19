@@ -38,7 +38,8 @@ func NewQueueService() (*QueueService, error) {
 
 	// Test connection
 	if err := client.Ping(context.Background()).Err(); err != nil {
-		return nil, fmt.Errorf("failed to connect to redis: %w", err)
+		fmt.Printf("  ⚠️  Redis Queue: Connection failed (%v). Continuing in limited mode.\n", err)
+		// Return client anyway, subsequent operations should handle errors
 	}
 
 	return &QueueService{

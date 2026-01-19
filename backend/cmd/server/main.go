@@ -127,7 +127,8 @@ func main() {
 	// Platforms
 	protected.Get("/platforms", platformHandler.ListPlatforms)
 	protected.Get("/platforms/:platform/connect", platformHandler.InitiateConnection)
-	protected.Delete("/platforms/:platform", platformHandler.DisconnectPlatform)
+	protected.Put("/platforms/:platform/disconnect", platformHandler.DeactivatePlatform)
+	protected.Delete("/platforms/:platform", platformHandler.RemovePlatform)
 
 	// Videos & Dashboard
 	protected.Get("/videos", videosHandler.ListVideos)
