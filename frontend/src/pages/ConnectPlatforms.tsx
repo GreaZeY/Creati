@@ -1,25 +1,30 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { platformsAPI } from '@/lib/api';
-import { Youtube, Instagram, Facebook, Linkedin, Twitter, ArrowLeft, CheckCheck, Link as LinkIcon, Sparkles } from 'lucide-react';
+import { ArrowLeft, CheckCheck, Link as LinkIcon, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { PLATFORMS } from '@/lib/constants';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useSearchParams } from 'react-router-dom';
+import { PlatformLogo } from '@/components/platforms/PlatformLogo';
 
 export const ConnectPlatforms = () => {
     const [searchParams] = useSearchParams();
     const status = searchParams.get('status');
     const platformParam = searchParams.get('platform');
 
-    const { data: platformStats = {} as Record<string, any> } = useQuery({
+    const { data: platformStats = [] as any[] } = useQuery({
         queryKey: ['platforms'],
         queryFn: async () => {
             const response = await platformsAPI.list();
-            return response.data;
+            return response.data as any[];
         },
     });
+
+    const getPlatformStatus = (id: string) => {
+        return platformStats.find((p: any) => p.id === id);
+    };
 
     const connectMutation = useMutation({
         mutationFn: async (platformId: string) => {
@@ -31,15 +36,6 @@ export const ConnectPlatforms = () => {
         },
     });
 
-    const getIcon = (id: string) => {
-        switch (id) {
-            case 'youtube': return Youtube;
-            case 'instagram': return Instagram;
-            case 'facebook': return Facebook;
-            case 'linkedin': return Linkedin;
-            default: return Twitter;
-        }
-    };
 
     return (
         <div className="max-w-5xl space-y-8 pb-10">
@@ -81,8 +77,8 @@ export const ConnectPlatforms = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
                 {Object.values(PLATFORMS).map((platform, i) => {
-                    const Icon = getIcon(platform.id);
-                    const isConnected = platformStats[platform.id]?.connected;
+                    const status = getPlatformStatus(platform.id);
+                    const isConnected = status?.connected;
                     const isSyncing = connectMutation.isPending && connectMutation.variables === platform.id;
 
                     return (
@@ -110,7 +106,7 @@ export const ConnectPlatforms = () => {
                                         "w-20 h-20 rounded-[1.5rem] flex items-center justify-center transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 shadow-2xl",
                                         isConnected ? "bg-emerald-500/10 text-emerald-500 shadow-emerald-500/10" : "bg-white/5 text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary group-hover:shadow-primary/20"
                                     )}>
-                                        <Icon size={40} />
+                                        <PlatformLogo platform={platform.id} size={40} />
                                     </div>
 
                                     <div className="flex-1 space-y-2">

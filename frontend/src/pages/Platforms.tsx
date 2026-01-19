@@ -1,14 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { platformsAPI } from '@/lib/api';
-import { Youtube, Instagram, Facebook, Linkedin, Twitter, Plus, Link2, Trash2, ArrowUpRight, Signal } from 'lucide-react';
+import { Plus, Link2, Trash2, ArrowUpRight, Signal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { PlatformLogo } from '@/components/platforms/PlatformLogo';
 
 interface PlatformData {
+    id: string;
+    name: string;
+    platform: string;
     connected: boolean;
     profileName?: string;
 }
@@ -44,11 +48,11 @@ const PLATFORM_THEMES: Record<string, { gradient: string; color: string; bg: str
 export const Platforms = () => {
     const queryClient = useQueryClient();
 
-    const { data: platformStats = {}, isLoading } = useQuery({
+    const { data: platformStats = [], isLoading } = useQuery({
         queryKey: ['platforms'],
         queryFn: async () => {
             const response = await platformsAPI.list();
-            return response.data as Record<string, PlatformData>;
+            return response.data as PlatformData[];
         },
     });
 
@@ -61,22 +65,7 @@ export const Platforms = () => {
         },
     });
 
-    const connectedPlatforms = Object.entries(platformStats)
-        .filter(([_, stats]) => stats.connected)
-        .map(([id, stats]) => ({
-            id,
-            ...stats,
-        }));
-
-    const getIcon = (id: string) => {
-        switch (id) {
-            case 'youtube': return Youtube;
-            case 'instagram': return Instagram;
-            case 'facebook': return Facebook;
-            case 'linkedin': return Linkedin;
-            default: return Twitter;
-        }
-    };
+    const connectedPlatforms = platformStats.filter(p => p.connected);
 
     return (
         <div className="space-y-8">
@@ -103,7 +92,6 @@ export const Platforms = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     <AnimatePresence mode="popLayout">
                         {connectedPlatforms.map((platform, i) => {
-                            const Icon = getIcon(platform.id);
                             const theme = PLATFORM_THEMES[platform.id] || { gradient: 'from-primary to-primary/80', color: 'text-white', bg: 'bg-primary' };
 
                             return (
@@ -135,11 +123,11 @@ export const Platforms = () => {
                                         <div className="p-8 flex flex-col flex-1 relative z-10">
                                             <div className="flex items-start justify-between mb-8">
                                                 <div className={cn(
-                                                    "p-4 rounded-2xl shadow-2xl transition-all duration-500 group-hover:scale-110 group-hover:rotate-3",
+                                                    "p-4 rounded-2xl shadow-2xl transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 flex items-center justify-center",
                                                     theme.bg,
                                                     theme.color
                                                 )}>
-                                                    <Icon size={28} />
+                                                    <PlatformLogo platform={platform.id} size={28} />
                                                 </div>
 
                                                 <div className="flex flex-col items-end gap-3">
@@ -219,7 +207,7 @@ export const Platforms = () => {
                     </Button>
                 </Card>
             )}
-        </div>
+        </div >
     );
 };
 

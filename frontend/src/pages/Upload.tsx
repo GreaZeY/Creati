@@ -8,6 +8,7 @@ import { UploadCloud, FileVideo, X, Sparkles } from 'lucide-react';
 import { PLATFORMS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
+import { PlatformLogo } from '@/components/platforms/PlatformLogo';
 
 export const Upload = () => {
     const [file, setFile] = useState<File | null>(null);
@@ -184,6 +185,7 @@ export const Upload = () => {
                                                             !p.enabled && "opacity-20 cursor-not-allowed grayscale scale-100 ring-transparent"
                                                         )}
                                                     >
+                                                        <PlatformLogo platform={p.id} size={18} className={cn("transition-colors", isSelected ? "text-white" : "text-muted-foreground/60")} />
                                                         {p.name}
                                                     </button>
                                                 );

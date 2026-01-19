@@ -1,16 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
-import { videosAPI } from '@/lib/api';
+import { videosAPI, platformsAPI } from '@/lib/api';
 import { VideoCard, VideoCardSkeleton } from '@/components/dashboard/VideoCard';
 import { PlusCircle, UploadCloud, Link2, LayoutDashboard, ArrowRight, Zap, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/Card';
 import { motion } from 'framer-motion';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { PlatformLogo } from '@/components/platforms/PlatformLogo';
 
 export const Dashboard = () => {
     const navigate = useNavigate();
 
-    const { data, isLoading } = useQuery({
+    const { data: videos = [], isLoading: videosLoading } = useQuery({
         queryKey: ['videos'],
         queryFn: async () => {
             const resp = await videosAPI.list();
@@ -25,7 +27,16 @@ export const Dashboard = () => {
         }
     });
 
-    const videos = data || [];
+    const { data: platforms = [], isLoading: platformsLoading } = useQuery({
+        queryKey: ['platforms'],
+        queryFn: async () => {
+            const resp = await platformsAPI.list();
+            return resp.data as any[];
+        }
+    });
+
+    const isLoading = videosLoading || platformsLoading;
+    const connectedPlatforms = Array.isArray(platforms) ? platforms.filter((p: any) => p.connected) : [];
 
     return (
         <div className="space-y-10">
@@ -76,9 +87,26 @@ export const Dashboard = () => {
                                     <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Network Status</p>
                                 </div>
                             </div>
-                            <p className="text-muted-foreground leading-relaxed font-medium">
-                                Connect YouTube, TikTok, and Instagram to automate your reach.
-                            </p>
+
+                            {isLoading ? (
+                                <div className="space-y-3">
+                                    <Skeleton className="h-4 w-full rounded-md opacity-20" />
+                                    <Skeleton className="h-4 w-2/3 rounded-md opacity-20" />
+                                </div>
+                            ) : connectedPlatforms.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {connectedPlatforms.map((p: any) => (
+                                        <div key={p.id} className="p-2 rounded-xl bg-secondary/30 ring-1 ring-white/5 flex items-center gap-2 group/icon hover:bg-primary/10 transition-colors">
+                                            <PlatformLogo platform={p.id} size={16} className="text-primary" />
+                                            <span className="text-[10px] font-black uppercase tracking-widest opacity-60 group-hover/icon:opacity-100">{p.id}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-muted-foreground leading-relaxed font-medium">
+                                    Connect YouTube, TikTok, and Instagram to automate your reach.
+                                </p>
+                            )}
                         </div>
 
                         <div className="relative z-10 pt-6">

@@ -56,10 +56,13 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 	// Build response: keys = platform ID, value = is connected
 	// Build response
 	type PlatformData struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Platform    string `json:"platform"`
 		Connected   bool   `json:"connected"`
 		ProfileName string `json:"profileName,omitempty"`
 	}
-	platforms := make(map[string]PlatformData)
+	platforms := make([]PlatformData, 0)
 
 	for _, platform := range services.GetSupportedPlatforms() {
 		info, ok := connected[platform]
@@ -72,13 +75,25 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 			profileName = info.ProfileName
 		}
 
-		platforms[platform] = PlatformData{
+		// Capitalize first letter for name
+		name := platform
+		if len(name) > 0 {
+			name = string(name[0]-32) + name[1:]
+		}
+		if platform == "youtube" {
+			name = "YouTube"
+		}
+
+		platforms = append(platforms, PlatformData{
+			ID:          platform,
+			Name:        name,
+			Platform:    platform,
 			Connected:   isConnected,
 			ProfileName: profileName,
-		}
+		})
 	}
 
-	return utils.SuccessResponse(c, platforms, "")
+	return c.JSON(platforms)
 }
 
 // InitiateConnection returns OAuth URL for platform connection
