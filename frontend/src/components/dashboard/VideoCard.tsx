@@ -5,6 +5,7 @@ import { Calendar, ExternalLink, BarChart2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { VideoAnalytics } from './VideoAnalytics';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 interface VideoCardProps {
     video: {
@@ -86,6 +87,30 @@ export const VideoCard = ({ video }: VideoCardProps) => {
             >
                 <VideoAnalytics videoId={video.id} />
             </Modal>
+        </Card>
+    );
+};
+
+export const VideoCardSkeleton = () => {
+    return (
+        <Card className="flex flex-col border-0 bg-card/40 backdrop-blur-xl h-full relative overflow-hidden rounded-[2rem] ring-1 ring-white/10 shadow-xl">
+            <Skeleton className="aspect-video rounded-none bg-secondary/30" />
+            <div className="p-6 flex flex-col flex-1 gap-5">
+                <div className="space-y-3">
+                    <Skeleton className="h-7 w-3/4 rounded-lg" />
+                    <div className="space-y-2">
+                        <Skeleton className="h-4 w-full rounded-md" />
+                        <Skeleton className="h-4 w-5/6 rounded-md" />
+                    </div>
+                </div>
+                <div className="mt-auto">
+                    <Skeleton className="h-6 w-24 rounded-lg" />
+                </div>
+                <div className="flex items-center gap-3 pt-4 border-t border-white/5">
+                    <Skeleton className="flex-1 h-11 rounded-xl" />
+                    <Skeleton className="w-11 h-11 rounded-xl" />
+                </div>
+            </div>
         </Card>
     );
 };

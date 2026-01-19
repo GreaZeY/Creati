@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { videosAPI } from '@/lib/api';
-import { VideoCard } from '@/components/dashboard/VideoCard';
+import { VideoCard, VideoCardSkeleton } from '@/components/dashboard/VideoCard';
 import { PlusCircle, UploadCloud, Link2, LayoutDashboard, ArrowRight, Zap, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
@@ -49,9 +49,9 @@ export const Dashboard = () => {
                         <Link to="/upload" className="flex items-center gap-4 relative z-10">
                             <PlusCircle className="w-6 h-6 transition-transform group-hover:rotate-90 duration-500 text-white" />
                             <span className="font-black text-lg text-white">New Distribution</span>
+                            {/* Animated Glow Effect - Moved inside Link */}
+                            <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl" />
                         </Link>
-                        {/* Animated Glow Effect */}
-                        <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl" />
                     </Button>
                 </motion.div>
             </header>
@@ -189,7 +189,7 @@ export const Dashboard = () => {
                 {isLoading ? (
                     <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
                         {[1, 2, 3].map(i => (
-                            <div key={i} className="h-[400px] rounded-[2.5rem] bg-secondary/20 animate-pulse border border-white/5 shadow-2xl" />
+                            <VideoCardSkeleton key={i} />
                         ))}
                     </div>
                 ) : videos.length > 0 ? (

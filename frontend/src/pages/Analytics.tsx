@@ -2,6 +2,7 @@ import { Card } from '@/components/ui/Card';
 import { BarChart2, TrendingUp, Users, Play, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 interface StatItem {
     label: string;
@@ -100,5 +101,20 @@ export const Analytics = () => {
                 </Card>
             </motion.div>
         </div>
+    );
+};
+
+const StatCardSkeleton = () => {
+    return (
+        <Card className="p-8 border-0 bg-card/40 backdrop-blur-xl group relative overflow-hidden rounded-[2.5rem] ring-1 ring-white/10 shadow-2xl h-full flex flex-col justify-between">
+            <div className="relative z-10 flex items-center justify-between">
+                <Skeleton className="w-14 h-14 rounded-2xl" />
+                <Skeleton className="w-16 h-6 rounded-full shadow-inner" />
+            </div>
+            <div className="mt-8 relative z-10">
+                <Skeleton className="w-32 h-10 rounded-lg mb-2" />
+                <Skeleton className="w-24 h-4 rounded-md opacity-40" />
+            </div>
+        </Card>
     );
 };

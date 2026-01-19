@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { Skeleton } from '@/components/ui/Skeleton';
 
 interface PlatformData {
     connected: boolean;
@@ -95,7 +96,7 @@ export const Platforms = () => {
             {isLoading ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {[1, 2, 3].map(i => (
-                        <div key={i} className="h-64 rounded-[2rem] bg-secondary/20 animate-pulse border border-border/30" />
+                        <PlatformSkeleton key={i} />
                     ))}
                 </div>
             ) : connectedPlatforms.length > 0 ? (
@@ -219,5 +220,31 @@ export const Platforms = () => {
                 </Card>
             )}
         </div>
+    );
+};
+
+const PlatformSkeleton = () => {
+    return (
+        <Card className="p-0 border-0 bg-card/40 backdrop-blur-xl overflow-hidden h-full flex flex-col relative shadow-2xl rounded-[2rem] ring-1 ring-white/10">
+            <div className="h-1.5 w-full bg-secondary/50" />
+            <div className="p-8 flex flex-col flex-1">
+                <div className="flex items-start justify-between mb-8">
+                    <Skeleton className="w-14 h-14 rounded-2xl" />
+                    <Skeleton className="w-24 h-7 rounded-full" />
+                </div>
+                <div className="space-y-4 mt-auto">
+                    <div className="flex items-center gap-3">
+                        <Skeleton className="w-12 h-2.5 rounded-md opacity-40" />
+                        <div className="flex-1 h-[1px] bg-white/5" />
+                    </div>
+                    <Skeleton className="w-3/4 h-8 rounded-lg" />
+                    <Skeleton className="w-28 h-6 rounded-lg opacity-60" />
+                </div>
+                <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
+                    <Skeleton className="w-24 h-4 rounded-md" />
+                    <Skeleton className="w-16 h-4 rounded-md" />
+                </div>
+            </div>
+        </Card>
     );
 };
