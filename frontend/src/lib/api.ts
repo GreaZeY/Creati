@@ -129,3 +129,8 @@ export const videosAPI = {
         api.get(`/videos/${videoId}/analytics`),
 };
 
+export const analyticsAPI = {
+    getOverview: () =>
+        api.get('/analytics/overview'),
+};
+

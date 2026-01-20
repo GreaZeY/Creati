@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { videosAPI, platformsAPI } from '@/lib/api';
+import { videosAPI, platformsAPI, analyticsAPI } from '@/lib/api';
 import { VideoCard, VideoCardSkeleton } from '@/components/dashboard/VideoCard';
 import { PlusCircle, UploadCloud, Link2, LayoutDashboard, ArrowRight, Zap, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -32,6 +32,14 @@ export const Dashboard = () => {
         queryFn: async () => {
             const resp = await platformsAPI.list();
             return resp.data as any[];
+        }
+    });
+
+    const { data: analytics, isLoading: analyticsLoading } = useQuery({
+        queryKey: ['analytics-overview'],
+        queryFn: async () => {
+            const res = await analyticsAPI.getOverview();
+            return res.data;
         }
     });
 
@@ -142,12 +150,22 @@ export const Dashboard = () => {
                                 </div>
                             </div>
 
-                            <div className="flex items-baseline gap-2">
-                                <span className="text-5xl font-black text-foreground">2.4k</span>
-                                <span className="text-[10px] font-black text-emerald-400 flex items-center gap-1 bg-emerald-400/10 px-3 py-1 rounded-full uppercase tracking-tighter shadow-sm ring-1 ring-emerald-400/20">
-                                    <Zap size={12} className="fill-emerald-400" /> +12%
-                                </span>
-                            </div>
+                            {analyticsLoading ? (
+                                <div className="space-y-3">
+                                    <Skeleton className="h-12 w-2/3 rounded-xl opacity-20" />
+                                    <Skeleton className="h-6 w-1/3 rounded-full opacity-20" />
+                                </div>
+                            ) : (
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-5xl font-black text-foreground">
+                                        {new Intl.NumberFormat('en-US', { notation: "compact", maximumFractionDigits: 1 }).format(analytics?.totalViews || 0)}
+                                    </span>
+                                    <span className="text-[10px] font-black text-emerald-400 flex items-center gap-1 bg-emerald-400/10 px-3 py-1 rounded-full uppercase tracking-tighter shadow-sm ring-1 ring-emerald-400/20">
+                                        <Zap size={12} className="fill-emerald-400" /> +{analytics?.totalVideos ? '12%' : '0%'}
+                                        {/* Growth is mocked for now until history is fully implemented */}
+                                    </span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="relative z-10 pt-6">

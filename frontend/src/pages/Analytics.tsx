@@ -3,6 +3,10 @@ import { BarChart2, TrendingUp, Users, Play, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
+import { useQuery } from '@tanstack/react-query';
+import { analyticsAPI } from '@/lib/api';
+import { Skeleton } from '@/components/ui/Skeleton';
+
 interface StatItem {
     label: string;
     value: string;
@@ -12,10 +16,46 @@ interface StatItem {
 }
 
 export const Analytics = () => {
+    const { data: analytics, isLoading } = useQuery({
+        queryKey: ['analytics-overview'],
+        queryFn: async () => {
+            const res = await analyticsAPI.getOverview();
+            return res.data;
+        }
+    });
+
+    const formatNumber = (num: number) => {
+        return new Intl.NumberFormat('en-US', {
+            notation: "compact",
+            maximumFractionDigits: 1
+        }).format(num);
+    };
+
+    const totalEngagement = (analytics?.totalLikes || 0) + (analytics?.totalComments || 0) + (analytics?.totalShares || 0);
+    const avgViews = analytics?.totalVideos ? Math.round(analytics.totalViews / analytics.totalVideos) : 0;
+
     const stats: StatItem[] = [
-        { label: 'Total Views', value: '128.4K', icon: Play, change: '+12%', trend: 'up' },
-        { label: 'Avg. Retention', value: '64%', icon: Clock, change: '+5%', trend: 'up' },
-        { label: 'Total Engagement', value: '4.2K', icon: Users, change: '-2%', trend: 'down' },
+        {
+            label: 'Total Views',
+            value: formatNumber(analytics?.totalViews || 0),
+            icon: Play,
+            change: '--', // History diff pending
+            trend: 'up'
+        },
+        {
+            label: 'Avg. Views/Video',
+            value: formatNumber(avgViews),
+            icon: Clock,
+            change: '--',
+            trend: 'up'
+        },
+        {
+            label: 'Total Engagement',
+            value: formatNumber(totalEngagement),
+            icon: Users,
+            change: '--',
+            trend: 'up'
+        },
     ];
 
     return (
@@ -31,45 +71,51 @@ export const Analytics = () => {
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {stats.map((stat, i) => {
-                    const isUp = stat.trend === 'up';
+                {isLoading ? (
+                    Array(3).fill(0).map((_, i) => (
+                        <Skeleton key={i} className="h-64 w-full rounded-[2.5rem] bg-card/20" />
+                    ))
+                ) : (
+                    stats.map((stat, i) => {
+                        const isUp = stat.trend === 'up';
 
-                    return (
-                        <motion.div
-                            key={stat.label}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: i * 0.1, type: "spring", stiffness: 100 }}
-                        >
-                            <Card className="p-8 border-0 bg-card/40 backdrop-blur-xl hover:bg-card/50 transition-all duration-500 group relative overflow-hidden rounded-[2.5rem] ring-1 ring-white/10 hover:ring-primary/30 shadow-2xl h-full flex flex-col justify-between">
-                                {/* Tailored Glow Background */}
-                                <div className={cn(
-                                    "absolute -top-24 -right-24 w-48 h-48 rounded-full blur-[80px] opacity-10 group-hover:opacity-20 transition-all duration-700 bg-gradient-to-br",
-                                    isUp ? "from-emerald-500 to-cyan-500" : "from-amber-500 to-orange-500"
-                                )} />
-
-                                <div className="relative z-10 flex items-center justify-between">
+                        return (
+                            <motion.div
+                                key={stat.label}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.1, type: "spring", stiffness: 100 }}
+                            >
+                                <Card className="p-8 border-0 bg-card/40 backdrop-blur-xl hover:bg-card/50 transition-all duration-500 group relative overflow-hidden rounded-[2.5rem] ring-1 ring-white/10 hover:ring-primary/30 shadow-2xl h-full flex flex-col justify-between">
+                                    {/* Tailored Glow Background */}
                                     <div className={cn(
-                                        "p-4 rounded-2xl transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 shadow-inner ring-1",
-                                        isUp ? "bg-emerald-500/10 text-emerald-500 ring-emerald-500/20" : "bg-amber-500/10 text-amber-500 ring-amber-500/20"
-                                    )}>
-                                        <stat.icon className="w-6 h-6" />
+                                        "absolute -top-24 -right-24 w-48 h-48 rounded-full blur-[80px] opacity-10 group-hover:opacity-20 transition-all duration-700 bg-gradient-to-br",
+                                        isUp ? "from-emerald-500 to-cyan-500" : "from-amber-500 to-orange-500"
+                                    )} />
+
+                                    <div className="relative z-10 flex items-center justify-between">
+                                        <div className={cn(
+                                            "p-4 rounded-2xl transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 shadow-inner ring-1",
+                                            isUp ? "bg-emerald-500/10 text-emerald-500 ring-emerald-500/20" : "bg-amber-500/10 text-amber-500 ring-amber-500/20"
+                                        )}>
+                                            <stat.icon className="w-6 h-6" />
+                                        </div>
+                                        <span className={cn(
+                                            "text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ring-1",
+                                            isUp ? "bg-emerald-500/10 text-emerald-500 ring-emerald-500/20" : "bg-amber-500/10 text-amber-500 ring-amber-500/20"
+                                        )}>
+                                            {stat.change}
+                                        </span>
                                     </div>
-                                    <span className={cn(
-                                        "text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest ring-1",
-                                        isUp ? "bg-emerald-500/10 text-emerald-500 ring-emerald-500/20" : "bg-amber-500/10 text-amber-500 ring-amber-500/20"
-                                    )}>
-                                        {stat.change}
-                                    </span>
-                                </div>
-                                <div className="mt-8 relative z-10">
-                                    <h3 className="text-4xl font-black tracking-tight">{stat.value}</h3>
-                                    <p className="text-sm text-muted-foreground font-bold uppercase tracking-widest mt-1 opacity-60">{stat.label}</p>
-                                </div>
-                            </Card>
-                        </motion.div>
-                    );
-                })}
+                                    <div className="mt-8 relative z-10">
+                                        <h3 className="text-4xl font-black tracking-tight">{stat.value}</h3>
+                                        <p className="text-sm text-muted-foreground font-bold uppercase tracking-widest mt-1 opacity-60">{stat.label}</p>
+                                    </div>
+                                </Card>
+                            </motion.div>
+                        );
+                    })
+                )}
             </div>
 
             <motion.div

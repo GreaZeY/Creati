@@ -30,7 +30,7 @@ func main() {
 		log.Fatal("DB Ping failed:", err)
 	}
 
-	migrationSQL, err := os.ReadFile("internal/db/migrations/002_add_email.sql")
+	migrationSQL, err := os.ReadFile("internal/db/migrations/003_analytics.sql")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -40,5 +40,5 @@ func main() {
 		log.Fatal("Migration failed:", err)
 	}
 
-	fmt.Println("Migration 002 applied successfully")
+	fmt.Println("Migration 003_analytics applied successfully")
 }

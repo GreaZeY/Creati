@@ -102,6 +102,7 @@ func main() {
 	platformHandler := api.NewPlatformHandler(db)
 	uploadHandler := api.NewUploadHandler(storageService, queueService, db)
 	videosHandler := api.NewVideosHandler(db)
+	analyticsHandler := api.NewAnalyticsHandler(db)
 
 	// API routes
 	apiRoutes := app.Group("/api")
@@ -134,6 +135,9 @@ func main() {
 	protected.Get("/videos", videosHandler.ListVideos)
 	protected.Get("/videos/:id/status", videosHandler.GetVideoStatus)
 	protected.Get("/videos/:id/analytics", videosHandler.GetVideoAnalytics)
+
+	// Analytics
+	protected.Get("/analytics/overview", analyticsHandler.GetOverview)
 
 	// Start server
 	port := os.Getenv("PORT")
