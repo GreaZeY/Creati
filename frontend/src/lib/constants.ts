@@ -25,6 +25,7 @@ export const ANIMATION = {
 } as const;
 
 // Platform configurations
+// Platform configurations
 export const PLATFORMS = {
     youtube: {
         id: 'youtube',
@@ -36,25 +37,25 @@ export const PLATFORMS = {
         id: 'instagram',
         name: 'Instagram',
         color: '#E4405F',
-        enabled: false, // Coming soon
+        enabled: true,
     },
     facebook: {
         id: 'facebook',
         name: 'Facebook',
         color: '#1877F2',
-        enabled: false, // Coming soon
+        enabled: true,
     },
     x: {
         id: 'x',
         name: 'X',
         color: '#000000',
-        enabled: false, // Coming soon
+        enabled: true,
     },
     linkedin: {
         id: 'linkedin',
         name: 'LinkedIn',
         color: '#0A66C2',
-        enabled: false, // Coming soon
+        enabled: true,
     },
 } as const;
 

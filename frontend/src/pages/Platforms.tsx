@@ -254,10 +254,15 @@ export const Platforms = () => {
                                                     onClick={() => handleReconnect(platform.id)}
                                                     isLoading={connectMutation.isPending && connectMutation.variables === platform.id}
                                                     size="sm"
-                                                    variant="ghost"
-                                                    className="!bg-transparent text-emerald-500 border border-emerald-500/60 hover:border-emerald-500 hover:bg-emerald-500/10 rounded-lg px-4 h-8 text-xs font-medium"
+                                                    variant={platform.profileName ? "ghost" : "default"}
+                                                    className={cn(
+                                                        "rounded-lg px-4 h-8 text-xs font-medium transition-all duration-300",
+                                                        platform.profileName
+                                                            ? "!bg-transparent text-emerald-500 border border-emerald-500/60 hover:border-emerald-500 hover:bg-emerald-500/10"
+                                                            : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 hover:shadow-primary/30"
+                                                    )}
                                                 >
-                                                    Reconnect
+                                                    {platform.profileName ? 'Reconnect' : 'Connect'}
                                                 </Button>
                                             )}
                                         </div>

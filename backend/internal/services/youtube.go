@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	v2 "google.golang.org/api/oauth2/v2"
 	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
 )
@@ -35,6 +36,7 @@ func NewYouTubeService(db *sql.DB) *YouTubeService {
 			Scopes: []string{
 				youtube.YoutubeUploadScope,
 				youtube.YoutubeReadonlyScope,
+				"https://www.googleapis.com/auth/userinfo.email",
 			},
 			Endpoint: google.Endpoint,
 		},
@@ -43,7 +45,25 @@ func NewYouTubeService(db *sql.DB) *YouTubeService {
 
 // GetAuthURL returns the OAuth URL for user authorization
 func (y *YouTubeService) GetAuthURL(state string) string {
-	return y.oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
+	return y.oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
+}
+
+// GetAuthURLWithHint returns the OAuth URL with login_hint to skip account picker
+func (y *YouTubeService) GetAuthURLWithHint(state, prompt, loginHint string) string {
+	opts := []oauth2.AuthCodeOption{
+		oauth2.AccessTypeOffline,
+		oauth2.ApprovalForce,
+	}
+	if len(loginHint) > 0 {
+		opts = append(opts, oauth2.SetAuthURLParam("login_hint", loginHint))
+	}
+	// "none" prompt isn't supported for offline access usually, but "select_account" is default.
+	// We leave prompt empty to let hint take effect, or force "consent" if needed.
+	// If reconnecting, user might just want to approve.
+	if len(prompt) > 0 {
+		opts = append(opts, oauth2.SetAuthURLParam("prompt", prompt))
+	}
+	return y.oauthConfig.AuthCodeURL(state, opts...)
 }
 
 // Authenticate implements Platform interface
@@ -75,14 +95,24 @@ func (y *YouTubeService) Authenticate(code string, userID int) error {
 		channelName = conn.Items[0].Snippet.Title
 	}
 
+	// Get user email
+	oauth2Service, err := v2.NewService(ctx, option.WithHTTPClient(client))
+	var userEmail string
+	if err == nil {
+		userInfo, err := oauth2Service.Userinfo.Get().Do()
+		if err == nil {
+			userEmail = userInfo.Email
+		}
+	}
+
 	// Store tokens in database using 'connected' status to match list logic
 	query := `
-		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, status, profile_name)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, status, profile_name, email)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (user_id, platform) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, status = $5, profile_name = $6, connected_at = NOW()
+		DO UPDATE SET access_token = $3, refresh_token = $4, status = $5, profile_name = $6, email = $7, connected_at = NOW()
 	`
-	_, err = y.db.Exec(query, userID, "youtube", token.AccessToken, token.RefreshToken, "connected", channelName)
+	_, err = y.db.Exec(query, userID, "youtube", token.AccessToken, token.RefreshToken, "connected", channelName, userEmail)
 	return err
 }
 

@@ -70,9 +70,11 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 		isConnected := false
 		profileName := ""
 
-		if ok && (info.Status == "connected" || info.Status == "active") {
-			isConnected = true
-			profileName = info.ProfileName
+		if ok {
+			profileName = info.ProfileName // Always return profile name if we know it
+			if info.Status == "connected" || info.Status == "active" {
+				isConnected = true
+			}
 		}
 
 		// Capitalize first letter for name
@@ -115,11 +117,17 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 	// Type assertion to get auth URL based on platform type
 	switch platform {
 	case "youtube":
+		// Optimize re-connect flow: if we have stored the connected account's email, use it as hint
+		// Query platform_accounts table, NOT users table
+		var email string
+		_ = h.db.QueryRow("SELECT email FROM platform_accounts WHERE user_id = $1 AND platform = 'youtube'", userID).Scan(&email)
+
 		ytService, ok := platformService.(*services.YouTubeService)
 		if !ok {
 			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "youtube service error")
 		}
-		authURL = ytService.GetAuthURL(state)
+		// Use login_hint if available to skip picker
+		authURL = ytService.GetAuthURLWithHint(state, "consent", email)
 	case "instagram":
 		igService, ok := platformService.(*services.InstagramService)
 		if !ok {
@@ -157,15 +165,17 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 func (h *PlatformHandler) HandleCallback(c *fiber.Ctx) error {
 	platform := c.Params("platform")
 	code := c.Query("code")
-	// state := c.Query("state") // Contains userID in simplified version
-	// Verify state usually here (omitted for brevity/MVP)
+	state := c.Query("state") // Contains userID in simplified version
 
 	if code == "" {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "missing authorization code")
 	}
 
 	// In production: validate state token and extract userID securely
-	userID := 1 // Simplified - extract from state
+	userID, err := strconv.Atoi(state)
+	if err != nil {
+		userID = 1 // Fallback if state parsing fails (should handle error better in prod)
+	}
 
 	// Get platform service
 	platformService, err := services.GetPlatformService(platform, h.db)
@@ -189,9 +199,10 @@ func (h *PlatformHandler) disconnectPlatformInternal(userID int, platform string
 	// platformService, _ := services.GetPlatformService(platform, h.db)
 	// if platformService != nil { _ = platformService.RevokeAccess(userID) }
 
+	// Don't clear profile_name so we can show "Reconnect" vs "Connect"
 	_, err := h.db.Exec(`
 		UPDATE platform_accounts 
-		SET status = 'disconnected', profile_name = NULL, updated_at = NOW() 
+		SET status = 'disconnected' 
 		WHERE user_id = $1 AND platform = $2
 	`, userID, platform)
 	return err

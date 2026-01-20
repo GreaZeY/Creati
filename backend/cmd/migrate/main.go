@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -13,14 +12,12 @@ import (
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found")
+		fmt.Println("No .env file found, using system env")
 	}
 
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		// Fallback to default local credentials
-		dbURL = "postgres://postgres:postgres@localhost:5432/creati?sslmode=disable"
-		fmt.Println("⚠️  DATABASE_URL not set, using default:", dbURL)
+		log.Fatal("DATABASE_URL not set")
 	}
 
 	db, err := sql.Open("postgres", dbURL)
@@ -29,30 +26,19 @@ func main() {
 	}
 	defer db.Close()
 
-	// Read migration files
-	files, err := os.ReadDir("internal/db/migrations")
+	if err := db.Ping(); err != nil {
+		log.Fatal("DB Ping failed:", err)
+	}
+
+	migrationSQL, err := os.ReadFile("internal/db/migrations/002_add_email.sql")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	for _, file := range files {
-		if file.IsDir() || !strings.HasSuffix(file.Name(), ".sql") {
-			continue
-		}
-
-		fmt.Printf("Running migration: %s... ", file.Name())
-		content, err := os.ReadFile("internal/db/migrations/" + file.Name())
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		_, err = db.Exec(string(content))
-		if err != nil {
-			log.Printf("❌ Migration %s failed: %v", file.Name(), err)
-			continue
-		}
-		fmt.Println("✅")
+	_, err = db.Exec(string(migrationSQL))
+	if err != nil {
+		log.Fatal("Migration failed:", err)
 	}
 
-	fmt.Println("\nAll migrations processed!")
+	fmt.Println("Migration 002 applied successfully")
 }
