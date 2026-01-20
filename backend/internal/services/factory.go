@@ -13,16 +13,21 @@ import (
  */
 
 // GetPlatformService returns the appropriate platform service
-// Adding Instagram later? Just add another case here.
 func GetPlatformService(platform string, db *sql.DB) (Platform, error) {
 	switch platform {
 	case "youtube":
 		return NewYouTubeService(db), nil
-	// Future platforms go here
-	// case "instagram":
-	//     return NewInstagramService(db), nil
-	// case "facebook":
-	//     return NewFacebookService(db), nil
+	case "instagram":
+		return NewInstagramService(db), nil
+	case "facebook":
+		return NewFacebookService(db), nil
+	case "linkedin":
+		return NewLinkedInService(db), nil
+	case "twitter":
+		return NewTwitterService(db), nil
+	// Future platforms
+	// case "tiktok":
+	//     return NewTikTokService(db), nil
 	default:
 		return nil, fmt.Errorf("unsupported platform: %s", platform)
 	}
@@ -30,5 +35,5 @@ func GetPlatformService(platform string, db *sql.DB) (Platform, error) {
 
 // GetSupportedPlatforms returns list of currently supported platforms
 func GetSupportedPlatforms() []string {
-	return []string{"youtube"}
+	return []string{"youtube", "instagram", "facebook", "linkedin", "twitter"}
 }

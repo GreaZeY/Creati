@@ -107,17 +107,47 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, err.Error())
 	}
 
-	// Type assertion to get auth URL (YouTube-specific for now)
-	// In production, add GetAuthURL to Platform interface
-	youtubeService, ok := platformService.(*services.YouTubeService)
-	if !ok {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "platform service error")
-	}
-
 	// Generate state token for security (should include userID)
 	state := strconv.Itoa(userID) // Simplified - use secure state generation in production
 
-	authURL := youtubeService.GetAuthURL(state)
+	var authURL string
+
+	// Type assertion to get auth URL based on platform type
+	switch platform {
+	case "youtube":
+		ytService, ok := platformService.(*services.YouTubeService)
+		if !ok {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "youtube service error")
+		}
+		authURL = ytService.GetAuthURL(state)
+	case "instagram":
+		igService, ok := platformService.(*services.InstagramService)
+		if !ok {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "instagram service error")
+		}
+		authURL = igService.GetAuthURL(state)
+	case "facebook":
+		fbService, ok := platformService.(*services.FacebookService)
+		if !ok {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "facebook service error")
+		}
+		authURL = fbService.GetAuthURL(state)
+	case "linkedin":
+		liService, ok := platformService.(*services.LinkedInService)
+		if !ok {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "linkedin service error")
+		}
+		authURL = liService.GetAuthURL(state)
+	case "twitter":
+		twService, ok := platformService.(*services.TwitterService)
+		if !ok {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "twitter service error")
+		}
+		authURL = twService.GetAuthURL(state)
+	default:
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "unsupported platform for OAuth")
+	}
+
 	return utils.SuccessResponse(c, map[string]string{
 		"authUrl": authURL,
 	}, "")
