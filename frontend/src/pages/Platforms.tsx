@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { platformsAPI } from '@/lib/api';
-import { Plus, Link2, MoreVertical, ShieldOff, Trash2, Signal, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Plus, Link2, MoreVertical, ShieldOff, Trash2, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -148,7 +148,7 @@ export const Platforms = () => {
                     ))}
                 </div>
             ) : platformStats.length > 0 ? (
-                <div className="flex flex-col gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <AnimatePresence mode="popLayout">
                         {platformStats.map((platform: PlatformData, i: number) => {
                             const theme = PLATFORM_THEMES[platform.id] || { gradient: 'from-primary to-primary/80', color: 'text-white', bg: 'bg-primary' };
@@ -169,120 +169,97 @@ export const Platforms = () => {
                                     className="w-full"
                                 >
                                     <Card className={cn(
-                                        "p-0 border-0 bg-card/40 backdrop-blur-xl overflow-hidden group relative flex flex-row items-center transition-all duration-500 rounded-[2rem] ring-1 ring-white/10 hover:ring-primary/30 min-h-[160px]",
-                                        !platform.connected && "grayscale-[0.6] opacity-80 hover:grayscale-0 hover:opacity-100"
+                                        "p-0 border-0 bg-card/40 backdrop-blur-xl group relative flex flex-row items-stretch transition-all duration-300 rounded-2xl ring-1 ring-white/10 hover:ring-primary/30",
+                                        !platform.connected && "grayscale-[0.5] opacity-75 hover:grayscale-0 hover:opacity-100"
                                     )}>
                                         {/* Accent side line */}
-                                        <div className={cn("w-1.5 self-stretch bg-gradient-to-b", theme.gradient)} />
+                                        <div className={cn("w-1 shrink-0 bg-gradient-to-b", theme.gradient)} />
 
-                                        <div className="flex flex-row items-center gap-8 p-8 w-full">
-                                            {/* Logo */}
-                                            <div className={cn(
-                                                "w-20 h-20 rounded-[1.5rem] shadow-2xl transition-all duration-500 group-hover:scale-110 group-hover:rotate-3 flex items-center justify-center shrink-0",
-                                                theme.bg,
-                                                theme.color
-                                            )}>
-                                                <PlatformLogo platform={platform.id} size={36} />
-                                            </div>
-
-                                            {/* Info */}
-                                            <div className="flex-1 space-y-2">
-                                                <div className="flex items-center gap-3">
-                                                    <h3 className="text-3xl font-black tracking-tight group-hover:text-primary transition-colors duration-300">
-                                                        {platform.profileName || platform.name}
-                                                    </h3>
-                                                    {platform.connected ? (
-                                                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-wider border border-emerald-500/30">
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                                            Active
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-500 text-[10px] font-black uppercase tracking-wider border border-amber-500/30">
-                                                            <AlertTriangle size={10} />
-                                                            Inactive
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <div className="flex items-center gap-6">
-                                                    <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground/60">
-                                                        <span className="uppercase tracking-[0.2em]">{platform.id}</span>
-                                                        <div className="w-1 h-1 rounded-full bg-border" />
-                                                        <span className="flex items-center gap-1.5">
-                                                            {platform.connected ? <Signal size={12} className="text-primary" /> : <RefreshCw size={12} />}
-                                                            {platform.connected ? 'Real-time Sync' : 'Reconnection Required'}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* Actions */}
-                                            <div className="flex items-center gap-4 shrink-0">
-                                                {!platform.connected && (
-                                                    <Button
-                                                        onClick={() => handleReconnect(platform.id)}
-                                                        isLoading={connectMutation.isPending && connectMutation.variables === platform.id}
-                                                        size="sm"
-                                                        className="rounded-xl px-6 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20"
-                                                    >
-                                                        Reconnect Now
-                                                    </Button>
-                                                )}
-
-                                                <DropdownMenu
-                                                    trigger={
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-12 w-12 rounded-2xl bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white transition-all duration-300"
-                                                        >
-                                                            <MoreVertical size={20} />
-                                                        </Button>
-                                                    }
-                                                >
-                                                    {platform.connected ? (
-                                                        <DropdownItem
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setConfirmState({
-                                                                    isOpen: true,
-                                                                    type: 'disconnect',
-                                                                    platformId: platform.id,
-                                                                    platformName: platform.name
-                                                                });
-                                                            }}
-                                                        >
-                                                            <ShieldOff size={16} />
-                                                            Disconnect
-                                                        </DropdownItem>
-                                                    ) : (
-                                                        <DropdownItem
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleReconnect(platform.id);
-                                                            }}
-                                                        >
-                                                            <RefreshCw size={16} />
-                                                            Reconnect
-                                                        </DropdownItem>
-                                                    )}
+                                        {/* Kebab menu at top-right */}
+                                        <div className="absolute top-3 right-3 z-10">
+                                            <DropdownMenu
+                                                trigger={
+                                                    <button className="p-2 rounded-lg text-muted-foreground/60 hover:text-white hover:bg-white/5 transition-colors">
+                                                        <MoreVertical size={18} />
+                                                    </button>
+                                                }
+                                            >
+                                                {platform.connected && (
                                                     <DropdownItem
-                                                        variant="danger"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             setConfirmState({
                                                                 isOpen: true,
-                                                                type: 'remove',
+                                                                type: 'disconnect',
                                                                 platformId: platform.id,
                                                                 platformName: platform.name
                                                             });
                                                         }}
                                                     >
-                                                        <Trash2 size={16} />
-                                                        Remove Platform
+                                                        <ShieldOff size={16} />
+                                                        Disconnect
                                                     </DropdownItem>
-                                                </DropdownMenu>
+                                                )}
+                                                <DropdownItem
+                                                    variant="danger"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setConfirmState({
+                                                            isOpen: true,
+                                                            type: 'remove',
+                                                            platformId: platform.id,
+                                                            platformName: platform.name
+                                                        });
+                                                    }}
+                                                >
+                                                    <Trash2 size={16} />
+                                                    Remove
+                                                </DropdownItem>
+                                            </DropdownMenu>
+                                        </div>
+
+                                        <div className="flex flex-row items-center gap-5 p-5 pr-12 w-full">
+                                            <div className={cn(
+                                                "w-14 h-14 rounded-xl shadow-lg transition-transform duration-300 group-hover:scale-105 flex items-center justify-center shrink-0",
+                                                theme.bg,
+                                                theme.color
+                                            )}>
+                                                <PlatformLogo platform={platform.id} size={28} />
                                             </div>
+
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h3 className="text-xl font-bold tracking-tight truncate">
+                                                        {platform.profileName || platform.name}
+                                                    </h3>
+                                                    {platform.connected ? (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[10px] font-semibold uppercase tracking-wide">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                            Active
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 text-[10px] font-semibold uppercase tracking-wide">
+                                                            <AlertTriangle size={10} />
+                                                            Inactive
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-muted-foreground/60 mt-1 uppercase tracking-wider">
+                                                    {platform.id}
+                                                </p>
+                                            </div>
+
+                                            {!platform.connected && (
+                                                <Button
+                                                    onClick={() => handleReconnect(platform.id)}
+                                                    isLoading={connectMutation.isPending && connectMutation.variables === platform.id}
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="!bg-transparent text-emerald-500 border border-emerald-500/60 hover:border-emerald-500 hover:bg-emerald-500/10 rounded-lg px-4 h-8 text-xs font-medium"
+                                                >
+                                                    Reconnect
+                                                </Button>
+                                            )}
                                         </div>
                                     </Card>
                                 </motion.div>
