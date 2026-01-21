@@ -30,7 +30,7 @@ func main() {
 		log.Fatal("DB Ping failed:", err)
 	}
 
-	migrationSQL, err := os.ReadFile("internal/db/migrations/003_analytics.sql")
+	migrationSQL, err := os.ReadFile("internal/db/migrations/004_discord_webhook.sql")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -40,5 +40,5 @@ func main() {
 		log.Fatal("Migration failed:", err)
 	}
 
-	fmt.Println("Migration 003_analytics applied successfully")
+	fmt.Println("Migration 004_discord_webhook applied successfully")
 }

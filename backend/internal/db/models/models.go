@@ -19,13 +19,17 @@ type CreatorPreferences struct {
 
 // PlatformAccount model
 type PlatformAccount struct {
-	ID           int       `json:"id" db:"id"`
-	UserID       int       `json:"user_id" db:"user_id"`
-	Platform     string    `json:"platform" db:"platform"`
-	AccessToken  string    `json:"-" db:"access_token"`  // Encrypted, never expose
-	RefreshToken string    `json:"-" db:"refresh_token"` // Encrypted, never expose
-	Status       string    `json:"status" db:"status"`
-	ConnectedAt  time.Time `json:"connected_at" db:"connected_at"`
+	ID             int       `json:"id" db:"id"`
+	UserID         int       `json:"user_id" db:"user_id"`
+	Platform       string    `json:"platform" db:"platform"`
+	AccessToken    string    `json:"-" db:"access_token"`  // Encrypted, never expose
+	RefreshToken   string    `json:"-" db:"refresh_token"` // Encrypted, never expose
+	Status         string    `json:"status" db:"status"`
+	ProfileName    string    `json:"profile_name" db:"profile_name"`
+	Email          string    `json:"email" db:"email"`
+	WebhookURL     string    `json:"webhook_url,omitempty" db:"webhook_url"`
+	PlatformUserID string    `json:"platform_user_id,omitempty" db:"platform_user_id"`
+	ConnectedAt    time.Time `json:"connected_at" db:"connected_at"`
 }
 
 // Video model

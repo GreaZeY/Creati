@@ -152,6 +152,18 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "twitter service error")
 		}
 		authURL = twService.GetAuthURL(state)
+	case "discord":
+		dsService, ok := platformService.(*services.DiscordService)
+		if !ok {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "discord service error")
+		}
+		authURL = dsService.GetAuthURL(state)
+	case "reddit":
+		rdService, ok := platformService.(*services.RedditService)
+		if !ok {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "reddit service error")
+		}
+		authURL = rdService.GetAuthURL(state)
 	default:
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "unsupported platform for OAuth")
 	}

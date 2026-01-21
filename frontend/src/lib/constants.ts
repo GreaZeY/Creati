@@ -57,6 +57,18 @@ export const PLATFORMS = {
         color: '#0A66C2',
         enabled: true,
     },
+    discord: {
+        id: 'discord',
+        name: 'Discord',
+        color: '#5865F2',
+        enabled: true,
+    },
+    reddit: {
+        id: 'reddit',
+        name: 'Reddit',
+        color: '#FF4500',
+        enabled: true,
+    },
 } as const;
 
 export type PlatformId = keyof typeof PLATFORMS;
