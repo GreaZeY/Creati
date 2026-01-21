@@ -94,14 +94,13 @@ func (r *RedditService) Authenticate(code string, userID int) error {
 // Upload implements Platform interface - posts to Reddit
 // Since Reddit video uploads are complex (require websocket/handshake),
 // we initially support posting the S3 URL as a link post or using Reddit's submit API for links.
-func (r *RedditService) Upload(video *models.Video) (string, error) {
+func (r *RedditService) Upload(video *models.Video, accountID int) (string, error) {
 	var accessToken string
 	err := r.db.QueryRow(
-		"SELECT access_token FROM platform_accounts WHERE user_id = $1 AND platform = 'reddit'",
-		video.UserID,
+		"SELECT access_token FROM platform_accounts WHERE id = $1", accountID,
 	).Scan(&accessToken)
 	if err != nil {
-		return "", fmt.Errorf("no reddit account connected: %w", err)
+		return "", fmt.Errorf("account not found: %w", err)
 	}
 
 	// In a real app, we'd let user choose a subreddit.
@@ -160,13 +159,13 @@ func (r *RedditService) GetStatus(platformVideoID string) (string, error) {
 }
 
 // FetchAnalytics implements Platform interface
-func (r *RedditService) FetchAnalytics(platformVideoID string) (*Analytics, error) {
+func (r *RedditService) FetchAnalytics(platformVideoID string, accountID int) (*Analytics, error) {
 	var accessToken string
 	err := r.db.QueryRow(
-		"SELECT access_token FROM platform_accounts WHERE platform = 'reddit' LIMIT 1",
+		"SELECT access_token FROM platform_accounts WHERE id = $1", accountID,
 	).Scan(&accessToken)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("account not found: %w", err)
 	}
 
 	// https://www.reddit.com/dev/api/#GET_api_info

@@ -125,15 +125,14 @@ func (y *YouTubeService) Authenticate(code string, userID int) error {
 
 // Upload implements Platform interface
 // Uploads video to YouTube and returns YouTube video ID
-func (y *YouTubeService) Upload(video *models.Video) (string, error) {
-	// Get user's access token
+func (y *YouTubeService) Upload(video *models.Video, accountID int) (string, error) {
+	// Get specific account's tokens
 	var accessToken, refreshToken string
 	err := y.db.QueryRow(
-		"SELECT access_token, refresh_token FROM platform_accounts WHERE user_id = $1 AND platform = $2",
-		video.UserID, "youtube",
+		"SELECT access_token, refresh_token FROM platform_accounts WHERE id = $1", accountID,
 	).Scan(&accessToken, &refreshToken)
 	if err != nil {
-		return "", fmt.Errorf("no youtube account connected: %w", err)
+		return "", fmt.Errorf("account not found: %w", err)
 	}
 
 	// Create OAuth2 token
@@ -186,15 +185,14 @@ func (y *YouTubeService) GetStatus(platformVideoID string) (string, error) {
 }
 
 // FetchAnalytics implements Platform interface
-func (y *YouTubeService) FetchAnalytics(platformVideoID string) (*Analytics, error) {
-	// Get any connected account's tokens (analytics is generally readonly)
-	// For production, ensure we use the specific user's token
+func (y *YouTubeService) FetchAnalytics(platformVideoID string, accountID int) (*Analytics, error) {
+	// Get specific account's tokens
 	var accessToken, refreshToken string
 	err := y.db.QueryRow(
-		"SELECT access_token, refresh_token FROM platform_accounts WHERE platform = 'youtube' LIMIT 1",
+		"SELECT access_token, refresh_token FROM platform_accounts WHERE id = $1", accountID,
 	).Scan(&accessToken, &refreshToken)
 	if err != nil {
-		return nil, fmt.Errorf("no youtube account found: %w", err)
+		return nil, fmt.Errorf("account not found: %w", err)
 	}
 
 	token := &oauth2.Token{

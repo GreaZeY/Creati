@@ -58,7 +58,7 @@ export const Platforms = () => {
         queryKey: ['platforms'],
         queryFn: async () => {
             const response = await platformsAPI.list();
-            return response.data as PlatformData[];
+            return response.data.data as PlatformData[];
         },
     });
 

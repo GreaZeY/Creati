@@ -105,7 +105,7 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 		})
 	}
 
-	return c.JSON(results)
+	return utils.SuccessResponse(c, results, "")
 }
 
 // InitiateConnection returns OAuth URL for platform connection

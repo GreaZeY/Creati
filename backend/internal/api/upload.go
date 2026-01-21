@@ -66,7 +66,8 @@ type ConfirmUploadRequest struct {
 	Key         string   `json:"key"`
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
-	Platforms   []string `json:"platforms"`
+	Platforms   []string `json:"platforms"`  // Legacy/Optional
+	AccountIDs  []int    `json:"accountIds"` // Specific accounts
 }
 
 func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
@@ -78,6 +79,37 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
 		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "User not found")
+	}
+
+	// Resolve target accounts
+	targetAccounts := make(map[int]string) // accountID -> platform
+
+	// 1. Add explicitly requested accounts
+	if len(req.AccountIDs) > 0 {
+		rows, err := h.db.Query("SELECT id, platform FROM platform_accounts WHERE id = ANY($1) AND user_id = $2", req.AccountIDs, userID)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var id int
+				var platform string
+				if err := rows.Scan(&id, &platform); err == nil {
+					targetAccounts[id] = platform
+				}
+			}
+		}
+	}
+
+	// 2. Fallback: Add first account for each platform if legacy "platforms" provided
+	for _, platform := range req.Platforms {
+		var accountID int
+		err := h.db.QueryRow("SELECT id FROM platform_accounts WHERE user_id = $1 AND platform = $2 LIMIT 1", userID, platform).Scan(&accountID)
+		if err == nil {
+			targetAccounts[accountID] = platform
+		}
+	}
+
+	if len(targetAccounts) == 0 {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "No connected accounts found for selected platforms")
 	}
 
 	// Construct full S3 URL
@@ -107,13 +139,13 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 	}
 
 	// 2. Create Platform Jobs & Enqueue
-	for _, platform := range req.Platforms {
+	for accountID, platform := range targetAccounts {
 		var jobID int
 		err = tx.QueryRow(`
-			INSERT INTO video_platform_jobs (video_id, platform, status)
-			VALUES ($1, $2, 'pending')
+			INSERT INTO video_platform_jobs (video_id, platform, account_id, status)
+			VALUES ($1, $2, $3, 'pending')
 			RETURNING id
-		`, videoID, platform).Scan(&jobID)
+		`, videoID, platform, accountID).Scan(&jobID)
 
 		if err != nil {
 			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to queue platform jobs")
@@ -124,11 +156,11 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 			err = h.Queue.EnqueueUpload(context.Background(), services.UploadJob{
 				VideoID:    videoID,
 				JobID:      jobID,
+				AccountID:  accountID,
 				Platform:   platform,
 				RetryCount: 0,
 			})
 			if err != nil {
-				// Don't fail the whole request if Redis fails, but log it
 				fmt.Printf("⚠️  Failed to enqueue job to Redis: %v\n", err)
 			}
 		}

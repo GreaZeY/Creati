@@ -31,7 +31,7 @@ export const Dashboard = () => {
         queryKey: ['platforms'],
         queryFn: async () => {
             const resp = await platformsAPI.list();
-            return resp.data as any[];
+            return resp.data.data as any[];
         }
     });
 

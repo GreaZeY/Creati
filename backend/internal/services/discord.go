@@ -111,14 +111,13 @@ func (d *DiscordService) Authenticate(code string, userID int) error {
 }
 
 // Upload implements Platform interface - sends video to Discord via Webhook
-func (d *DiscordService) Upload(video *models.Video) (string, error) {
+func (d *DiscordService) Upload(video *models.Video, accountID int) (string, error) {
 	var webhookURL string
 	err := d.db.QueryRow(
-		"SELECT webhook_url FROM platform_accounts WHERE user_id = $1 AND platform = 'discord'",
-		video.UserID,
+		"SELECT webhook_url FROM platform_accounts WHERE id = $1", accountID,
 	).Scan(&webhookURL)
 	if err != nil || webhookURL == "" {
-		return "", fmt.Errorf("no discord webhook found for user: %w", err)
+		return "", fmt.Errorf("account not found or no webhook: %w", err)
 	}
 
 	// Download video from S3
@@ -182,8 +181,8 @@ func (d *DiscordService) GetStatus(platformVideoID string) (string, error) {
 	return "completed", nil // Webhook sends immediately
 }
 
-// FetchAnalytics implements Platform interface - retrieves reactions
-func (d *DiscordService) FetchAnalytics(platformVideoID string) (*Analytics, error) {
+// FetchAnalytics implements Platform interface
+func (d *DiscordService) FetchAnalytics(platformVideoID string, accountID int) (*Analytics, error) {
 	// Discord webhooks don't easily allow fetching reactions back unless we have a bot token
 	// or use the webhook URL with /messages/ID? wait=true but identifying which message is hard
 	// without storing guild/channel.

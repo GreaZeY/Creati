@@ -1,23 +1,50 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
+import { useQuery } from '@tanstack/react-query';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { uploadAPI } from '@/lib/api';
+import { uploadAPI, platformsAPI } from '@/lib/api';
 import { AnimatePresence, motion } from 'framer-motion';
-import { UploadCloud, FileVideo, X, Sparkles } from 'lucide-react';
-import { PLATFORMS } from '@/lib/constants';
+import { UploadCloud, FileVideo, X, Sparkles, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
 import { PlatformLogo } from '@/components/platforms/PlatformLogo';
+
+interface ConnectedAccount {
+    accountId: number;
+    id: string;
+    name: string;
+    platform: string;
+    connected: boolean;
+    profileName: string;
+}
 
 export const Upload = () => {
     const [file, setFile] = useState<File | null>(null);
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['youtube']);
+    const [selectedAccounts, setSelectedAccounts] = useState<number[]>([]);
     const [uploading, setUploading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Fetch connected accounts
+    // Fetch connected accounts with a specific key to avoid conflicts
+    const { data: connectedAccounts = [] } = useQuery({
+        queryKey: ['connected-accounts'],
+        queryFn: async () => {
+            const resp = await platformsAPI.list();
+            const allAccounts = (resp.data.data || []) as ConnectedAccount[];
+            return allAccounts.filter(a => a.connected);
+        },
+    });
+
+    // Auto-select first account when accounts load if none selected
+    useEffect(() => {
+        if (selectedAccounts.length === 0 && connectedAccounts.length > 0) {
+            setSelectedAccounts([connectedAccounts[0].accountId]);
+        }
+    }, [connectedAccounts, selectedAccounts.length]);
 
     const onDrop = useCallback((acceptedFiles: File[]) => {
         if (acceptedFiles?.length > 0) {
@@ -41,25 +68,32 @@ export const Upload = () => {
 
     const handleUpload = async () => {
         if (!file) return;
+        if (selectedAccounts.length === 0) {
+            setError("Please select at least one account to publish to.");
+            return;
+        }
         setUploading(true);
         setError(null);
 
         try {
-            const { data } = await uploadAPI.init({
+            const resp = await uploadAPI.init({
                 filename: file.name,
                 contentType: file.type,
                 size: file.size
             });
 
-            await axios.put(data.uploadUrl, file, {
+            // Access nested data from SuccessResponse
+            const { uploadUrl, key } = resp.data.data;
+
+            await axios.put(uploadUrl, file, {
                 headers: { 'Content-Type': file.type },
             });
 
             await uploadAPI.confirm({
-                key: data.key,
+                key: key,
                 title: title || file.name,
                 description: description,
-                platforms: selectedPlatforms
+                accountIds: selectedAccounts
             });
 
             setSuccess(true);
@@ -67,10 +101,11 @@ export const Upload = () => {
                 setFile(null);
                 setTitle('');
                 setDescription('');
+                setSelectedAccounts([]);
                 setSuccess(false);
             }, 3000);
         } catch (err: any) {
-            setError("Upload failed. Please try again.");
+            setError(err.message || "Upload failed. Please try again.");
         } finally {
             setUploading(false);
         }
@@ -163,33 +198,42 @@ export const Upload = () => {
                                     </div>
 
                                     <div className="space-y-6 relative z-10">
-                                        <label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">Target Platforms</label>
+                                        <label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">Target Accounts</label>
                                         <div className="flex flex-wrap gap-3">
-                                            {Object.values(PLATFORMS).map((p) => {
-                                                const isSelected = selectedPlatforms.includes(p.id);
-                                                return (
-                                                    <button
-                                                        key={p.id}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            setSelectedPlatforms(prev =>
-                                                                isSelected ? prev.filter(id => id !== p.id) : [...prev, p.id]
-                                                            );
-                                                        }}
-                                                        disabled={!p.enabled || uploading || success}
-                                                        className={cn(
-                                                            "flex items-center gap-3 px-6 py-3 rounded-2xl border-0 transition-all font-black text-sm uppercase tracking-wider ring-1 shadow-lg",
-                                                            isSelected
-                                                                ? "bg-gradient-to-r from-primary to-cyan-500 text-white ring-primary shadow-primary/20 scale-105"
-                                                                : "bg-secondary/50 text-muted-foreground/60 ring-white/10 hover:bg-secondary hover:text-muted-foreground hover:scale-105",
-                                                            !p.enabled && "opacity-20 cursor-not-allowed grayscale scale-100 ring-transparent"
-                                                        )}
-                                                    >
-                                                        <PlatformLogo platform={p.id} size={18} className={cn("transition-colors", isSelected ? "text-white" : "text-muted-foreground/60")} />
-                                                        {p.name}
-                                                    </button>
-                                                );
-                                            })}
+                                            {connectedAccounts.length > 0 ? (
+                                                connectedAccounts.map((account) => {
+                                                    const isSelected = selectedAccounts.includes(account.accountId);
+                                                    return (
+                                                        <button
+                                                            key={account.accountId}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setSelectedAccounts(prev =>
+                                                                    isSelected ? prev.filter(id => id !== account.accountId) : [...prev, account.accountId]
+                                                                );
+                                                            }}
+                                                            disabled={uploading || success}
+                                                            className={cn(
+                                                                "flex items-center gap-3 px-6 py-3 rounded-2xl border-0 transition-all font-black text-sm uppercase tracking-wider ring-1 shadow-lg",
+                                                                isSelected
+                                                                    ? "bg-gradient-to-r from-primary to-cyan-500 text-white ring-primary shadow-primary/20 scale-105"
+                                                                    : "bg-secondary/50 text-muted-foreground/60 ring-white/10 hover:bg-secondary hover:text-muted-foreground hover:scale-105"
+                                                            )}
+                                                        >
+                                                            <PlatformLogo platform={account.platform} size={18} className={cn("transition-colors", isSelected ? "text-white" : "text-muted-foreground/60")} />
+                                                            <div className="flex flex-col items-start leading-tight">
+                                                                <span className="text-[10px] opacity-70 font-bold">{account.platform}</span>
+                                                                <span>{account.profileName || 'Connected'}</span>
+                                                            </div>
+                                                            {isSelected && <CheckCircle2 className="w-4 h-4 ml-1" />}
+                                                        </button>
+                                                    );
+                                                })
+                                            ) : (
+                                                <p className="text-muted-foreground text-sm font-medium p-4 bg-secondary/30 rounded-2xl w-full border border-dashed border-white/10 text-center">
+                                                    No accounts connected. <a href="/platforms/connect" className="text-primary hover:underline">Connect one now</a>
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 </Card>

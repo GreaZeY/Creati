@@ -106,14 +106,13 @@ func (l *LinkedInService) getUserProfile(accessToken string) (string, string, er
 }
 
 // Upload implements Platform interface - uploads video to LinkedIn
-func (l *LinkedInService) Upload(video *models.Video) (string, error) {
+func (l *LinkedInService) Upload(video *models.Video, accountID int) (string, error) {
 	var accessToken, profileID string
 	err := l.db.QueryRow(
-		"SELECT access_token, platform_user_id FROM platform_accounts WHERE user_id = $1 AND platform = $2",
-		video.UserID, "linkedin",
+		"SELECT access_token, platform_user_id FROM platform_accounts WHERE id = $1", accountID,
 	).Scan(&accessToken, &profileID)
 	if err != nil {
-		return "", fmt.Errorf("no linkedin account connected: %w", err)
+		return "", fmt.Errorf("account not found: %w", err)
 	}
 
 	// Step 1: Register video upload
@@ -234,13 +233,13 @@ func (l *LinkedInService) GetStatus(platformVideoID string) (string, error) {
 }
 
 // FetchAnalytics implements Platform interface
-func (l *LinkedInService) FetchAnalytics(platformVideoID string) (*Analytics, error) {
+func (l *LinkedInService) FetchAnalytics(platformVideoID string, accountID int) (*Analytics, error) {
 	var accessToken string
 	err := l.db.QueryRow(
-		"SELECT access_token FROM platform_accounts WHERE platform = 'linkedin' LIMIT 1",
+		"SELECT access_token FROM platform_accounts WHERE id = $1", accountID,
 	).Scan(&accessToken)
 	if err != nil {
-		return nil, fmt.Errorf("no linkedin account found: %w", err)
+		return nil, fmt.Errorf("account not found: %w", err)
 	}
 
 	// LinkedIn analytics require Marketing Developer Platform access

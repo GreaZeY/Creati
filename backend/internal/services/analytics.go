@@ -94,21 +94,9 @@ func (s *AnalyticsService) SyncUserAnalytics(userID int) {
 
 // SyncVideoAnalytics fetches fresh data from platforms and updates cache
 func (s *AnalyticsService) SyncVideoAnalytics(videoID int) {
-	// 1. Check if we need to update (Throttling)
-	var lastFetched time.Time
-	err := s.db.QueryRow(`
-		SELECT fetched_at FROM video_analytics 
-		WHERE video_id = $1 ORDER BY fetched_at DESC LIMIT 1
-	`, videoID).Scan(&lastFetched)
-
-	// If data is fresh (< 1 hour), skip update
-	if err == nil && time.Since(lastFetched) < 1*time.Hour {
-		return
-	}
-
-	// 2. Find connected platforms for this video
+	// 1. Find connected platforms and accounts for this video
 	rows, err := s.db.Query(`
-		SELECT platform, platform_id 
+		SELECT platform, platform_id, account_id
 		FROM video_platform_jobs 
 		WHERE video_id = $1 AND status = 'completed' AND platform_id IS NOT NULL
 	`, videoID)
@@ -119,28 +107,42 @@ func (s *AnalyticsService) SyncVideoAnalytics(videoID int) {
 
 	for rows.Next() {
 		var platform, platformID string
-		if err := rows.Scan(&platform, &platformID); err != nil {
+		var accountID int
+		if err := rows.Scan(&platform, &platformID, &accountID); err != nil {
 			continue
 		}
 
-		// Use factory to get service
+		// 2. Check if we need to update this specific (video, account) pair
+		var lastFetched time.Time
+		err := s.db.QueryRow(`
+			SELECT fetched_at FROM video_analytics 
+			WHERE video_id = $1 AND account_id = $2 
+			ORDER BY fetched_at DESC LIMIT 1
+		`, videoID, accountID).Scan(&lastFetched)
+
+		// If data is fresh (< 1 hour), skip update for this account
+		if err == nil && time.Since(lastFetched) < 1*time.Hour {
+			continue
+		}
+
+		// 3. Use factory to get service
 		svc, err := GetPlatformService(platform, s.db)
 		if err != nil {
 			continue
 		}
 
-		// Fetch from external API
-		stats, err := svc.FetchAnalytics(platformID)
+		// 4. Fetch from external API
+		stats, err := svc.FetchAnalytics(platformID, accountID)
 		if err != nil {
-			log.Printf("Failed to fetch analytics for %s video %s: %v", platform, platformID, err)
+			log.Printf("Failed to fetch analytics for %s video %s (account %d): %v", platform, platformID, accountID, err)
 			continue
 		}
 
-		// Insert snapshot
+		// 5. Insert snapshot
 		_, err = s.db.Exec(`
-			INSERT INTO video_analytics (video_id, platform, views, likes, comments, shares)
-			VALUES ($1, $2, $3, $4, $5, $6)
-		`, videoID, platform, stats.Views, stats.Likes, stats.Comments, stats.Shares)
+			INSERT INTO video_analytics (video_id, account_id, platform, views, likes, comments, shares)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`, videoID, accountID, platform, stats.Views, stats.Likes, stats.Comments, stats.Shares)
 
 		if err != nil {
 			log.Printf("Failed to save analytics snapshot: %v", err)

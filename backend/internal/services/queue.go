@@ -16,6 +16,7 @@ type QueueService struct {
 type UploadJob struct {
 	VideoID    int    `json:"video_id"`
 	JobID      int    `json:"job_id"`
+	AccountID  int    `json:"account_id"`
 	Platform   string `json:"platform"`
 	RetryCount int    `json:"retry_count"`
 }

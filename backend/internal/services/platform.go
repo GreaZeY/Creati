@@ -17,16 +17,16 @@ type Platform interface {
 	// Authenticate handles OAuth flow and stores tokens
 	Authenticate(code string, userID int) error
 
-	// Upload uploads a video to the platform
+	// Upload uploads a video to the platform for a specific account
 	// Returns platform-specific video ID
-	Upload(video *models.Video) (platformVideoID string, err error)
+	Upload(video *models.Video, accountID int) (platformVideoID string, err error)
 
 	// GetStatus retrieves current upload/processing status from platform
 	GetStatus(platformVideoID string) (status string, err error)
 
-	// FetchAnalytics retrieves analytics data from platform
+	// FetchAnalytics retrieves analytics data from platform for a specific account
 	// Returns view count, engagement metrics, etc.
-	FetchAnalytics(platformVideoID string) (analytics *Analytics, err error)
+	FetchAnalytics(platformVideoID string, accountID int) (analytics *Analytics, err error)
 }
 
 // Analytics struct - standardized across platforms

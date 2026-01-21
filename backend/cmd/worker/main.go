@@ -47,7 +47,7 @@ func main() {
 
 	fmt.Println("\n========================================")
 	fmt.Println("👷 Worker starting...")
-	fmt.Println("========================================\n")
+	fmt.Println("========================================")
 
 	// Context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -134,7 +134,13 @@ func processJob(db *sql.DB, job *services.UploadJob) error {
 	}
 
 	// 4. Perform Upload
-	platformVideoID, err := platformSvc.Upload(video)
+	accountID := job.AccountID
+	if accountID == 0 {
+		// Fallback: try to find the account_id if it's missing (legacy jobs)
+		_ = db.QueryRow("SELECT account_id FROM video_platform_jobs WHERE id = $1", job.JobID).Scan(&accountID)
+	}
+
+	platformVideoID, err := platformSvc.Upload(video, accountID)
 	if err != nil {
 		updateJobError(db, job.JobID, err.Error())
 		return err
