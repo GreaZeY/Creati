@@ -6,6 +6,7 @@ import {
     BarChart2,
     Settings,
     Link2,
+    Zap,
     LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -14,6 +15,7 @@ import { useAuth } from '@/hooks/useAuth';
 const NAV_ITEMS = [
     { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
     { label: 'Upload', icon: UploadCloud, href: '/upload' },
+    { label: 'Magic Sync', icon: Zap, href: '/automation' },
     { label: 'Analytics', icon: BarChart2, href: '/analytics' },
     { label: 'Platforms', icon: Link2, href: '/platforms' },
     { label: 'Settings', icon: Settings, href: '/settings' },

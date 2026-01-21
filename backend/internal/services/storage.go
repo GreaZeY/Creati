@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -52,4 +54,19 @@ func (s *StorageService) GeneratePresignedURL(key string, contentType string) (s
 	}
 
 	return request.URL, nil
+}
+
+func (s *StorageService) Upload(ctx context.Context, key string, reader io.Reader, contentType string) error {
+	_, err := s.Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(s.Bucket),
+		Key:         aws.String(key),
+		Body:        reader,
+		ContentType: aws.String(contentType),
+	})
+	return err
+}
+
+func (s *StorageService) GetObjectURL(key string) string {
+	// Simplified URL construction. In production, consider region-specific endpoints.
+	return fmt.Sprintf("https://%s.s3.amazonaws.com/%s", s.Bucket, key)
 }

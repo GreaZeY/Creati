@@ -140,4 +140,16 @@ export const analyticsAPI = {
     getOverview: () =>
         api.get('/analytics/overview'),
 };
+export const automationAPI = {
+    list: () =>
+        api.get<ApiResponse<any[]>>('/automation'),
 
+    create: (data: any) =>
+        api.post<ApiResponse<{ id: number }>>('/automation', data),
+
+    toggle: (id: number, isActive: boolean) =>
+        api.put<ApiResponse>(`/automation/${id}`, { isActive }),
+
+    delete: (id: number) =>
+        api.delete<ApiResponse>(`/automation/${id}`),
+};

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	url "net/url"
 	"os"
 
 	"example.com/creati/backend/internal/db/models"
@@ -120,7 +121,18 @@ func (y *YouTubeService) Authenticate(code string, userID int) error {
 		DO UPDATE SET access_token = $3, refresh_token = $4, status = $5, profile_name = $6, email = $7, connected_at = NOW()
 	`
 	_, err = y.db.Exec(query, userID, "youtube", token.AccessToken, token.RefreshToken, "connected", channelName, userEmail, channelID)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Trigger real-time monitoring via webhooks
+	if subErr := y.SubscribeToChannel(channelID); subErr != nil {
+		fmt.Printf("⚠️  Failed to subscribe to YouTube webhooks for %s: %v\n", channelID, subErr)
+		// We don't fail the whole connection if only subscription fails,
+		// but notify user/log it.
+	}
+
+	return nil
 }
 
 // Upload implements Platform interface
@@ -223,4 +235,37 @@ func (y *YouTubeService) FetchAnalytics(platformVideoID string, accountID int) (
 		Likes:    int64(stats.LikeCount),
 		Comments: int64(stats.CommentCount),
 	}, nil
+}
+
+// SubscribeToChannel monitors a channel for new uploads using PubSubHubbub
+func (y *YouTubeService) SubscribeToChannel(channelID string) error {
+	hubURL := "https://pubsubhubbub.appspot.com/subscribe"
+	topicURL := fmt.Sprintf("https://www.youtube.com/xml/schemas/2015/feed?channel_id=%s", channelID)
+
+	// Use BACKEND_URL from env for callback
+	backendURL := os.Getenv("BACKEND_URL")
+	if backendURL == "" {
+		backendURL = "http://localhost:8080" // Fallback
+	}
+	callbackURL := fmt.Sprintf("%s/api/webhooks/youtube", backendURL)
+
+	data := url.Values{}
+	data.Set("hub.callback", callbackURL)
+	data.Set("hub.topic", topicURL)
+	data.Set("hub.verify", "async")
+	data.Set("hub.mode", "subscribe")
+
+	fmt.Printf("🚀 Subscribing to YouTube Channel: %s (Callback: %s)\n", channelID, callbackURL)
+
+	resp, err := http.PostForm(hubURL, data)
+	if err != nil {
+		return fmt.Errorf("failed to post subscription: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted && resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("subscription failed with status: %d", resp.StatusCode)
+	}
+
+	return nil
 }

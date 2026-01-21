@@ -14,6 +14,7 @@ import (
 	"example.com/creati/backend/internal/db/models"
 	"example.com/creati/backend/internal/services"
 	"github.com/joho/godotenv"
+	"github.com/kkdai/youtube/v2"
 	_ "github.com/lib/pq"
 )
 
@@ -43,6 +44,11 @@ func main() {
 	queueService, err := services.NewQueueService()
 	if err != nil {
 		log.Fatal("❌ Failed to initialize queue service:", err)
+	}
+
+	storageService, err := services.NewStorageService()
+	if err != nil {
+		log.Printf("⚠️  Storage service failed to initialize: %v", err)
 	}
 
 	fmt.Println("\n========================================")
@@ -82,7 +88,7 @@ func main() {
 			log.Printf("🚀 Processing job: VideoID=%d, Platform=%s", job.VideoID, job.Platform)
 
 			// Process job
-			err = processJob(db, job)
+			err = processJob(db, storageService, job)
 			if err != nil {
 				log.Printf("❌ Job failed: %v", err)
 
@@ -100,6 +106,9 @@ func main() {
 					}(*job, delay)
 				} else {
 					log.Printf("💀 Max retries reached for job %d", job.JobID)
+					if job.AutomationJobID > 0 {
+						db.Exec("UPDATE automation_jobs SET status = 'failed', error = $1 WHERE id = $2", err.Error(), job.AutomationJobID)
+					}
 				}
 			} else {
 				log.Printf("✅ Job completed: VideoID=%d, Platform=%s", job.VideoID, job.Platform)
@@ -108,7 +117,11 @@ func main() {
 	}
 }
 
-func processJob(db *sql.DB, job *services.UploadJob) error {
+func processJob(db *sql.DB, storage *services.StorageService, job *services.UploadJob) error {
+	if job.AutomationJobID > 0 {
+		return handleAutomationJob(db, storage, job)
+	}
+
 	// 1. Get Video details
 	video := &models.Video{}
 	err := db.QueryRow(`
@@ -152,6 +165,79 @@ func processJob(db *sql.DB, job *services.UploadJob) error {
 		SET status = $1, platform_id = $2, updated_at = NOW() 
 		WHERE id = $3
 	`, models.JobStatusCompleted, platformVideoID, job.JobID)
+
+	return err
+}
+
+func handleAutomationJob(db *sql.DB, storage *services.StorageService, job *services.UploadJob) error {
+	log.Printf("🤖 Processing Automation Job %d (Source: %s)", job.AutomationJobID, job.SourceVideoID)
+
+	// Update status
+	_, err := db.Exec("UPDATE automation_jobs SET status = 'processing', updated_at = NOW() WHERE id = $1", job.AutomationJobID)
+	if err != nil {
+		return err
+	}
+
+	// 1. Get Target Details (for title/description)
+	var userID int
+	var ruleName string
+	err = db.QueryRow(`
+		SELECT user_id, name FROM automation_rules WHERE id = (SELECT rule_id FROM automation_jobs WHERE id = $1)
+	`, job.AutomationJobID).Scan(&userID, &ruleName)
+	if err != nil {
+		return fmt.Errorf("failed to fetch rule details: %w", err)
+	}
+
+	// 2. Download from YouTube
+	client := youtube.Client{}
+	videoMetadata, err := client.GetVideo(job.SourceVideoID)
+	if err != nil {
+		return fmt.Errorf("failed to fetch youtube metadata: %w", err)
+	}
+
+	formats := videoMetadata.Formats.WithAudioChannels()
+	stream, _, err := client.GetStream(videoMetadata, &formats[0])
+	if err != nil {
+		return fmt.Errorf("failed to get youtube stream: %w", err)
+	}
+	defer stream.Close()
+
+	// 3. Stage in S3
+	s3Key := fmt.Sprintf("automation/%d/%d_%s.mp4", userID, job.AutomationJobID, job.SourceVideoID)
+	err = storage.Upload(context.Background(), s3Key, stream, "video/mp4")
+	if err != nil {
+		return fmt.Errorf("failed to stage video in S3: %w", err)
+	}
+
+	s3URL := storage.GetObjectURL(s3Key)
+
+	// 4. Create transient Video model
+	video := &models.Video{
+		UserID:      userID,
+		Title:       videoMetadata.Title,
+		Description: fmt.Sprintf("Automatically synced from YouTube: %s\n\nRule: %s", videoMetadata.Description, ruleName),
+		S3URL:       s3URL,
+	}
+
+	// 5. Proceed with normal Upload
+	platformSvc, err := services.GetPlatformService(job.Platform, db)
+	if err != nil {
+		return err
+	}
+
+	platformVideoID, err := platformSvc.Upload(video, job.AccountID)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("   ✅ Automation redistributed to %s (ID: %s)", job.Platform, platformVideoID)
+
+	// 6. Final Status Update
+	_, err = db.Exec(`
+		UPDATE automation_jobs 
+		SET status = 'completed', updated_at = NOW() 
+		WHERE id = $1
+	`, job.AutomationJobID)
 
 	return err
 }

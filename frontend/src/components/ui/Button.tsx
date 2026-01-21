@@ -12,7 +12,7 @@ const buttonVariants = cva(
         variants: {
             variant: {
                 default:
-                    "bg-primary text-primary-foreground shadow-sm", // Motion handles hover/active
+                    "bg-primary text-slate-950 shadow-sm font-semibold", // Using slate-950 for maximum visibility
                 destructive:
                     "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm",
                 outline:
@@ -126,9 +126,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                             >
                                 {loadingText}
                                 {/* Progress Bar inside button */}
-                                <div className="absolute bottom-0 left-0 h-[2px] bg-white/40 w-full">
+                                <div className="absolute bottom-0 left-0 h-[2px] bg-slate-950/20 w-full">
                                     <motion.div
-                                        className="h-full bg-white"
+                                        className="h-full bg-slate-950/40"
                                         initial={{ width: "0%" }}
                                         animate={{ width: "100%" }}
                                         transition={{ duration: 2, ease: "linear", repeat: Infinity }}
@@ -151,7 +151,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
-                                className="flex items-center gap-2 font-bold text-white"
+                                className="flex items-center gap-2 font-bold text-slate-950"
                             >
                                 <X className="w-4 h-4" /> {errorText}
                             </motion.span>
