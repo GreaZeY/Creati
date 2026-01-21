@@ -103,8 +103,8 @@ func (d *DiscordService) Authenticate(code string, userID int) error {
 	query := `
 		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, status, profile_name, email, webhook_url, platform_user_id)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		ON CONFLICT (user_id, platform) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, status = $5, profile_name = $6, email = $7, webhook_url = $8, platform_user_id = $9, connected_at = NOW()
+		ON CONFLICT (user_id, platform, platform_user_id) 
+		DO UPDATE SET access_token = $3, refresh_token = $4, status = $5, profile_name = $6, email = $7, webhook_url = $8, connected_at = NOW()
 	`
 	_, err = d.db.Exec(query, userID, "discord", token.AccessToken, token.RefreshToken, "connected", profileName, user.Email, webhookURL, user.ID)
 	return err

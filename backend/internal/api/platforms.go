@@ -25,77 +25,87 @@ func NewPlatformHandler(db *sql.DB) *PlatformHandler {
 	return &PlatformHandler{db: db}
 }
 
-// ListPlatforms returns list of available platforms and connection status
+// ListPlatforms returns list of available platforms and all connected accounts
 func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
-	// Get connected platforms for user
+	// Get all connected accounts for user
 	rows, err := h.db.Query(`
-		SELECT platform, status, COALESCE(profile_name, '') as profile_name FROM platform_accounts WHERE user_id = $1
+		SELECT id, platform, status, COALESCE(profile_name, '') as profile_name, platform_user_id 
+		FROM platform_accounts 
+		WHERE user_id = $1
 	`, userID)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
 	}
 	defer rows.Close()
 
-	type PlatformInfo struct {
-		Status      string
-		ProfileName string
+	type PlatformData struct {
+		AccountID      int    `json:"accountId,omitempty"`
+		ID             string `json:"id"` // Unique ID for frontend list (e.g., accountID or platform)
+		Name           string `json:"name"`
+		Platform       string `json:"platform"`
+		Connected      bool   `json:"connected"`
+		ProfileName    string `json:"profileName,omitempty"`
+		PlatformUserID string `json:"platformUserId,omitempty"`
 	}
-	connected := make(map[string]PlatformInfo)
 
+	results := make([]PlatformData, 0)
+	connectedPlatforms := make(map[string]bool)
+
+	// 1. Add all connected accounts
 	for rows.Next() {
-		var platform, status, profileName string
-		if err := rows.Scan(&platform, &status, &profileName); err != nil {
+		var accountID int
+		var platform, status, profileName, platformUserID string
+		if err := rows.Scan(&accountID, &platform, &status, &profileName, &platformUserID); err != nil {
 			continue
 		}
-		connected[platform] = PlatformInfo{Status: status, ProfileName: profileName}
-	}
 
-	// Build response with all supported platforms
-	// Build response: keys = platform ID, value = is connected
-	// Build response
-	type PlatformData struct {
-		ID          string `json:"id"`
-		Name        string `json:"name"`
-		Platform    string `json:"platform"`
-		Connected   bool   `json:"connected"`
-		ProfileName string `json:"profileName,omitempty"`
-	}
-	platforms := make([]PlatformData, 0)
-
-	for _, platform := range services.GetSupportedPlatforms() {
-		info, ok := connected[platform]
-
-		isConnected := false
-		profileName := ""
-
-		if ok {
-			profileName = info.ProfileName // Always return profile name if we know it
-			if info.Status == "connected" || info.Status == "active" {
-				isConnected = true
-			}
+		isConnected := (status == "connected" || status == "active")
+		if isConnected {
+			connectedPlatforms[platform] = true
 		}
 
-		// Capitalize first letter for name
-		name := platform
-		if len(name) > 0 {
-			name = string(name[0]-32) + name[1:]
+		// Capitalize first letter for display name
+		displayName := platform
+		if len(displayName) > 0 {
+			displayName = string(displayName[0]-32) + displayName[1:]
 		}
 		if platform == "youtube" {
-			name = "YouTube"
+			displayName = "YouTube"
 		}
 
-		platforms = append(platforms, PlatformData{
-			ID:          platform,
-			Name:        name,
-			Platform:    platform,
-			Connected:   isConnected,
-			ProfileName: profileName,
+		results = append(results, PlatformData{
+			AccountID:      accountID,
+			ID:             strconv.Itoa(accountID),
+			Name:           displayName,
+			Platform:       platform,
+			Connected:      isConnected,
+			ProfileName:    profileName,
+			PlatformUserID: platformUserID,
 		})
 	}
 
-	return c.JSON(platforms)
+	// 2. Add "Available" options for ALL supported platforms
+	// This ensures the "Connect Platform" page can always show a Link button
+	for _, p := range services.GetSupportedPlatforms() {
+		displayName := p
+		if len(displayName) > 0 {
+			displayName = string(displayName[0]-32) + displayName[1:]
+		}
+		if p == "youtube" {
+			displayName = "YouTube"
+		}
+
+		results = append(results, PlatformData{
+			ID:        p, // ID is the platform name (e.g., "youtube")
+			Name:      displayName,
+			Platform:  p,
+			Connected: false,
+		})
+	}
+
+	return c.JSON(results)
 }
 
 // InitiateConnection returns OAuth URL for platform connection
@@ -113,59 +123,48 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 	state := strconv.Itoa(userID) // Simplified - use secure state generation in production
 
 	var authURL string
+	var errSvc error
 
-	// Type assertion to get auth URL based on platform type
-	switch platform {
-	case "youtube":
-		// Optimize re-connect flow: if we have stored the connected account's email, use it as hint
-		// Query platform_accounts table, NOT users table
+	// Check if the parameter is a platform name or an account ID
+	accountID, errID := strconv.Atoi(platform)
+	targetPlatform := platform
+	isReconnect := errID == nil
+
+	if isReconnect {
+		// Reconnect specific account: get platform name and email hint
 		var email string
-		_ = h.db.QueryRow("SELECT email FROM platform_accounts WHERE user_id = $1 AND platform = 'youtube'", userID).Scan(&email)
+		err := h.db.QueryRow("SELECT platform, email FROM platform_accounts WHERE id = $1 AND user_id = $2", accountID, userID).Scan(&targetPlatform, &email)
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusNotFound, "account not found")
+		}
 
-		ytService, ok := platformService.(*services.YouTubeService)
-		if !ok {
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "youtube service error")
+		// Re-initialize service with correct platform
+		platformService, errSvc = services.GetPlatformService(targetPlatform, h.db)
+		if errSvc != nil {
+			return utils.ErrorResponse(c, fiber.StatusBadRequest, errSvc.Error())
 		}
-		// Use login_hint if available to skip picker
-		authURL = ytService.GetAuthURLWithHint(state, "consent", email)
-	case "instagram":
-		igService, ok := platformService.(*services.InstagramService)
-		if !ok {
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "instagram service error")
+
+		if targetPlatform == "youtube" {
+			ytService := platformService.(*services.YouTubeService)
+			// For reconnect, use login_hint but still force consent to ensure token refresh
+			authURL = ytService.GetAuthURLWithHint(state, "consent", email)
+		} else {
+			// For other platforms, just use default auth URL
+			authURL = platformService.GetAuthURL(state)
 		}
-		authURL = igService.GetAuthURL(state)
-	case "facebook":
-		fbService, ok := platformService.(*services.FacebookService)
-		if !ok {
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "facebook service error")
+	} else {
+		// New connection: show account picker and DON'T use login hint
+		if targetPlatform == "youtube" {
+			ytService := platformService.(*services.YouTubeService)
+			// "select_account" ensures user can pick a different account
+			authURL = ytService.GetAuthURLWithHint(state, "select_account consent", "")
+		} else {
+			authURL = platformService.GetAuthURL(state)
 		}
-		authURL = fbService.GetAuthURL(state)
-	case "linkedin":
-		liService, ok := platformService.(*services.LinkedInService)
-		if !ok {
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "linkedin service error")
-		}
-		authURL = liService.GetAuthURL(state)
-	case "twitter":
-		twService, ok := platformService.(*services.TwitterService)
-		if !ok {
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "twitter service error")
-		}
-		authURL = twService.GetAuthURL(state)
-	case "discord":
-		dsService, ok := platformService.(*services.DiscordService)
-		if !ok {
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "discord service error")
-		}
-		authURL = dsService.GetAuthURL(state)
-	case "reddit":
-		rdService, ok := platformService.(*services.RedditService)
-		if !ok {
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "reddit service error")
-		}
-		authURL = rdService.GetAuthURL(state)
-	default:
-		return utils.ErrorResponse(c, fiber.StatusBadRequest, "unsupported platform for OAuth")
+	}
+
+	if authURL == "" {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate auth URL")
 	}
 
 	return utils.SuccessResponse(c, map[string]string{
@@ -206,17 +205,26 @@ func (h *PlatformHandler) HandleCallback(c *fiber.Ctx) error {
 }
 
 // disconnectPlatformInternal handles token revocation and status updates (reusable logic)
-func (h *PlatformHandler) disconnectPlatformInternal(userID int, platform string) error {
-	// In production, add platform-specific revocation here
-	// platformService, _ := services.GetPlatformService(platform, h.db)
-	// if platformService != nil { _ = platformService.RevokeAccess(userID) }
+func (h *PlatformHandler) disconnectPlatformInternal(userID int, target string) error {
+	// Check if target is a numeric account ID or a platform name
+	accountID, errID := strconv.Atoi(target)
 
-	// Don't clear profile_name so we can show "Reconnect" vs "Connect"
-	_, err := h.db.Exec(`
-		UPDATE platform_accounts 
-		SET status = 'disconnected' 
-		WHERE user_id = $1 AND platform = $2
-	`, userID, platform)
+	var err error
+	if errID == nil {
+		// Target is an ID
+		_, err = h.db.Exec(`
+			UPDATE platform_accounts 
+			SET status = 'disconnected' 
+			WHERE id = $1 AND user_id = $2
+		`, accountID, userID)
+	} else {
+		// Target is a platform name (legacy support or mass-disconnect)
+		_, err = h.db.Exec(`
+			UPDATE platform_accounts 
+			SET status = 'disconnected' 
+			WHERE platform = $1 AND user_id = $2
+		`, target, userID)
+	}
 	return err
 }
 
@@ -234,15 +242,27 @@ func (h *PlatformHandler) DeactivatePlatform(c *fiber.Ctx) error {
 
 // RemovePlatform (DELETE /api/platforms/:platform) - Hard removal
 func (h *PlatformHandler) RemovePlatform(c *fiber.Ctx) error {
-	platform := c.Params("platform")
+	target := c.Params("platform")
 	userID := middleware.GetUserID(c)
 
 	// Always attempt to disconnect first (reusing logic as requested)
-	_ = h.disconnectPlatformInternal(userID, platform)
+	_ = h.disconnectPlatformInternal(userID, target)
 
-	_, err := h.db.Exec(`
-		DELETE FROM platform_accounts WHERE user_id = $1 AND platform = $2
-	`, userID, platform)
+	// Check if target is a numeric account ID or a platform name
+	accountID, errID := strconv.Atoi(target)
+
+	var err error
+	if errID == nil {
+		// Target is an ID
+		_, err = h.db.Exec(`
+			DELETE FROM platform_accounts WHERE id = $1 AND user_id = $2
+		`, accountID, userID)
+	} else {
+		// Target is a platform name
+		_, err = h.db.Exec(`
+			DELETE FROM platform_accounts WHERE platform = $1 AND user_id = $2
+		`, target, userID)
+	}
 
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to remove platform")

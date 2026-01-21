@@ -66,8 +66,8 @@ func (l *LinkedInService) Authenticate(code string, userID int) error {
 	query := `
 		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, platform_user_id, status, profile_name)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (user_id, platform) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, platform_user_id = $5, status = $6, profile_name = $7, connected_at = NOW()
+		ON CONFLICT (user_id, platform, platform_user_id) 
+		DO UPDATE SET access_token = $3, refresh_token = $4, status = $6, profile_name = $7, connected_at = NOW()
 	`
 	refreshToken := ""
 	if token.RefreshToken != "" {

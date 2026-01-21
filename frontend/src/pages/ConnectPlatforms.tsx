@@ -123,15 +123,15 @@ export const ConnectPlatforms = () => {
 
                                         <div className="pt-4 flex items-center gap-4">
                                             <Button
-                                                onClick={() => !isConnected && connectMutation.mutate(platform.id)}
-                                                disabled={!platform.enabled || isConnected || isSyncing}
+                                                onClick={() => connectMutation.mutate(platform.id)}
+                                                disabled={!platform.enabled || isSyncing}
                                                 variant={isConnected ? "outline" : "default"}
                                                 className={cn(
                                                     "h-12 px-10 rounded-2xl font-black transition-all",
                                                     !isConnected && "bg-gradient-to-r from-primary to-cyan-500 shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 text-white"
                                                 )}
                                             >
-                                                {isSyncing ? 'Linking...' : isConnected ? 'Connected' : `Link ${platform.name}`}
+                                                {isSyncing ? 'Linking...' : isConnected ? `Link Another ${platform.name}` : `Link ${platform.name}`}
                                             </Button>
 
                                             {!isConnected && platform.enabled && (

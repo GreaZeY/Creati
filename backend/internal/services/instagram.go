@@ -77,8 +77,8 @@ func (i *InstagramService) Authenticate(code string, userID int) error {
 	query := `
 		INSERT INTO platform_accounts (user_id, platform, access_token, platform_user_id, status, profile_name)
 		VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (user_id, platform) 
-		DO UPDATE SET access_token = $3, platform_user_id = $4, status = $5, profile_name = $6, connected_at = NOW()
+		ON CONFLICT (user_id, platform, platform_user_id) 
+		DO UPDATE SET access_token = $3, status = $5, profile_name = $6, connected_at = NOW()
 	`
 	_, err = i.db.Exec(query, userID, "instagram", longLivedToken, igAccountID, "connected", username)
 	return err

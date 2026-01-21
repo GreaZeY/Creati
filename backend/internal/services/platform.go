@@ -11,6 +11,9 @@ import "example.com/creati/backend/internal/db/models"
  * 2. Registering it in the platform factory
  */
 type Platform interface {
+	// GetAuthURL returns the OAuth URL for user authorization
+	GetAuthURL(state string) string
+
 	// Authenticate handles OAuth flow and stores tokens
 	Authenticate(code string, userID int) error
 
