@@ -17,6 +17,8 @@ interface ConnectedAccount {
     platform: string;
     connected: boolean;
     profileName: string;
+    platformUserId: string;
+    handle?: string;
 }
 
 export const Upload = () => {
@@ -223,7 +225,8 @@ export const Upload = () => {
                                                             <PlatformLogo platform={account.platform} size={18} className={cn("transition-colors", isSelected ? "text-white" : "text-muted-foreground/60")} />
                                                             <div className="flex flex-col items-start leading-tight">
                                                                 <span className="text-[10px] opacity-70 font-bold">{account.platform}</span>
-                                                                <span>{account.profileName || 'Connected'}</span>
+                                                                <span className="truncate max-w-[120px]">{account.profileName || 'Connected'}</span>
+                                                                {account.handle && <span className="text-[9px] opacity-50 font-medium truncate max-w-[120px]">{account.handle}</span>}
                                                             </div>
                                                             {isSelected && <CheckCircle2 className="w-4 h-4 ml-1" />}
                                                         </button>

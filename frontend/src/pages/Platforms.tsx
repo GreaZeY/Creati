@@ -21,6 +21,7 @@ interface PlatformData {
     connected: boolean;
     profileName?: string;
     platformUserId?: string;
+    handle?: string;
 }
 
 const PLATFORM_THEMES: Record<string, { gradient: string; color: string; bg: string }> = {
@@ -247,7 +248,7 @@ export const Platforms = () => {
                                                     )}
                                                 </div>
                                                 <p className="text-xs text-muted-foreground/60 mt-1 uppercase tracking-wider">
-                                                    {platform.platform} {platform.platformUserId ? `• ${platform.platformUserId}` : ''}
+                                                    {platform.platform} {platform.handle ? `• ${platform.handle}` : platform.platformUserId ? `• ${platform.platformUserId}` : ''}
                                                 </p>
                                             </div>
 

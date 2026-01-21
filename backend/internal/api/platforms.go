@@ -31,7 +31,7 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 
 	// Get all connected accounts for user
 	rows, err := h.db.Query(`
-		SELECT id, platform, status, COALESCE(profile_name, '') as profile_name, platform_user_id 
+		SELECT id, platform, status, COALESCE(profile_name, '') as profile_name, platform_user_id, COALESCE(handle, '') as handle
 		FROM platform_accounts 
 		WHERE user_id = $1
 	`, userID)
@@ -48,6 +48,7 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 		Connected      bool   `json:"connected"`
 		ProfileName    string `json:"profileName,omitempty"`
 		PlatformUserID string `json:"platformUserId,omitempty"`
+		Handle         string `json:"handle"`
 	}
 
 	results := make([]PlatformData, 0)
@@ -56,8 +57,8 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 	// 1. Add all connected accounts
 	for rows.Next() {
 		var accountID int
-		var platform, status, profileName, platformUserID string
-		if err := rows.Scan(&accountID, &platform, &status, &profileName, &platformUserID); err != nil {
+		var platform, status, profileName, platformUserID, handle string
+		if err := rows.Scan(&accountID, &platform, &status, &profileName, &platformUserID, &handle); err != nil {
 			continue
 		}
 
@@ -83,6 +84,7 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 			Connected:      isConnected,
 			ProfileName:    profileName,
 			PlatformUserID: platformUserID,
+			Handle:         handle,
 		})
 	}
 

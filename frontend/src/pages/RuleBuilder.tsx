@@ -160,7 +160,7 @@ export function RuleBuilder() {
                                     </div>
                                     <div className="flex-1 overflow-hidden">
                                         <div className="font-semibold truncate">{account.profileName}</div>
-                                        <div className="text-xs text-muted-foreground truncate">{account.platformUserID}</div>
+                                        <div className="text-xs text-muted-foreground truncate">{account.handle || account.platformUserId}</div>
                                     </div>
                                     {sourceAccountId === account.accountId && (
                                         <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center">

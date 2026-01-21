@@ -93,9 +93,11 @@ func (y *YouTubeService) Authenticate(code string, userID int) error {
 
 	channelName := "Unknown Channel"
 	channelID := ""
+	handle := ""
 	if len(conn.Items) > 0 {
 		channelName = conn.Items[0].Snippet.Title
 		channelID = conn.Items[0].Id
+		handle = conn.Items[0].Snippet.CustomUrl
 	}
 
 	if channelID == "" {
@@ -115,12 +117,12 @@ func (y *YouTubeService) Authenticate(code string, userID int) error {
 	// Store tokens in database using 'connected' status to match list logic
 	// Update: use (user_id, platform, platform_user_id) for conflict resolution to allow multiple accounts
 	query := `
-		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, status, profile_name, email, platform_user_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, status, profile_name, email, platform_user_id, handle)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (user_id, platform, platform_user_id) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, status = $5, profile_name = $6, email = $7, connected_at = NOW()
+		DO UPDATE SET access_token = $3, refresh_token = $4, status = $5, profile_name = $6, email = $7, handle = $9, connected_at = NOW()
 	`
-	_, err = y.db.Exec(query, userID, "youtube", token.AccessToken, token.RefreshToken, "connected", channelName, userEmail, channelID)
+	_, err = y.db.Exec(query, userID, "youtube", token.AccessToken, token.RefreshToken, "connected", channelName, userEmail, channelID, handle)
 	if err != nil {
 		return err
 	}
