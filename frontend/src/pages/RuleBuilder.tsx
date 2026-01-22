@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/events';
+import { PlatformLogo } from '@/components/platforms/PlatformLogo';
 
 const STEPS = [
     { id: 'source', title: 'Source', icon: Youtube },
@@ -93,7 +94,8 @@ export function RuleBuilder() {
     };
 
     const youtubeAccounts = accounts.filter((a: any) => a.platform === 'youtube');
-    const targetAccounts = accounts.filter((a: any) => a.platform !== 'youtube');
+    // Allow any account that is NOT the selected source account as a target
+    const targetAccounts = accounts.filter((a: any) => a.accountId !== sourceAccountId);
 
     return (
         <div className="max-w-4xl mx-auto py-8 space-y-8">
@@ -163,7 +165,7 @@ export function RuleBuilder() {
                                         <div className="text-xs text-muted-foreground truncate">{account.handle || account.platformUserId}</div>
                                     </div>
                                     {sourceAccountId === account.accountId && (
-                                        <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center">
+                                        <div className="w-6 h-6 rounded-full bg-primary text-slate-950 flex items-center justify-center">
                                             <Check size={14} />
                                         </div>
                                     )}
@@ -231,15 +233,15 @@ export function RuleBuilder() {
                                                     : "border-border hover:border-primary/50"
                                             )}
                                         >
-                                            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center font-bold">
-                                                {account.platform[0].toUpperCase()}
+                                            <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center p-2.5">
+                                                <PlatformLogo platform={account.platform} className="text-primary" />
                                             </div>
                                             <div className="flex-1 overflow-hidden">
                                                 <div className="font-semibold truncate">{account.profileName}</div>
-                                                <div className="text-xs text-muted-foreground capitalize">{account.platform}</div>
+                                                <div className="text-xs text-muted-foreground truncate">{account.handle || account.platformUserId}</div>
                                             </div>
                                             {isSelected && (
-                                                <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center">
+                                                <div className="w-6 h-6 rounded-full bg-primary text-slate-950 flex items-center justify-center">
                                                     <Check size={14} />
                                                 </div>
                                             )}
@@ -313,7 +315,10 @@ export function RuleBuilder() {
                     {currentStep < STEPS.length - 1 ? (
                         <Button
                             onClick={() => setCurrentStep(currentStep + 1)}
-                            disabled={(currentStep === 0 && !sourceAccountId)}
+                            disabled={
+                                (currentStep === 0 && !sourceAccountId) ||
+                                (currentStep === 2 && selectedTargets.length === 0)
+                            }
                         >
                             Keep it movin'
                             <ArrowRight size={18} className="ml-2" />

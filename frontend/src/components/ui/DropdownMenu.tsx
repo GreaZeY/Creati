@@ -91,7 +91,7 @@ export const DropdownItem = ({ children, onClick, className, variant = 'default'
             className={cn(
                 "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150 outline-none",
                 variant === 'default'
-                    ? "text-muted-foreground hover:bg-white/5 hover:text-white"
+                    ? "text-muted-foreground hover:bg-white/5 hover:text-slate-950"
                     : "text-red-400 hover:bg-red-500/10 hover:text-red-300",
                 className
             )}

@@ -149,7 +149,7 @@ export const Upload = () => {
 
                                 <div className={cn(
                                     "w-28 h-28 rounded-[2.5rem] flex items-center justify-center mb-8 transition-all duration-700 relative z-10 shadow-2xl ring-1 ring-white/10",
-                                    isDragActive ? "bg-primary text-white rotate-12 scale-110 shadow-primary/30" : "bg-secondary/50 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary group-hover:rotate-3"
+                                    isDragActive ? "bg-primary text-slate-950 rotate-12 scale-110 shadow-primary/30" : "bg-secondary/50 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary group-hover:rotate-3"
                                 )}>
                                     <UploadCloud className="w-12 h-12" />
                                 </div>
@@ -218,11 +218,11 @@ export const Upload = () => {
                                                             className={cn(
                                                                 "flex items-center gap-3 px-6 py-3 rounded-2xl border-0 transition-all font-black text-sm uppercase tracking-wider ring-1 shadow-lg",
                                                                 isSelected
-                                                                    ? "bg-gradient-to-r from-primary to-cyan-500 text-white ring-primary shadow-primary/20 scale-105"
+                                                                    ? "bg-gradient-to-r from-primary to-cyan-500 text-slate-950 ring-primary shadow-primary/20 scale-105"
                                                                     : "bg-secondary/50 text-muted-foreground/60 ring-white/10 hover:bg-secondary hover:text-muted-foreground hover:scale-105"
                                                             )}
                                                         >
-                                                            <PlatformLogo platform={account.platform} size={18} className={cn("transition-colors", isSelected ? "text-white" : "text-muted-foreground/60")} />
+                                                            <PlatformLogo platform={account.platform} size={18} className={cn("transition-colors", isSelected ? "text-slate-950" : "text-muted-foreground/60")} />
                                                             <div className="flex flex-col items-start leading-tight">
                                                                 <span className="text-[10px] opacity-70 font-bold">{account.platform}</span>
                                                                 <span className="truncate max-w-[120px]">{account.profileName || 'Connected'}</span>

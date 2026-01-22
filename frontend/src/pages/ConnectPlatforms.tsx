@@ -55,14 +55,14 @@ export const ConnectPlatforms = () => {
                         exit={{ opacity: 0, scale: 0.95, y: -20 }}
                         className="bg-emerald-500/10 border-2 border-emerald-500/20 p-6 rounded-3xl flex items-center gap-5 shadow-2xl shadow-emerald-500/10 backdrop-blur-md"
                     >
-                        <div className="p-3 bg-emerald-500 rounded-2xl text-white shadow-lg shadow-emerald-500/20">
+                        <div className="p-3 bg-emerald-500 rounded-2xl text-slate-950 shadow-lg shadow-emerald-500/20">
                             <CheckCheck className="w-6 h-6" />
                         </div>
                         <div>
                             <h3 className="font-black text-xl text-emerald-500 capitalize leading-none">Connected {platformParam}!</h3>
                             <p className="text-emerald-500/80 font-bold text-sm mt-1">Your account is now ready for unified publishing.</p>
                         </div>
-                        <Button asChild size="sm" className="ml-auto rounded-xl bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 font-bold text-white">
+                        <Button asChild size="sm" className="ml-auto rounded-xl bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-500/20 font-bold text-slate-950">
                             <Link to="/platforms">My Platforms</Link>
                         </Button>
                     </motion.div>

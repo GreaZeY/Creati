@@ -27,27 +27,27 @@ interface PlatformData {
 const PLATFORM_THEMES: Record<string, { gradient: string; color: string; bg: string }> = {
     youtube: {
         gradient: 'from-[#FF0000] to-[#cc0000]',
-        color: 'text-white',
+        color: 'text-slate-950',
         bg: 'bg-[#FF0000]'
     },
     instagram: {
         gradient: 'from-[#833AB4] via-[#FD1D1D] to-[#FCB045]',
-        color: 'text-white',
+        color: 'text-slate-950',
         bg: 'bg-gradient-to-tr from-[#833AB4] via-[#FD1D1D] to-[#FCB045]'
     },
     facebook: {
         gradient: 'from-[#1877F2] to-[#0d56b3]',
-        color: 'text-white',
+        color: 'text-slate-950',
         bg: 'bg-[#1877F2]'
     },
     linkedin: {
         gradient: 'from-[#0A66C2] to-[#004182]',
-        color: 'text-white',
+        color: 'text-slate-950',
         bg: 'bg-[#0A66C2]'
     },
     twitter: {
         gradient: 'from-[#1DA1F2] to-[#0c85d0]',
-        color: 'text-white',
+        color: 'text-slate-950',
         bg: 'bg-[#1DA1F2]'
     },
 };
@@ -154,7 +154,7 @@ export const Platforms = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <AnimatePresence mode="popLayout">
                         {platformStats.map((platform: PlatformData, i: number) => {
-                            const theme = PLATFORM_THEMES[platform.platform] || { gradient: 'from-primary to-primary/80', color: 'text-white', bg: 'bg-primary' };
+                            const theme = PLATFORM_THEMES[platform.platform] || { gradient: 'from-primary to-primary/80', color: 'text-slate-950', bg: 'bg-primary' };
 
                             return (
                                 <motion.div
@@ -182,7 +182,7 @@ export const Platforms = () => {
                                         <div className="absolute top-3 right-3 z-10">
                                             <DropdownMenu
                                                 trigger={
-                                                    <button className="p-2 rounded-lg text-muted-foreground/60 hover:text-white hover:bg-white/5 transition-colors">
+                                                    <button className="p-2 rounded-lg text-muted-foreground/60 hover:text-slate-950 hover:bg-white/5 transition-colors">
                                                         <MoreVertical size={18} />
                                                     </button>
                                                 }

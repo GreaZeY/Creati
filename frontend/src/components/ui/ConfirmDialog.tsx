@@ -75,13 +75,13 @@ export const ConfirmDialog = ({
                             {/* Icon */}
                             <div className="flex justify-center mb-8">
                                 <div className={`p-5 rounded-[1.5rem] bg-gradient-to-br ${colors[variant]} bg-opacity-10 ring-1 ring-white/20`}>
-                                    <AlertCircle className="w-10 h-10 text-white" />
+                                    <AlertCircle className="w-10 h-10 text-slate-950" />
                                 </div>
                             </div>
 
                             {/* Text */}
                             <div className="text-center space-y-4 mb-10">
-                                <h3 className="text-2xl font-black tracking-tight text-white">{title}</h3>
+                                <h3 className="text-2xl font-black tracking-tight text-slate-950">{title}</h3>
                                 <p className="text-muted-foreground leading-relaxed">
                                     {description}
                                 </p>
@@ -93,14 +93,14 @@ export const ConfirmDialog = ({
                                     variant="ghost"
                                     onClick={onClose}
                                     disabled={isLoading}
-                                    className="flex-1 h-14 rounded-[1.25rem] border-white/10 hover:bg-white/5 text-muted-foreground hover:text-white transition-all duration-300"
+                                    className="flex-1 h-14 rounded-[1.25rem] border-white/10 hover:bg-white/5 text-muted-foreground hover:text-slate-950 transition-all duration-300"
                                 >
                                     {cancelText}
                                 </Button>
                                 <Button
                                     onClick={onConfirm}
                                     isLoading={isLoading}
-                                    className={`flex-1 h-14 rounded-[1.25rem] bg-gradient-to-r ${colors[variant]} border-0 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 font-bold text-white shadow-lg`}
+                                    className={`flex-1 h-14 rounded-[1.25rem] bg-gradient-to-r ${colors[variant]} border-0 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 font-bold text-slate-950 shadow-lg`}
                                 >
                                     {confirmText}
                                 </Button>
@@ -111,7 +111,7 @@ export const ConfirmDialog = ({
                         <button
                             onClick={onClose}
                             disabled={isLoading}
-                            className="absolute top-6 right-6 p-2 rounded-full bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white transition-all duration-300"
+                            className="absolute top-6 right-6 p-2 rounded-full bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-slate-950 transition-all duration-300"
                         >
                             <X className="w-5 h-5" />
                         </button>

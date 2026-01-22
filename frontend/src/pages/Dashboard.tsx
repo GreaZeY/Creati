@@ -66,8 +66,8 @@ export const Dashboard = () => {
                 >
                     <Button asChild size="lg" className="shadow-2xl shadow-primary/40 rounded-[1.5rem] h-16 px-10 group relative overflow-hidden bg-gradient-to-r from-primary to-cyan-500 border-0 hover:scale-105 active:scale-95 transition-all duration-300">
                         <Link to="/upload" className="flex items-center gap-4 relative z-10">
-                            <PlusCircle className="w-6 h-6 transition-transform group-hover:rotate-90 duration-500 text-white" />
-                            <span className="font-black text-lg text-white">New Distribution</span>
+                            <PlusCircle className="w-6 h-6 transition-transform group-hover:rotate-90 duration-500 text-slate-950" />
+                            <span className="font-black text-lg text-slate-950">New Distribution</span>
                             {/* Animated Glow Effect - Moved inside Link */}
                             <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl" />
                         </Link>
