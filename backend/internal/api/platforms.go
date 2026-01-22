@@ -89,25 +89,6 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 		})
 	}
 
-	// 2. Add "Available" options for ALL supported platforms
-	// This ensures the "Connect Platform" page can always show a Link button
-	for _, p := range services.GetSupportedPlatforms() {
-		displayName := p
-		if len(displayName) > 0 {
-			displayName = string(displayName[0]-32) + displayName[1:]
-		}
-		if p == "youtube" {
-			displayName = "YouTube"
-		}
-
-		results = append(results, PlatformData{
-			ID:        p, // ID is the platform name (e.g., "youtube")
-			Name:      displayName,
-			Platform:  p,
-			Connected: false,
-		})
-	}
-
 	return utils.SuccessResponse(c, results, "")
 }
 
@@ -116,13 +97,6 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 	platform := c.Params("platform")
 	userID := middleware.GetUserID(c)
 	fmt.Println(platform)
-
-	// Get platform service using factory (Open/Closed principle)
-	platformService, err := services.GetPlatformService(platform, h.db)
-	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusBadRequest, err.Error())
-	}
-
 	// Generate state token for security (should include userID)
 	state := strconv.Itoa(userID) // Simplified - use secure state generation in production
 
@@ -132,7 +106,6 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 	accountID, errID := strconv.Atoi(platform)
 	targetPlatform := platform
 	isReconnect := errID == nil
-	fmt.Println(platform, accountID, errID)
 
 	if isReconnect {
 		// Reconnect specific account: get platform name and email hint
@@ -142,7 +115,7 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 			return utils.ErrorResponse(c, fiber.StatusNotFound, "account not found")
 		}
 
-		// Re-initialize service with correct platform
+		// Initialize service with correct platform
 		platformService, errSvc := services.GetPlatformService(targetPlatform, h.db)
 		if errSvc != nil {
 			return utils.ErrorResponse(c, fiber.StatusBadRequest, errSvc.Error())
@@ -157,7 +130,12 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 			authURL = platformService.GetAuthURL(state)
 		}
 	} else {
-		// New connection: show account picker and DON'T use login hint
+		// New connection
+		platformService, errSvc := services.GetPlatformService(targetPlatform, h.db)
+		if errSvc != nil {
+			return utils.ErrorResponse(c, fiber.StatusBadRequest, errSvc.Error())
+		}
+
 		if targetPlatform == "youtube" {
 			ytService := platformService.(*services.YouTubeService)
 			// "select_account" ensures user can pick a different account
