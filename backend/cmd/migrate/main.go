@@ -56,19 +56,19 @@ func main() {
 
 		sqlBytes, err := os.ReadFile(path)
 		if err != nil {
-			log.Printf("✗ Read failed (%s): %v\n", file, err)
+			log.Printf("❌ Read failed (%s): %v\n", file, err)
 			failed = true
 			continue
 		}
 
 		_, err = db.Exec(string(sqlBytes))
 		if err != nil {
-			log.Printf("✗ Migration failed (%s): %v\n", file, err)
+			log.Printf("❌ Migration failed (%s): %v\n", file, err)
 			failed = true
 			continue
 		}
 
-		fmt.Println("✓ Applied migration:", file)
+		fmt.Println("✅ Applied migration:", file)
 	}
 
 	if failed {
