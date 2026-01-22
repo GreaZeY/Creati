@@ -247,8 +247,8 @@ export const Platforms = () => {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <p className="text-xs text-muted-foreground/60 mt-1 uppercase tracking-wider">
-                                                    {platform.platform} {platform.handle ? `• ${platform.handle}` : platform.platformUserId ? `• ${platform.platformUserId}` : ''}
+                                                <p className="text-xs text-muted-foreground/90 mt-1 tracking-wider">
+                                                    <span className="capitalize">{platform.platform}</span> {platform.handle ? `• ${platform.handle}` : platform.platformUserId ? `• ${platform.platformUserId}` : ''}
                                                 </p>
                                             </div>
 
