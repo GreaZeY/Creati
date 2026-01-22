@@ -38,26 +38,44 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
 	rows, err := h.db.Query(`
-		SELECT id, name, source_account_id, trigger_type, filters, targets, is_active, last_run_at, created_at
-		FROM automation_rules
-		WHERE user_id = $1
-		ORDER BY created_at DESC
+		SELECT 
+			ar.id, ar.name, ar.source_account_id, ar.trigger_type, ar.filters, ar.targets, ar.is_active, ar.last_run_at, ar.created_at,
+			pa.profile_name, pa.handle, pa.platform
+		FROM automation_rules ar
+		LEFT JOIN platform_accounts pa ON ar.source_account_id = pa.id
+		WHERE ar.user_id = $1
+		ORDER BY ar.created_at DESC
 	`, userID)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
 	}
 	defer rows.Close()
 
+	type AccountInfo struct {
+		AccountID   int    `json:"accountId"`
+		ProfileName string `json:"profileName"`
+		Handle      string `json:"handle"`
+		Platform    string `json:"platform"`
+	}
+
+	type TargetWithInfo struct {
+		AccountID       int    `json:"accountId"`
+		CaptionTemplate string `json:"captionTemplate"`
+		ProfileName     string `json:"profileName"`
+		Handle          string `json:"handle"`
+		Platform        string `json:"platform"`
+	}
+
 	type RuleResponse struct {
-		ID              int             `json:"id"`
-		Name            string          `json:"name"`
-		SourceAccountID int             `json:"sourceAccountId"`
-		TriggerType     string          `json:"triggerType"`
-		Filters         json.RawMessage `json:"filters"`
-		Targets         json.RawMessage `json:"targets"`
-		IsActive        bool            `json:"isActive"`
-		LastRunAt       *string         `json:"lastRunAt"`
-		CreatedAt       string          `json:"createdAt"`
+		ID            int              `json:"id"`
+		Name          string           `json:"name"`
+		SourceAccount AccountInfo      `json:"sourceAccount"`
+		TriggerType   string           `json:"triggerType"`
+		Filters       json.RawMessage  `json:"filters"`
+		Targets       []TargetWithInfo `json:"targets"`
+		IsActive      bool             `json:"isActive"`
+		LastRunAt     *string          `json:"lastRunAt"`
+		CreatedAt     string           `json:"createdAt"`
 	}
 
 	rules := make([]RuleResponse, 0)
@@ -65,11 +83,43 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 		var r RuleResponse
 		var filters, targets []byte
 		var lastRunAt sql.NullString
-		if err := rows.Scan(&r.ID, &r.Name, &r.SourceAccountID, &r.TriggerType, &filters, &targets, &r.IsActive, &lastRunAt, &r.CreatedAt); err != nil {
+		var sourceProfileName, sourceHandle, sourcePlatform sql.NullString
+		var sourceAccountID int
+
+		if err := rows.Scan(
+			&r.ID, &r.Name, &sourceAccountID, &r.TriggerType, &filters, &targets, &r.IsActive, &lastRunAt, &r.CreatedAt,
+			&sourceProfileName, &sourceHandle, &sourcePlatform,
+		); err != nil {
 			continue
 		}
+
+		r.SourceAccount = AccountInfo{
+			AccountID:   sourceAccountID,
+			ProfileName: sourceProfileName.String,
+			Handle:      sourceHandle.String,
+			Platform:    sourcePlatform.String,
+		}
+
 		r.Filters = json.RawMessage(filters)
-		r.Targets = json.RawMessage(targets)
+
+		// Enrich targets with account details
+		var rawTargets []RuleTarget
+		json.Unmarshal(targets, &rawTargets)
+
+		enrichedTargets := make([]TargetWithInfo, 0, len(rawTargets))
+		for _, t := range rawTargets {
+			var profileName, handle, platform sql.NullString
+			h.db.QueryRow(`SELECT profile_name, handle, platform FROM platform_accounts WHERE id = $1`, t.AccountID).Scan(&profileName, &handle, &platform)
+			enrichedTargets = append(enrichedTargets, TargetWithInfo{
+				AccountID:       t.AccountID,
+				CaptionTemplate: t.CaptionTemplate,
+				ProfileName:     profileName.String,
+				Handle:          handle.String,
+				Platform:        platform.String,
+			})
+		}
+		r.Targets = enrichedTargets
+
 		if lastRunAt.Valid {
 			val := lastRunAt.String
 			r.LastRunAt = &val

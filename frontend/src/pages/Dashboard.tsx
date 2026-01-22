@@ -106,7 +106,7 @@ export const Dashboard = () => {
                                     {connectedPlatforms.map((p: any) => (
                                         <div key={p.id} className="p-2 rounded-xl bg-secondary/30 ring-1 ring-white/5 flex items-center gap-2 group/icon hover:bg-primary/10 transition-colors">
                                             <PlatformLogo platform={p.platform} size={16} className="text-primary" />
-                                            <span className="text-[10px] font-black uppercase tracking-widest opacity-60 group-hover/icon:opacity-100">{p.name}</span>
+                                            <span className="text-[10px] font-black tracking-widest opacity-60 group-hover/icon:opacity-100">{p.handle}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -119,7 +119,6 @@ export const Dashboard = () => {
 
                         <div className="relative z-10 pt-6">
                             <Button
-                                variant="secondary"
                                 className="w-full h-14 rounded-2xl font-black group bg-secondary/50 hover:bg-secondary border-0 transition-all"
                                 onClick={() => navigate('/platforms')}
                             >
@@ -170,11 +169,12 @@ export const Dashboard = () => {
 
                         <div className="relative z-10 pt-6">
                             <Button
-                                variant="ghost"
-                                className="w-full h-14 rounded-2xl font-black hover:bg-secondary/50 transition-all"
+                                className="w-full h-14 rounded-2xl font-black group bg-secondary/50 hover:bg-secondary border-0 transition-all"
                                 onClick={() => navigate('/analytics')}
                             >
                                 View Detailed Stats
+                                <ArrowRight className="w-5 h-5 ml-2 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300" />
+
                             </Button>
                         </div>
                     </Card>

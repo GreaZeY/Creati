@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/Label';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/events';
 import { PlatformLogo } from '@/components/platforms/PlatformLogo';
+import { PLATFORMS } from '@/lib/constants';
 
 const STEPS = [
     { id: 'source', title: 'Source', icon: Youtube },
@@ -48,7 +49,7 @@ export function RuleBuilder() {
     const createMutation = useMutation({
         mutationFn: (data: any) => automationAPI.create(data),
         onSuccess: () => {
-            toast.success('Magic is now active! ✨');
+            toast.success('Workflow is now active! ✨');
             navigate('/automation');
         },
     });
@@ -93,18 +94,19 @@ export function RuleBuilder() {
         });
     };
 
-    const youtubeAccounts = accounts.filter((a: any) => a.platform === 'youtube');
+    // Filter accounts based on platform capabilities (only platforms with events can be sources)
+    const sourceAccounts = accounts.filter((a: any) => {
+        const platformConfig = PLATFORMS[a.platform as keyof typeof PLATFORMS];
+        return platformConfig && platformConfig.hasEvents;
+    });
+
     // Allow any account that is NOT the selected source account as a target
     const targetAccounts = accounts.filter((a: any) => a.accountId !== sourceAccountId);
 
     return (
         <div className="max-w-4xl mx-auto py-8 space-y-8">
             <header className="flex items-center gap-4">
-                <Button variant="ghost" size="sm" onClick={() => navigate('/automation')}>
-                    <ArrowLeft size={18} className="mr-2" />
-                    Back
-                </Button>
-                <h1 className="text-2xl font-bold">Setup Magic Sync</h1>
+                <h1 className="text-2xl font-bold">Setup Workflow</h1>
             </header>
 
             {/* Stepper */}
@@ -141,12 +143,12 @@ export function RuleBuilder() {
                 {currentStep === 0 && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                         <div className="space-y-2">
-                            <Label className="text-xl">Pick Your Main 🎮</Label>
+                            <Label className="text-xl">Pick Your Main</Label>
                             <p className="text-sm text-muted-foreground">Whenever you drop a banger on this channel, we'll blast it everywhere else.</p>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                            {youtubeAccounts.map((account: any) => (
+                            {sourceAccounts.map((account: any) => (
                                 <button
                                     key={account.accountId}
                                     onClick={() => setSourceAccountId(account.accountId)}
@@ -157,8 +159,8 @@ export function RuleBuilder() {
                                             : "border-border hover:border-primary/50 hover:bg-muted/50"
                                     )}
                                 >
-                                    <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center text-red-600">
-                                        <Youtube size={24} fill="currentColor" />
+                                    <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center p-2.5">
+                                        <PlatformLogo platform={account.platform} className="text-primary" />
                                     </div>
                                     <div className="flex-1 overflow-hidden">
                                         <div className="font-semibold truncate">{account.profileName}</div>
@@ -269,7 +271,7 @@ export function RuleBuilder() {
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                         <div className="space-y-2">
                             <Label className="text-xl">What's the play? (Name this rule)</Label>
-                            <p className="text-sm text-muted-foreground">Give it a catchy name so you can track the magic.</p>
+                            <p className="text-sm text-muted-foreground">Give it a catchy name so you can track the workflow.</p>
                         </div>
 
                         <Input
@@ -287,7 +289,7 @@ export function RuleBuilder() {
                             <div className="grid grid-cols-2 gap-4 text-sm mt-4">
                                 <div>
                                     <div className="text-muted-foreground">Source Account</div>
-                                    <div className="font-medium">{youtubeAccounts.find(a => a.accountId === sourceAccountId)?.profileName || 'None'}</div>
+                                    <div className="font-medium">{sourceAccounts.find((a: any) => a.accountId === sourceAccountId)?.profileName || 'None'}</div>
                                 </div>
                                 <div>
                                     <div className="text-muted-foreground">Target Platforms</div>
@@ -329,7 +331,7 @@ export function RuleBuilder() {
                             className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20"
                             disabled={createMutation.isPending}
                         >
-                            {createMutation.isPending ? 'Activating...' : 'Activate Magic ✨'}
+                            {createMutation.isPending ? 'Activating...' : 'Activate ✨'}
                             <Zap size={18} className="ml-2 fill-current" />
                         </Button>
                     )}

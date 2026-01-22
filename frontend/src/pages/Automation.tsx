@@ -7,8 +7,7 @@ import {
     Play,
     Trash2,
     ArrowRight,
-    Clock,
-    Youtube
+    Clock
 } from 'lucide-react';
 import { automationAPI } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
@@ -16,14 +15,26 @@ import { Card } from '@/components/ui/Card';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/events';
+import { PlatformLogo } from '@/components/platforms/PlatformLogo';
+
+interface AccountInfo {
+    accountId: number;
+    profileName: string;
+    handle: string;
+    platform: string;
+}
+
+interface TargetWithInfo extends AccountInfo {
+    captionTemplate: string;
+}
 
 interface AutomationRule {
     id: number;
     name: string;
-    sourceAccountId: number;
+    sourceAccount: AccountInfo;
     triggerType: string;
     filters: any;
-    targets: any[];
+    targets: TargetWithInfo[];
     isActive: boolean;
     lastRunAt: string | null;
     createdAt: string;
@@ -52,7 +63,7 @@ export function Automation() {
         mutationFn: (id: number) => automationAPI.delete(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['automation-rules'] });
-            toast.success('Magic removed.');
+            toast.success('Workflow removed.');
         },
     });
 
@@ -68,13 +79,13 @@ export function Automation() {
         <div className="space-y-8 pb-12">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Magic Sync</h1>
-                    <p className="text-muted-foreground mt-1">Blast your content across platforms automatically. No cap. 🚀</p>
+                    <h1 className="text-3xl font-bold tracking-tight">Workflows</h1>
+                    <p className="text-muted-foreground mt-1">Blast your content across platforms automatically.</p>
                 </div>
                 <Link to="/automation/new">
                     <Button className="gap-2">
                         <Plus size={18} />
-                        New Magic
+                        New Workflow
                     </Button>
                 </Link>
             </header>
@@ -84,9 +95,9 @@ export function Automation() {
                     <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                         <Zap className="text-primary" size={32} />
                     </div>
-                    <h3 className="text-xl font-semibold italic">A bit quiet in here... 👻</h3>
+                    <h3 className="text-xl font-semibold italic">A bit quiet in here...</h3>
                     <p className="text-muted-foreground mt-2 max-w-sm">
-                        Turn one upload into a viral spree. Sync your YouTube heat to Insta, LinkedIn & more.
+                        Turn one upload into a viral spree. Sync your Insta heat to YT, LinkedIn & more.
                     </p>
                     <Link to="/automation/new" className="mt-6">
                         <Button className="gap-2">
@@ -108,15 +119,21 @@ export function Automation() {
                             >
                                 <Card className={cn(
                                     "group relative p-6 transition-all duration-300 overflow-hidden",
-                                    !rule.isActive && "opacity-75 grayscale-[0.5]"
+                                    !rule.isActive && "opacity-60 grayscale-[0.4]"
                                 )}>
                                     <div className="flex flex-col md:flex-row md:items-center gap-6">
-                                        {/* Status Icon */}
-                                        <div className={cn(
-                                            "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-                                            rule.isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                                        )}>
-                                            <Zap size={24} fill={rule.isActive ? "currentColor" : "none"} />
+                                        {/* Status Icon with minimalistic pulse for active */}
+                                        <div className="relative">
+                                            <div className={cn(
+                                                "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+                                                rule.isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                                            )}>
+                                                <Zap size={24} fill={rule.isActive ? "currentColor" : "none"} />
+                                            </div>
+                                            {/* Minimalistic active indicator - subtle dot */}
+                                            {rule.isActive && (
+                                                <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full ring-2 ring-background animate-pulse" />
+                                            )}
                                         </div>
 
                                         {/* Info */}
@@ -125,25 +142,49 @@ export function Automation() {
                                                 <h3 className="font-semibold text-lg truncate">{rule.name}</h3>
                                                 <span className={cn(
                                                     "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                                                    rule.isActive ? "bg-green-500/10 text-green-500" : "bg-muted text-muted-foreground"
+                                                    rule.isActive ? "bg-emerald-500/10 text-emerald-500" : "bg-muted text-muted-foreground"
                                                 )}>
                                                     {rule.isActive ? 'Active' : 'Paused'}
                                                 </span>
                                             </div>
 
-                                            <div className="flex flex-wrap items-center gap-y-2 gap-x-4 mt-2 text-sm text-muted-foreground">
-                                                <div className="flex items-center gap-1.5">
-                                                    <Youtube size={14} className="text-[#FF0000]" />
-                                                    <span>YouTube Source</span>
+                                            {/* Source → Targets display */}
+                                            <div className="flex flex-wrap items-center gap-y-2 gap-x-3 mt-3 text-sm">
+                                                {/* Source Account */}
+                                                <div className="flex items-center gap-2 bg-secondary/50 px-3 py-1 rounded-lg">
+                                                    <PlatformLogo platform={rule.sourceAccount.platform} size={14} className="text-primary" />
+                                                    <span className="text-xs font-medium truncate max-w-[120px]">
+                                                        {rule.sourceAccount.profileName || rule.sourceAccount.handle}
+                                                    </span>
                                                 </div>
-                                                <ArrowRight size={14} />
-                                                <div className="flex items-center gap-1.5">
-                                                    <span>{(rule.targets as any[]).length} Targets</span>
+
+                                                <ArrowRight size={16} className="text-muted-foreground" />
+
+                                                {/* Target Accounts */}
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    {rule.targets.slice(0, 3).map((target) => (
+                                                        <div
+                                                            key={target.accountId}
+                                                            className="flex items-center gap-1.5 bg-secondary/50 px-3 py-1 rounded-lg"
+                                                            title={`${target.profileName || target.handle}`}
+                                                        >
+                                                            <PlatformLogo platform={target.platform} size={14} className="text-muted-foreground" />
+                                                            <span className="text-xs font-medium truncate max-w-[120px]">
+                                                                {target.profileName || target.handle}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                    {rule.targets.length > 3 && (
+                                                        <span className="text-xs text-muted-foreground font-medium">
+                                                            +{rule.targets.length - 3} more
+                                                        </span>
+                                                    )}
                                                 </div>
+
                                                 {rule.lastRunAt && (
-                                                    <div className="flex items-center gap-1.5 border-l border-border pl-4 ml-2">
+                                                    <div className="flex items-center gap-1.5 text-muted-foreground border-l border-border pl-3 ml-1">
                                                         <Clock size={14} />
-                                                        <span>Last run: {new Date(rule.lastRunAt).toLocaleDateString()}</span>
+                                                        <span className="text-xs">{new Date(rule.lastRunAt).toLocaleDateString()}</span>
                                                     </div>
                                                 )}
                                             </div>
@@ -177,16 +218,11 @@ export function Automation() {
                                         </div>
                                     </div>
 
-                                    {/* Progress/Stats Bar */}
-                                    <div className="absolute bottom-0 left-0 h-1 bg-primary/20 w-full overflow-hidden">
-                                        {rule.isActive && (
-                                            <motion.div
-                                                className="h-full bg-primary"
-                                                animate={{ x: ["-100%", "100%"] }}
-                                                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                                            />
-                                        )}
-                                    </div>
+                                    {/* Minimalistic left accent bar for active rules */}
+                                    <div className={cn(
+                                        "absolute left-0 top-0 bottom-0 w-1 transition-colors",
+                                        rule.isActive ? "bg-emerald-500" : "bg-muted"
+                                    )} />
                                 </Card>
                             </motion.div>
                         ))}

@@ -3,7 +3,7 @@ import { ChevronRight, Home } from 'lucide-react';
 
 export const Breadcrumbs = () => {
     const location = useLocation();
-    const pathnames = location.pathname.split('/').filter((x) => x);
+    const pathnames = location.pathname.split('/').filter((x) => x)
 
     if (pathnames.length === 0) return null;
 
@@ -16,6 +16,8 @@ export const Breadcrumbs = () => {
         upload: 'Upload Content',
         login: 'Login',
         register: 'Register',
+        automation: 'Workflows',
+        'automation/new': 'New Workflow',
     };
 
     return (
@@ -31,7 +33,7 @@ export const Breadcrumbs = () => {
             {pathnames.map((value, index) => {
                 const last = index === pathnames.length - 1;
                 const to = `/${pathnames.slice(0, index + 1).join('/')}`;
-                const label = routeMap[value] || value.charAt(0).toUpperCase() + value.slice(1);
+                const label = routeMap[to.slice(1)] || value.charAt(0).toUpperCase() + value.slice(1);
 
                 return (
                     <div key={to} className="flex items-center gap-2">

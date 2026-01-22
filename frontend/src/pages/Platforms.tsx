@@ -24,30 +24,29 @@ interface PlatformData {
     handle?: string;
 }
 
-const PLATFORM_THEMES: Record<string, { gradient: string; color: string; bg: string }> = {
+const PLATFORM_THEMES: Record<string, { gradient: string; bg: string }> = {
     youtube: {
         gradient: 'from-[#FF0000] to-[#cc0000]',
-        color: 'text-slate-950',
         bg: 'bg-[#FF0000]'
     },
     instagram: {
         gradient: 'from-[#833AB4] via-[#FD1D1D] to-[#FCB045]',
-        color: 'text-slate-950',
+        // color: 'text-slate-950',
         bg: 'bg-gradient-to-tr from-[#833AB4] via-[#FD1D1D] to-[#FCB045]'
     },
     facebook: {
         gradient: 'from-[#1877F2] to-[#0d56b3]',
-        color: 'text-slate-950',
+        // color: 'text-slate-950',
         bg: 'bg-[#1877F2]'
     },
     linkedin: {
         gradient: 'from-[#0A66C2] to-[#004182]',
-        color: 'text-slate-950',
+        // color: 'text-slate-950',
         bg: 'bg-[#0A66C2]'
     },
     twitter: {
         gradient: 'from-[#1DA1F2] to-[#0c85d0]',
-        color: 'text-slate-950',
+        // color: 'text-slate-950',
         bg: 'bg-[#1DA1F2]'
     },
 };
@@ -154,7 +153,7 @@ export const Platforms = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <AnimatePresence mode="popLayout">
                         {platformStats.map((platform: PlatformData, i: number) => {
-                            const theme = PLATFORM_THEMES[platform.platform] || { gradient: 'from-primary to-primary/80', color: 'text-slate-950', bg: 'bg-primary' };
+                            const theme = PLATFORM_THEMES[platform.platform] || { gradient: 'from-primary to-primary/80', bg: 'bg-primary' };
 
                             return (
                                 <motion.div
@@ -169,7 +168,7 @@ export const Platforms = () => {
                                         stiffness: 120,
                                         damping: 20
                                     }}
-                                    className="w-full"
+                                    className="w-full cursor-pointer"
                                 >
                                     <Card className={cn(
                                         "p-0 border-0 bg-card/40 backdrop-blur-xl group relative flex flex-row items-stretch transition-all duration-300 rounded-2xl ring-1 ring-white/10 hover:ring-primary/30",
@@ -225,7 +224,6 @@ export const Platforms = () => {
                                             <div className={cn(
                                                 "w-14 h-14 rounded-xl shadow-lg transition-transform duration-300 group-hover:scale-105 flex items-center justify-center shrink-0",
                                                 theme.bg,
-                                                theme.color
                                             )}>
                                                 <PlatformLogo platform={platform.platform} size={28} />
                                             </div>

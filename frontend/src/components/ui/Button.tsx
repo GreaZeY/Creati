@@ -7,20 +7,20 @@ import { Check, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-    "relative inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 overflow-hidden",
+    "relative text-slate-950 inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 overflow-hidden",
     {
         variants: {
             variant: {
                 default:
-                    "bg-primary text-slate-950 shadow-sm font-semibold", // Using slate-950 for maximum visibility
+                    "bg-primary shadow-sm font-semibold",
                 destructive:
                     "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm",
                 outline:
-                    "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+                    "text-primary border border-input bg-background hover:bg-accent hover:text-accent-foreground",
                 secondary:
-                    "bg-transparent border border-border text-foreground hover:bg-accent hover:border-primary/30",
-                ghost: "hover:bg-accent hover:text-accent-foreground",
-                link: "text-primary underline-offset-4 hover:underline",
+                    "text-primary bg-transparent border border-border hover:bg-accent hover:border-primary/30 hover:text-slate-950",
+                ghost: "text-primary hover:bg-accent hover:text-accent-foreground",
+                link: "text-primary text-primary underline-offset-4 hover:underline",
             },
             size: {
                 default: "h-[50px] px-6 rounded-[14px]", // 14px radius, 50px height as per spec
@@ -103,15 +103,17 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 animate={isError ? { x: [0, -10, 10, -10, 10, 0] } : {}}
                 {...(props as HTMLMotionProps<"button">)}
             >
-                {/* Background Color Shift for Success/Error */}
-                <motion.div
-                    className="absolute inset-0 z-0 bg-primary"
-                    animate={{
-                        opacity: 1, // Base
-                        backgroundColor: isSuccess ? "#4ADE80" : isError ? "#F87171" : undefined // Green or Red
-                    }}
-                    transition={{ duration: 0.3 }}
-                />
+                {/* Background Color Shift for Success/Error - Only for primary variant */}
+                {isPrimary && (
+                    <motion.div
+                        className="absolute inset-0 z-0 bg-primary"
+                        animate={{
+                            opacity: 1, // Base
+                            backgroundColor: isSuccess ? "#4ADE80" : isError ? "#F87171" : undefined // Green or Red
+                        }}
+                        transition={{ duration: 0.3 }}
+                    />
+                )}
 
                 {/* Content Container */}
                 <span className="relative z-10 flex items-center justify-center gap-2">
@@ -170,7 +172,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 </span>
 
                 {/* Idle Sheen (Only for Primary, when not interacting) */}
-                {isPrimary && !isLoading && !isSuccess && !isError && (
+                {/* {isPrimary && !isLoading && !isSuccess && !isError && (
                     <motion.div
                         className="absolute inset-0 z-1 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12"
                         initial={{ x: "-100%" }}
@@ -182,7 +184,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                             ease: "linear"
                         }}
                     />
-                )}
+                )} */}
             </motion.button>
         )
     }
