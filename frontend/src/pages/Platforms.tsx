@@ -12,6 +12,8 @@ import { DropdownMenu, DropdownItem } from '@/components/ui/DropdownMenu';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useState } from 'react';
 import { toast } from '@/lib/events';
+import { useEntitlement } from '@/hooks/useEntitlement';
+import { CAPABILITIES } from '@/lib/features';
 
 interface PlatformData {
     accountId?: number;
@@ -53,6 +55,8 @@ const PLATFORM_THEMES: Record<string, { gradient: string; bg: string }> = {
 
 export const Platforms = () => {
     const queryClient = useQueryClient();
+    const { limit } = useEntitlement();
+    const maxAccounts = limit(CAPABILITIES.MAX_CONNECTED_ACCOUNTS);
 
     const { data: platformStats = [], isLoading } = useQuery({
         queryKey: ['platforms'],
@@ -61,6 +65,9 @@ export const Platforms = () => {
             return response.data.data as PlatformData[];
         },
     });
+
+    const connectedCount = platformStats.filter(p => p.connected).length;
+    const isLimitReached = maxAccounts > 0 && connectedCount >= maxAccounts;
 
     const connectMutation = useMutation({
         mutationFn: async (platformId: string) => {
@@ -135,12 +142,24 @@ export const Platforms = () => {
                     <h1 className="text-4xl font-extrabold tracking-tight">Distribution Network</h1>
                     <p className="text-muted-foreground mt-2 text-lg">Manage your connected accounts and automation settings.</p>
                 </div>
-                <Button asChild className="gap-2 h-12 px-6 rounded-xl shadow-2xl shadow-primary/30 transition-all hover:scale-105 active:scale-95 bg-gradient-to-r from-primary to-cyan-500 hover:shadow-primary/40">
-                    <Link to="/platforms/connect">
-                        <Plus className="w-5 h-5" />
-                        Connect New Platform
-                    </Link>
-                </Button>
+                {isLimitReached ? (
+                    <div className="flex flex-col items-end gap-1">
+                        <Button disabled className="gap-2 h-12 px-6 rounded-xl opacity-50 cursor-not-allowed">
+                            <Plus className="w-5 h-5" />
+                            Use Limit Reached
+                        </Button>
+                        <Link to="/pricing" className="text-xs text-primary hover:underline font-bold">
+                            Upgrade to add more
+                        </Link>
+                    </div>
+                ) : (
+                    <Button asChild className="gap-2 h-12 px-6 rounded-xl shadow-2xl shadow-primary/30 transition-all hover:scale-105 active:scale-95 bg-gradient-to-r from-primary to-cyan-500 hover:shadow-primary/40">
+                        <Link to="/platforms/connect">
+                            <Plus className="w-5 h-5" />
+                            Connect New Platform
+                        </Link>
+                    </Button>
+                )}
             </div>
 
             {isLoading ? (

@@ -7,7 +7,8 @@ import {
     Settings,
     Link2,
     Zap,
-    LogOut
+    LogOut,
+    Crown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,6 +19,7 @@ const NAV_ITEMS = [
     { label: 'Workflows', icon: Zap, href: '/automation' },
     { label: 'Analytics', icon: BarChart2, href: '/analytics' },
     { label: 'Platforms', icon: Link2, href: '/platforms' },
+    { label: 'Upgrade Plan', icon: Crown, href: '/pricing' },
     { label: 'Settings', icon: Settings, href: '/settings' },
 ];
 

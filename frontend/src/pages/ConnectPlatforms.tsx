@@ -7,12 +7,30 @@ import { PLATFORMS } from '@/lib/constants';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useSearchParams } from 'react-router-dom';
 import { PlatformLogo } from '@/components/platforms/PlatformLogo';
+import { useQuery } from '@tanstack/react-query';
+import { useEntitlement } from '@/hooks/useEntitlement';
+import { CAPABILITIES } from '@/lib/features';
 
 export const ConnectPlatforms = () => {
     const [searchParams] = useSearchParams();
     const status = searchParams.get('status');
     const platformParam = searchParams.get('platform');
 
+
+    const { limit } = useEntitlement();
+    const maxAccounts = limit(CAPABILITIES.MAX_CONNECTED_ACCOUNTS);
+
+    // Fetch current connected count (we need to know if limit reached)
+    const { data: platformStats = [] } = useQuery({
+        queryKey: ['platforms'],
+        queryFn: async () => {
+            const response = await platformsAPI.list();
+            return response.data.data as any[];
+        },
+    });
+
+    const connectedCount = platformStats.filter(p => p.connected).length;
+    const isLimitReached = maxAccounts > 0 && connectedCount >= maxAccounts;
 
     const connectMutation = useMutation({
         mutationFn: async (platformId: string) => {
@@ -70,10 +88,34 @@ export const ConnectPlatforms = () => {
             </AnimatePresence>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                {isLimitReached && (
+                    <div className="md:col-span-2 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-4 text-amber-500">
+                        <div className="p-2 bg-amber-500/20 rounded-lg">
+                            <Zap size={20} />
+                        </div>
+                        <div className="flex-1">
+                            <h4 className="font-bold">Connection Limit Reached</h4>
+                            <p className="text-sm opacity-90">You've hit the limit of {maxAccounts} connected accounts on your current plan.</p>
+                        </div>
+                        <Button asChild variant="outline" size="sm" className="border-amber-500/30 hover:bg-amber-500/10 text-amber-500">
+                            <Link to="/pricing">Upgrade</Link>
+                        </Button>
+                    </div>
+                )}
+
                 {Object.values(PLATFORMS).map((platform: any, i: number) => {
 
 
                     const isSyncing = connectMutation.isPending && connectMutation.variables === platform.id;
+                    // isDisabled removed as it was unused and replaced by finalDisabled
+                    // Actually, ConnectPlatforms shows ALL platforms. We need to know if THIS platform is connected to disable or change button text.
+                    // platformStats element has `platform` (name) and `connected` boolean.
+                    // platform.id in loop is 'youtube', 'instagram' etc.
+                    // platformStats check:
+                    const isConnected = platformStats.some(p => p.platform === platform.id && p.connected);
+
+                    // Re-evaluate disabled state
+                    const finalDisabled = !platform.enabled || isSyncing || (isLimitReached && !isConnected);
 
                     return (
                         <motion.div
@@ -98,16 +140,22 @@ export const ConnectPlatforms = () => {
                                         </p>
 
                                         <div className="pt-4 flex items-center gap-4">
-                                            <Button
-                                                onClick={() => connectMutation.mutate(platform.id)}
-                                                disabled={!platform.enabled || isSyncing}
-                                                variant="default"
-                                                className="h-12 px-10 rounded-2xl font-black transition-all"
-                                            >
-                                                {isSyncing ? 'Linking...' : `Link ${platform.name}`}
-                                            </Button>
+                                            {isConnected ? (
+                                                <Button disabled variant="outline" className="h-12 px-10 rounded-2xl font-bold border-emerald-500/50 text-emerald-500 bg-emerald-500/10 opacity-100">
+                                                    Connected
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    onClick={() => connectMutation.mutate(platform.id)}
+                                                    disabled={finalDisabled}
+                                                    variant="default"
+                                                    className="h-12 px-10 rounded-2xl font-black transition-all"
+                                                >
+                                                    {isSyncing ? 'Linking...' : isLimitReached ? 'Limit Reached' : `Link ${platform.name}`}
+                                                </Button>
+                                            )}
 
-                                            {platform.enabled && (
+                                            {platform.enabled && !isConnected && (
                                                 <div className="flex items-center gap-1.5 text-[10px] text-primary/60 font-black uppercase tracking-[0.2em]">
                                                     <Zap size={14} className="text-primary fill-primary" />
                                                     One-Tap

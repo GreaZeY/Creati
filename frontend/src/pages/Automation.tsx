@@ -16,6 +16,8 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/events';
 import { PlatformLogo } from '@/components/platforms/PlatformLogo';
+import { useEntitlement } from '@/hooks/useEntitlement';
+import { CAPABILITIES } from '@/lib/features';
 
 interface AccountInfo {
     accountId: number;
@@ -42,12 +44,14 @@ interface AutomationRule {
 
 export function Automation() {
     const queryClient = useQueryClient();
-    const { data: rules = [], isLoading } = useQuery({
+    const { canUse, isLoading: isEntitlementLoading } = useEntitlement();
+    const { data: rules = [], isLoading: isRulesLoading } = useQuery({
         queryKey: ['automation-rules'],
         queryFn: async () => {
             const resp = await automationAPI.list();
             return resp.data.data || [];
-        }
+        },
+        enabled: canUse(CAPABILITIES.CAN_USE_MAGIC_SYNC) // Only fetch if allowed
     });
 
     const toggleMutation = useMutation({
@@ -67,10 +71,40 @@ export function Automation() {
         },
     });
 
+    const isLoading = isRulesLoading || isEntitlementLoading;
+
     if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
+
+    // Entitlement Gate
+    if (!canUse(CAPABILITIES.CAN_USE_MAGIC_SYNC)) {
+        return (
+            <div className="max-w-4xl mx-auto py-12 text-center space-y-8">
+                <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Zap className="text-primary w-12 h-12" />
+                </div>
+                <h1 className="text-4xl font-bold">Unleash the Magic ✨</h1>
+                <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+                    Magic Sync automates your entire distribution workflow. Post once on YouTube, and we'll handle Insta, LinkedIn, and more.
+                </p>
+                <div className="p-6 bg-secondary/30 rounded-xl border border-dashed border-primary/20 max-w-lg mx-auto">
+                    <p className="font-medium mb-4">Upgrade to Creator or Pro to access:</p>
+                    <ul className="text-sm space-y-2 text-left inline-block">
+                        <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary" /> Auto-sync to unlimited platforms</li>
+                        <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary" /> Custom filter rules</li>
+                        <li className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-primary" /> Set-and-forget processing</li>
+                    </ul>
+                </div>
+                <Link to="/pricing">
+                    <Button size="lg" className="h-12 px-8 text-lg shadow-lg shadow-primary/25 mt-4">
+                        Upgrade to Unlock
+                    </Button>
+                </Link>
             </div>
         );
     }

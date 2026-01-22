@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"example.com/creati/backend/internal/db/models"
+	"example.com/creati/backend/internal/features"
 	"example.com/creati/backend/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
@@ -54,9 +55,16 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to hash password")
 	}
 
+	// Start transaction
+	tx, err := h.db.Begin()
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+	}
+	defer tx.Rollback()
+
 	// Insert user
 	var userID int
-	err = h.db.QueryRow(
+	err = tx.QueryRow(
 		"INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id",
 		req.Email, string(hashedPassword),
 	).Scan(&userID)
@@ -66,6 +74,22 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 			return utils.ErrorResponse(c, fiber.StatusConflict, "email already exists")
 		}
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create user")
+	}
+
+	// Create free subscription
+	// Default to 1 month free
+	_, err = tx.Exec(`
+		INSERT INTO subscriptions (user_id, plan, billing_cycle, status, current_period_end)
+		VALUES ($1, $2, 'monthly', 'active', NOW() + INTERVAL '1 month')
+	`, userID, features.PlanFree)
+
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to initialize subscription")
+	}
+
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "transaction commit failed")
 	}
 
 	// Generate JWT token

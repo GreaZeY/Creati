@@ -105,6 +105,7 @@ func main() {
 	analyticsHandler := api.NewAnalyticsHandler(db)
 	automationService := services.NewAutomationService(db, queueService)
 	automationHandler := api.NewAutomationHandler(db, automationService)
+	paymentHandler := api.NewPaymentHandler(db)
 
 	// API routes
 	apiRoutes := app.Group("/api")
@@ -150,6 +151,11 @@ func main() {
 	protected.Post("/automation", automationHandler.CreateRule)
 	protected.Put("/automation/:id", automationHandler.ToggleRule)
 	protected.Delete("/automation/:id", automationHandler.DeleteRule)
+
+	// Payments
+	protected.Post("/payments/create-order", paymentHandler.CreateOrder)
+	protected.Post("/payments/verify", paymentHandler.VerifyPayment)
+	protected.Get("/payments/subscription", paymentHandler.GetSubscription)
 
 	// Start server
 	port := os.Getenv("PORT")

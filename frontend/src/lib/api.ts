@@ -153,3 +153,14 @@ export const automationAPI = {
     delete: (id: number) =>
         api.delete<ApiResponse>(`/automation/${id}`),
 };
+
+export const paymentsAPI = {
+    createOrder: (planId: string, billingCycle: string) =>
+        api.post<{ success: boolean; data: any }>('/payments/create-order', { planId, billingCycle }),
+
+    verify: (data: any) =>
+        api.post('/payments/verify', data),
+
+    getSubscription: () =>
+        api.get('/payments/subscription'),
+};
