@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"fmt"
 	"strconv"
 
 	"example.com/creati/backend/internal/middleware"
@@ -114,6 +115,7 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 	platform := c.Params("platform")
 	userID := middleware.GetUserID(c)
+	fmt.Println(platform)
 
 	// Get platform service using factory (Open/Closed principle)
 	platformService, err := services.GetPlatformService(platform, h.db)
@@ -125,12 +127,12 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 	state := strconv.Itoa(userID) // Simplified - use secure state generation in production
 
 	var authURL string
-	var errSvc error
 
 	// Check if the parameter is a platform name or an account ID
 	accountID, errID := strconv.Atoi(platform)
 	targetPlatform := platform
 	isReconnect := errID == nil
+	fmt.Println(platform, accountID, errID)
 
 	if isReconnect {
 		// Reconnect specific account: get platform name and email hint
@@ -141,7 +143,7 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 		}
 
 		// Re-initialize service with correct platform
-		platformService, errSvc = services.GetPlatformService(targetPlatform, h.db)
+		platformService, errSvc := services.GetPlatformService(targetPlatform, h.db)
 		if errSvc != nil {
 			return utils.ErrorResponse(c, fiber.StatusBadRequest, errSvc.Error())
 		}

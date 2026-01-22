@@ -153,7 +153,7 @@ export const Platforms = () => {
             ) : platformStats.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <AnimatePresence mode="popLayout">
-                        {platformStats.filter((p: any) => p.connected).map((platform: PlatformData, i: number) => {
+                        {platformStats.map((platform: PlatformData, i: number) => {
                             const theme = PLATFORM_THEMES[platform.platform] || { gradient: 'from-primary to-primary/80', color: 'text-white', bg: 'bg-primary' };
 
                             return (

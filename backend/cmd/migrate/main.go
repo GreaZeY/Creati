@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -27,18 +30,50 @@ func main() {
 	defer db.Close()
 
 	if err := db.Ping(); err != nil {
-		log.Fatal("DB Ping failed:", err)
+		log.Fatal("DB ping failed:", err)
 	}
 
-	migrationSQL, err := os.ReadFile("internal/db/migrations/007_automation.sql")
+	migrationsDir := "internal/db/migrations"
+
+	files, err := os.ReadDir(migrationsDir)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to read migrations dir:", err)
 	}
 
-	_, err = db.Exec(string(migrationSQL))
-	if err != nil {
-		log.Fatal("Migration failed:", err)
+	var migrationFiles []string
+	for _, file := range files {
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".sql") {
+			migrationFiles = append(migrationFiles, file.Name())
+		}
 	}
 
-	fmt.Println("Migration 007_automation applied successfully")
+	sort.Strings(migrationFiles)
+
+	var failed bool
+
+	for _, file := range migrationFiles {
+		path := filepath.Join(migrationsDir, file)
+
+		sqlBytes, err := os.ReadFile(path)
+		if err != nil {
+			log.Printf("❌ Read failed (%s): %v\n", file, err)
+			failed = true
+			continue
+		}
+
+		_, err = db.Exec(string(sqlBytes))
+		if err != nil {
+			log.Printf("❌ Migration failed (%s): %v\n", file, err)
+			failed = true
+			continue
+		}
+
+		fmt.Println("✅ Applied migration:", file)
+	}
+
+	if failed {
+		fmt.Println("Migrations completed with errors")
+	} else {
+		fmt.Println("All migrations applied successfully")
+	}
 }
