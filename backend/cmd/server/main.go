@@ -103,6 +103,8 @@ func main() {
 	uploadHandler := api.NewUploadHandler(storageService, queueService, db)
 	videosHandler := api.NewVideosHandler(db)
 	analyticsHandler := api.NewAnalyticsHandler(db)
+	automationService := services.NewAutomationService(db, queueService)
+	automationHandler := api.NewAutomationHandler(db, automationService)
 
 	// API routes
 	apiRoutes := app.Group("/api")
@@ -114,6 +116,10 @@ func main() {
 
 	// OAuth callback (public)
 	apiRoutes.Get("/platforms/:platform/callback", platformHandler.HandleCallback)
+
+	// Webhooks (public)
+	apiRoutes.Get("/webhooks/youtube", automationHandler.HandleYouTubeWebhook)
+	apiRoutes.Post("/webhooks/youtube", automationHandler.HandleYouTubeWebhook)
 
 	// Protected routes (require authentication)
 	protected := apiRoutes.Use(middleware.AuthMiddleware)
@@ -138,6 +144,12 @@ func main() {
 
 	// Analytics
 	protected.Get("/analytics/overview", analyticsHandler.GetOverview)
+
+	// Automation
+	protected.Get("/automation", automationHandler.ListRules)
+	protected.Post("/automation", automationHandler.CreateRule)
+	protected.Put("/automation/:id", automationHandler.ToggleRule)
+	protected.Delete("/automation/:id", automationHandler.DeleteRule)
 
 	// Start server
 	port := os.Getenv("PORT")

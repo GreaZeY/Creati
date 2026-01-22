@@ -10,6 +10,8 @@ import { Platforms } from './pages/Platforms';
 import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
 import { Upload } from './pages/Upload';
+import { Automation } from './pages/Automation';
+import { RuleBuilder } from './pages/RuleBuilder';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { PublicRoute } from './components/PublicRoute';
 import { PageTransition } from './components/layout/PageTransition';
@@ -38,7 +40,7 @@ const AppRoutes = () => {
   const location = useLocation();
 
   // Define which pages show the sidebar
-  const protectedPaths = ['/dashboard', '/platforms', '/platforms/connect', '/analytics', '/settings', '/upload'];
+  const protectedPaths = ['/dashboard', '/platforms', '/platforms/connect', '/analytics', '/settings', '/upload', '/automation', '/automation/new'];
   const isProtectedPath = protectedPaths.includes(location.pathname);
 
   // Auth pages (Login, Register) - No sidebar but use layout styling
@@ -68,6 +70,8 @@ const AppRoutes = () => {
         <Route path="/analytics" element={<ProtectedRoute><PageTransition><Analytics /></PageTransition></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><PageTransition><Settings /></PageTransition></ProtectedRoute>} />
         <Route path="/upload" element={<ProtectedRoute><PageTransition><Upload /></PageTransition></ProtectedRoute>} />
+        <Route path="/automation" element={<ProtectedRoute><PageTransition><Automation /></PageTransition></ProtectedRoute>} />
+        <Route path="/automation/new" element={<ProtectedRoute><PageTransition><RuleBuilder /></PageTransition></ProtectedRoute>} />
 
         {/* Catch all */}
         <Route path="*" element={<Navigate to="/" replace />} />

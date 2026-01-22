@@ -77,8 +77,8 @@ func (i *InstagramService) Authenticate(code string, userID int) error {
 	query := `
 		INSERT INTO platform_accounts (user_id, platform, access_token, platform_user_id, status, profile_name)
 		VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (user_id, platform) 
-		DO UPDATE SET access_token = $3, platform_user_id = $4, status = $5, profile_name = $6, connected_at = NOW()
+		ON CONFLICT (user_id, platform, platform_user_id) 
+		DO UPDATE SET access_token = $3, status = $5, profile_name = $6, connected_at = NOW()
 	`
 	_, err = i.db.Exec(query, userID, "instagram", longLivedToken, igAccountID, "connected", username)
 	return err
@@ -182,15 +182,14 @@ func (i *InstagramService) getInstagramBusinessAccount(accessToken string) (stri
 
 // Upload implements Platform interface
 // Uploads a Reel to Instagram
-func (i *InstagramService) Upload(video *models.Video) (string, error) {
-	// Get user's access token and Instagram account ID
+func (i *InstagramService) Upload(video *models.Video, accountID int) (string, error) {
+	// Get specific account's tokens and Instagram account ID
 	var accessToken, igAccountID string
 	err := i.db.QueryRow(
-		"SELECT access_token, platform_user_id FROM platform_accounts WHERE user_id = $1 AND platform = $2",
-		video.UserID, "instagram",
+		"SELECT access_token, platform_user_id FROM platform_accounts WHERE id = $1", accountID,
 	).Scan(&accessToken, &igAccountID)
 	if err != nil {
-		return "", fmt.Errorf("no instagram account connected: %w", err)
+		return "", fmt.Errorf("account not found: %w", err)
 	}
 
 	// Step 1: Create media container for Reel
@@ -261,13 +260,13 @@ func (i *InstagramService) GetStatus(platformVideoID string) (string, error) {
 }
 
 // FetchAnalytics implements Platform interface
-func (i *InstagramService) FetchAnalytics(platformVideoID string) (*Analytics, error) {
+func (i *InstagramService) FetchAnalytics(platformVideoID string, accountID int) (*Analytics, error) {
 	var accessToken string
 	err := i.db.QueryRow(
-		"SELECT access_token FROM platform_accounts WHERE platform = 'instagram' LIMIT 1",
+		"SELECT access_token FROM platform_accounts WHERE id = $1", accountID,
 	).Scan(&accessToken)
 	if err != nil {
-		return nil, fmt.Errorf("no instagram account found: %w", err)
+		return nil, fmt.Errorf("account not found: %w", err)
 	}
 
 	// Get media insights

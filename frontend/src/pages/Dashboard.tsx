@@ -31,7 +31,7 @@ export const Dashboard = () => {
         queryKey: ['platforms'],
         queryFn: async () => {
             const resp = await platformsAPI.list();
-            return resp.data as any[];
+            return resp.data.data as any[];
         }
     });
 
@@ -105,8 +105,8 @@ export const Dashboard = () => {
                                 <div className="flex flex-wrap gap-2">
                                     {connectedPlatforms.map((p: any) => (
                                         <div key={p.id} className="p-2 rounded-xl bg-secondary/30 ring-1 ring-white/5 flex items-center gap-2 group/icon hover:bg-primary/10 transition-colors">
-                                            <PlatformLogo platform={p.id} size={16} className="text-primary" />
-                                            <span className="text-[10px] font-black uppercase tracking-widest opacity-60 group-hover/icon:opacity-100">{p.id}</span>
+                                            <PlatformLogo platform={p.platform} size={16} className="text-primary" />
+                                            <span className="text-[10px] font-black uppercase tracking-widest opacity-60 group-hover/icon:opacity-100">{p.name}</span>
                                         </div>
                                     ))}
                                 </div>

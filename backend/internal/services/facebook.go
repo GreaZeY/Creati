@@ -73,8 +73,8 @@ func (f *FacebookService) Authenticate(code string, userID int) error {
 	query := `
 		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, platform_user_id, status, profile_name)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (user_id, platform) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, platform_user_id = $5, status = $6, profile_name = $7, connected_at = NOW()
+		ON CONFLICT (user_id, platform, platform_user_id) 
+		DO UPDATE SET access_token = $3, refresh_token = $4, status = $6, profile_name = $7, connected_at = NOW()
 	`
 	_, err = f.db.Exec(query, userID, "facebook", pageToken, longLivedToken, pageID, "connected", pageName)
 	return err
@@ -137,14 +137,13 @@ func (f *FacebookService) getPageInfo(accessToken string) (string, string, strin
 }
 
 // Upload implements Platform interface - uploads video to Facebook Page
-func (f *FacebookService) Upload(video *models.Video) (string, error) {
+func (f *FacebookService) Upload(video *models.Video, accountID int) (string, error) {
 	var pageToken, pageID string
 	err := f.db.QueryRow(
-		"SELECT access_token, platform_user_id FROM platform_accounts WHERE user_id = $1 AND platform = $2",
-		video.UserID, "facebook",
+		"SELECT access_token, platform_user_id FROM platform_accounts WHERE id = $1", accountID,
 	).Scan(&pageToken, &pageID)
 	if err != nil {
-		return "", fmt.Errorf("no facebook account connected: %w", err)
+		return "", fmt.Errorf("account not found: %w", err)
 	}
 
 	// Upload video using resumable upload API
@@ -245,13 +244,13 @@ func (f *FacebookService) GetStatus(platformVideoID string) (string, error) {
 }
 
 // FetchAnalytics implements Platform interface
-func (f *FacebookService) FetchAnalytics(platformVideoID string) (*Analytics, error) {
+func (f *FacebookService) FetchAnalytics(platformVideoID string, accountID int) (*Analytics, error) {
 	var pageToken string
 	err := f.db.QueryRow(
-		"SELECT access_token FROM platform_accounts WHERE platform = 'facebook' LIMIT 1",
+		"SELECT access_token FROM platform_accounts WHERE id = $1", accountID,
 	).Scan(&pageToken)
 	if err != nil {
-		return nil, fmt.Errorf("no facebook account found: %w", err)
+		return nil, fmt.Errorf("account not found: %w", err)
 	}
 
 	insightsURL := fmt.Sprintf(

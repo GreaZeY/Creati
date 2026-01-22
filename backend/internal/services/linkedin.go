@@ -66,8 +66,8 @@ func (l *LinkedInService) Authenticate(code string, userID int) error {
 	query := `
 		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, platform_user_id, status, profile_name)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (user_id, platform) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, platform_user_id = $5, status = $6, profile_name = $7, connected_at = NOW()
+		ON CONFLICT (user_id, platform, platform_user_id) 
+		DO UPDATE SET access_token = $3, refresh_token = $4, status = $6, profile_name = $7, connected_at = NOW()
 	`
 	refreshToken := ""
 	if token.RefreshToken != "" {
@@ -106,14 +106,13 @@ func (l *LinkedInService) getUserProfile(accessToken string) (string, string, er
 }
 
 // Upload implements Platform interface - uploads video to LinkedIn
-func (l *LinkedInService) Upload(video *models.Video) (string, error) {
+func (l *LinkedInService) Upload(video *models.Video, accountID int) (string, error) {
 	var accessToken, profileID string
 	err := l.db.QueryRow(
-		"SELECT access_token, platform_user_id FROM platform_accounts WHERE user_id = $1 AND platform = $2",
-		video.UserID, "linkedin",
+		"SELECT access_token, platform_user_id FROM platform_accounts WHERE id = $1", accountID,
 	).Scan(&accessToken, &profileID)
 	if err != nil {
-		return "", fmt.Errorf("no linkedin account connected: %w", err)
+		return "", fmt.Errorf("account not found: %w", err)
 	}
 
 	// Step 1: Register video upload
@@ -234,13 +233,13 @@ func (l *LinkedInService) GetStatus(platformVideoID string) (string, error) {
 }
 
 // FetchAnalytics implements Platform interface
-func (l *LinkedInService) FetchAnalytics(platformVideoID string) (*Analytics, error) {
+func (l *LinkedInService) FetchAnalytics(platformVideoID string, accountID int) (*Analytics, error) {
 	var accessToken string
 	err := l.db.QueryRow(
-		"SELECT access_token FROM platform_accounts WHERE platform = 'linkedin' LIMIT 1",
+		"SELECT access_token FROM platform_accounts WHERE id = $1", accountID,
 	).Scan(&accessToken)
 	if err != nil {
-		return nil, fmt.Errorf("no linkedin account found: %w", err)
+		return nil, fmt.Errorf("account not found: %w", err)
 	}
 
 	// LinkedIn analytics require Marketing Developer Platform access

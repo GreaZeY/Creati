@@ -1,7 +1,6 @@
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { platformsAPI } from '@/lib/api';
 import { ArrowLeft, CheckCheck, Link as LinkIcon, Network, Zap } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { PLATFORMS } from '@/lib/constants';
@@ -14,17 +13,6 @@ export const ConnectPlatforms = () => {
     const status = searchParams.get('status');
     const platformParam = searchParams.get('platform');
 
-    const { data: platformStats = [] as any[] } = useQuery({
-        queryKey: ['platforms'],
-        queryFn: async () => {
-            const response = await platformsAPI.list();
-            return response.data as any[];
-        },
-    });
-
-    const getPlatformStatus = (id: string) => {
-        return platformStats.find((p: any) => p.id === id);
-    };
 
     const connectMutation = useMutation({
         mutationFn: async (platformId: string) => {
@@ -83,8 +71,8 @@ export const ConnectPlatforms = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
                 {Object.values(PLATFORMS).map((platform: any, i: number) => {
-                    const status = getPlatformStatus(platform.id);
-                    const isConnected = status?.connected;
+
+
                     const isSyncing = connectMutation.isPending && connectMutation.variables === platform.id;
 
                     return (
@@ -94,24 +82,12 @@ export const ConnectPlatforms = () => {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: i * 0.05, type: "spring", stiffness: 100 }}
                         >
-                            <Card className={cn(
-                                "p-8 bg-card/40 backdrop-blur-xl border-border/40 hover:border-primary/50 transition-all duration-500 group relative overflow-hidden rounded-[2rem] ring-1 ring-white/5 shadow-2xl hover:shadow-primary/5",
-                                isConnected && "opacity-80 border-emerald-500/30 bg-emerald-500/[0.03] ring-emerald-500/10"
-                            )}>
-                                {isConnected && (
-                                    <div className="absolute top-0 right-0 p-3">
-                                        <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20">
-                                            <CheckCheck size={12} />
-                                            Active
-                                        </div>
-                                    </div>
-                                )}
+                            <Card className="p-8 bg-card/40 backdrop-blur-xl border-border/40 hover:border-primary/50 transition-all duration-500 group relative overflow-hidden rounded-[2rem] ring-1 ring-white/5 shadow-2xl hover:shadow-primary/5"
+                            >
+
 
                                 <div className="flex items-start gap-6 relative z-10">
-                                    <div className={cn(
-                                        "w-20 h-20 rounded-[1.5rem] flex items-center justify-center transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 shadow-2xl",
-                                        isConnected ? "bg-emerald-500/10 text-emerald-500 shadow-emerald-500/10" : "bg-white/5 text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary group-hover:shadow-primary/20"
-                                    )}>
+                                    <div className="w-20 h-20 rounded-[1.5rem] flex items-center justify-center transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 shadow-2xl">
                                         <PlatformLogo platform={platform.id} size={40} />
                                     </div>
 
@@ -123,18 +99,15 @@ export const ConnectPlatforms = () => {
 
                                         <div className="pt-4 flex items-center gap-4">
                                             <Button
-                                                onClick={() => !isConnected && connectMutation.mutate(platform.id)}
-                                                disabled={!platform.enabled || isConnected || isSyncing}
-                                                variant={isConnected ? "outline" : "default"}
-                                                className={cn(
-                                                    "h-12 px-10 rounded-2xl font-black transition-all",
-                                                    !isConnected && "bg-gradient-to-r from-primary to-cyan-500 shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 text-white"
-                                                )}
+                                                onClick={() => connectMutation.mutate(platform.id)}
+                                                disabled={!platform.enabled || isSyncing}
+                                                variant="default"
+                                                className="h-12 px-10 rounded-2xl font-black transition-all"
                                             >
-                                                {isSyncing ? 'Linking...' : isConnected ? 'Connected' : `Link ${platform.name}`}
+                                                {isSyncing ? 'Linking...' : `Link ${platform.name}`}
                                             </Button>
 
-                                            {!isConnected && platform.enabled && (
+                                            {platform.enabled && (
                                                 <div className="flex items-center gap-1.5 text-[10px] text-primary/60 font-black uppercase tracking-[0.2em]">
                                                     <Zap size={14} className="text-primary fill-primary" />
                                                     One-Tap

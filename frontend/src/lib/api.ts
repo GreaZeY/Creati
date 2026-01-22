@@ -9,6 +9,13 @@ declare module 'axios' {
     }
 }
 
+export interface ApiResponse<T = any> {
+    success: boolean;
+    data: T;
+    message?: string;
+    error?: string;
+}
+
 // Create axios instance with defaults
 // Create axios instance with defaults
 export const api = axios.create({
@@ -98,7 +105,7 @@ export const preferencesAPI = {
 
 export const platformsAPI = {
     list: () =>
-        api.get('/platforms'),
+        api.get<ApiResponse<any[]>>('/platforms'),
 
     connect: (platform: string) =>
         api.get(`/platforms/${platform}/connect`),
@@ -112,10 +119,10 @@ export const platformsAPI = {
 
 export const uploadAPI = {
     init: (data: { filename: string; contentType: string; size: number }) =>
-        api.post<{ uploadUrl: string; key: string }>('/upload/init', data),
+        api.post<ApiResponse<{ uploadUrl: string; key: string }>>('/upload/init', data),
 
-    confirm: (data: { key: string; title: string; description: string; platforms: string[] }) =>
-        api.post('/upload/confirm', data),
+    confirm: (data: { key: string; title: string; description: string; platforms?: string[]; accountIds?: number[] }) =>
+        api.post<ApiResponse>('/upload/confirm', data),
 };
 
 export const videosAPI = {
@@ -133,4 +140,16 @@ export const analyticsAPI = {
     getOverview: () =>
         api.get('/analytics/overview'),
 };
+export const automationAPI = {
+    list: () =>
+        api.get<ApiResponse<any[]>>('/automation'),
 
+    create: (data: any) =>
+        api.post<ApiResponse<{ id: number }>>('/automation', data),
+
+    toggle: (id: number, isActive: boolean) =>
+        api.put<ApiResponse>(`/automation/${id}`, { isActive }),
+
+    delete: (id: number) =>
+        api.delete<ApiResponse>(`/automation/${id}`),
+};

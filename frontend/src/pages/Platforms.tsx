@@ -14,11 +14,14 @@ import { useState } from 'react';
 import { toast } from '@/lib/events';
 
 interface PlatformData {
-    id: string;
+    accountId?: number;
+    id: string; // unique ID (accountID or platform name)
     name: string;
     platform: string;
     connected: boolean;
     profileName?: string;
+    platformUserId?: string;
+    handle?: string;
 }
 
 const PLATFORM_THEMES: Record<string, { gradient: string; color: string; bg: string }> = {
@@ -56,7 +59,7 @@ export const Platforms = () => {
         queryKey: ['platforms'],
         queryFn: async () => {
             const response = await platformsAPI.list();
-            return response.data as PlatformData[];
+            return response.data.data as PlatformData[];
         },
     });
 
@@ -150,8 +153,8 @@ export const Platforms = () => {
             ) : platformStats.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <AnimatePresence mode="popLayout">
-                        {platformStats.map((platform: PlatformData, i: number) => {
-                            const theme = PLATFORM_THEMES[platform.id] || { gradient: 'from-primary to-primary/80', color: 'text-white', bg: 'bg-primary' };
+                        {platformStats.filter((p: any) => p.connected).map((platform: PlatformData, i: number) => {
+                            const theme = PLATFORM_THEMES[platform.platform] || { gradient: 'from-primary to-primary/80', color: 'text-white', bg: 'bg-primary' };
 
                             return (
                                 <motion.div
@@ -224,7 +227,7 @@ export const Platforms = () => {
                                                 theme.bg,
                                                 theme.color
                                             )}>
-                                                <PlatformLogo platform={platform.id} size={28} />
+                                                <PlatformLogo platform={platform.platform} size={28} />
                                             </div>
 
                                             <div className="flex-1 min-w-0">
@@ -245,7 +248,7 @@ export const Platforms = () => {
                                                     )}
                                                 </div>
                                                 <p className="text-xs text-muted-foreground/60 mt-1 uppercase tracking-wider">
-                                                    {platform.id}
+                                                    {platform.platform} {platform.handle ? `• ${platform.handle}` : platform.platformUserId ? `• ${platform.platformUserId}` : ''}
                                                 </p>
                                             </div>
 
