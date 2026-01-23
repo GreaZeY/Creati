@@ -37,41 +37,53 @@ export function Pricing() {
         loadRazorpay();
     }, []);
 
-    const createOrderWrapper = async (planId: string) => {
+    const handleSubscription = async (planId: string) => {
         try {
-            const resp = await paymentsAPI.createOrder(planId, billingCycle);
-            const data = resp.data.data;
+            // Case 1: New Subscription (currently on Free)
+            if (currentPlan === 'free') {
+                const resp = await paymentsAPI.createSubscription(planId, billingCycle);
+                const data = resp.data.data;
 
-            const options = {
-                key: data.key,
-                amount: data.amount,
-                currency: data.currency,
-                name: "Creati",
-                description: "Upgrade your creator game",
-                order_id: data.orderId,
-                handler: async (response: any) => {
-                    try {
-                        await paymentsAPI.verify({
-                            razorpay_order_id: response.razorpay_order_id,
-                            razorpay_payment_id: response.razorpay_payment_id,
-                            razorpay_signature: response.razorpay_signature,
-                            planId: planId, // Captured from closure
-                            billingCycle: billingCycle
-                        });
-                        toast.success("Welcome to the big leagues! 🚀");
-                        queryClient.invalidateQueries({ queryKey: ['subscription'] });
-                    } catch (error) {
-                        toast.error("Payment verification failed. That's sus.");
+                const options = {
+                    key: data.key,
+                    subscription_id: data.subscriptionId,
+                    name: "Creati",
+                    description: "Upgrade your creator game",
+                    handler: async (response: any) => {
+                        try {
+                            await paymentsAPI.verifySubscription({
+                                razorpay_subscription_id: response.razorpay_subscription_id,
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_signature: response.razorpay_signature,
+                                planId: planId,
+                                billingCycle: billingCycle
+                            });
+                            toast.success("Welcome to the big leagues! 🚀");
+                            queryClient.invalidateQueries({ queryKey: ['subscription'] });
+                        } catch (error) {
+                            toast.error("Payment verification failed. That's sus.");
+                        }
+                    },
+                    theme: {
+                        color: "#08cea8"
                     }
-                },
-                theme: {
-                    color: "#08cea8"
-                }
-            };
+                };
 
-            const rzp = new (window as any).Razorpay(options);
-            rzp.open();
+                const rzp = new (window as any).Razorpay(options);
+                rzp.open();
+            } else {
+                // Case 2: Upgrade / Downgrade
+                // Ideally show a confirmation modal, but for now we proceed directly
+                try {
+                     await paymentsAPI.updateSubscription(planId, billingCycle);
+                     toast.success("Plan updated successfully! The changes are pro-rated.");
+                     queryClient.invalidateQueries({ queryKey: ['subscription'] });
+                } catch(error) {
+                    toast.error("Failed to update plan.");
+                }
+            }
         } catch (error) {
+            console.error(error);
             toast.error("Could not start checkout. Valid API keys?");
         }
     };
@@ -175,11 +187,11 @@ export function Pricing() {
                         <li className="flex items-center gap-3 text-sm opacity-50"><X className="w-5 h-5 flex-shrink-0" /> Advanced Analytics</li>
                     </ul>
                     <Button
-                        onClick={() => createOrderWrapper(PLANS.CREATOR)}
+                        onClick={() => handleSubscription(PLANS.CREATOR)}
                         disabled={currentPlan === 'creator'}
                         className={cn("w-full rounded-xl py-6 font-bold shadow-lg shadow-primary/25", currentPlan === 'creator' ? "bg-primary/20 text-primary" : "bg-primary text-slate-950")}
                     >
-                        {currentPlan === 'creator' ? "Current Plan" : "Get Creator"}
+                        {currentPlan === 'creator' ? "Current Plan" : (currentPlan === 'pro' ? "Downgrade to Creator" : "Get Creator")}
                     </Button>
                 </Card>
 
@@ -201,11 +213,11 @@ export function Pricing() {
                         <li className="flex items-center gap-3 text-sm"><Check className="text-purple-400 w-5 h-5 flex-shrink-0" /> Advanced Analytics & AI</li>
                     </ul>
                     <Button
-                        onClick={() => createOrderWrapper(PLANS.PRO)}
+                        onClick={() => handleSubscription(PLANS.PRO)}
                         disabled={currentPlan === 'pro'}
                         className={cn("w-full rounded-xl py-6 font-bold", currentPlan === 'pro' ? "bg-secondary text-foreground" : "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/25")}
                     >
-                        {currentPlan === 'pro' ? "Current Plan" : "Go Pro 🚀"}
+                        {currentPlan === 'pro' ? "Current Plan" : (currentPlan === 'creator' ? "Upgrade to Pro" : "Go Pro 🚀")}
                     </Button>
                 </Card>
             </div>

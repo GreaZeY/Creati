@@ -121,6 +121,7 @@ func main() {
 	// Webhooks (public)
 	apiRoutes.Get("/webhooks/youtube", automationHandler.HandleYouTubeWebhook)
 	apiRoutes.Post("/webhooks/youtube", automationHandler.HandleYouTubeWebhook)
+	apiRoutes.Post("/webhooks/razorpay", paymentHandler.HandleWebhook)
 
 	// Protected routes (require authentication)
 	protected := apiRoutes.Use(middleware.AuthMiddleware)
@@ -153,8 +154,10 @@ func main() {
 	protected.Delete("/automation/:id", automationHandler.DeleteRule)
 
 	// Payments
-	protected.Post("/payments/create-order", paymentHandler.CreateOrder)
-	protected.Post("/payments/verify", paymentHandler.VerifyPayment)
+	// Payments
+	protected.Post("/payments/create-subscription", paymentHandler.CreateSubscription)
+	protected.Post("/payments/verify-subscription", paymentHandler.VerifySubscription)
+	protected.Put("/payments/subscription", paymentHandler.UpdateSubscription)
 	protected.Get("/payments/subscription", paymentHandler.GetSubscription)
 
 	// Start server

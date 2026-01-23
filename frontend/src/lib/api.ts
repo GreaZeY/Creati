@@ -155,11 +155,14 @@ export const automationAPI = {
 };
 
 export const paymentsAPI = {
-    createOrder: (planId: string, billingCycle: string) =>
-        api.post<{ success: boolean; data: any }>('/payments/create-order', { planId, billingCycle }),
+    createSubscription: (planId: string, billingCycle: string) =>
+        api.post<{ success: boolean; data: any }>('/payments/create-subscription', { planId, billingCycle }),
 
-    verify: (data: any) =>
-        api.post('/payments/verify', data),
+    verifySubscription: (data: any) =>
+        api.post('/payments/verify-subscription', data),
+
+    updateSubscription: (targetPlanId: string, billingCycle: string) =>
+        api.put('/payments/subscription', { targetPlanId, billingCycle }),
 
     getSubscription: () =>
         api.get('/payments/subscription'),

@@ -28,49 +28,70 @@ func NewPaymentHandler(db *sql.DB) *PaymentHandler {
 	return &PaymentHandler{db: db, client: client}
 }
 
-type CreateOrderRequest struct {
+type CreateSubscriptionRequest struct {
 	PlanID       string `json:"planId"`       // 'creator' or 'pro'
 	BillingCycle string `json:"billingCycle"` // 'monthly' or 'yearly'
 }
 
-type VerifyPaymentRequest struct {
-	RazorpayOrderID   string `json:"razorpay_order_id"`
-	RazorpayPaymentID string `json:"razorpay_payment_id"`
-	RazorpaySignature string `json:"razorpay_signature"`
-	PlanID            string `json:"planId"`
-	BillingCycle      string `json:"billingCycle"`
+type UpdateSubscriptionRequest struct {
+	TargetPlanID string `json:"targetPlanId"`
+	BillingCycle string `json:"billingCycle"`
 }
 
-// Pricing configuration
+type VerifySubscriptionRequest struct {
+	RazorpaySubscriptionID string `json:"razorpay_subscription_id"`
+	RazorpayPaymentID      string `json:"razorpay_payment_id"`
+	RazorpaySignature      string `json:"razorpay_signature"`
+	PlanID                 string `json:"planId"`
+	BillingCycle           string `json:"billingCycle"`
+}
+
+// Pricing configuration - keeping for reference, but actual pricing is now controlled by Razorpay Plan IDs
 var pricing = map[string]map[string]int{
 	features.PlanCreator: {
-		"monthly": 49900,  // in paise (₹499)
-		"yearly":  499900, // in paise (₹4999)
+		"monthly": 49900,
+		"yearly":  499900,
 	},
 	features.PlanPro: {
-		"monthly": 129900,  // in paise (₹1299)
-		"yearly":  1199900, // in paise (₹11999)
+		"monthly": 129900,
+		"yearly":  1199900,
 	},
 }
 
-// CreateOrder initiates a Razorpay order
-func (h *PaymentHandler) CreateOrder(c *fiber.Ctx) error {
+func getRazorpayPlanID(plan string, cycle string) string {
+	// Normalize key to uppercase
+	// e.g. RAZORPAY_PLAN_CREATOR_MONTHLY
+	p := "CREATOR"
+	if plan == features.PlanPro {
+		p = "PRO"
+	}
+	c := "MONTHLY"
+	if cycle == "yearly" {
+		c = "YEARLY"
+	}
+	envKey := fmt.Sprintf("RAZORPAY_PLAN_%s_%s", p, c)
+	return os.Getenv(envKey)
+}
+
+// CreateSubscription initiates a Razorpay subscription
+func (h *PaymentHandler) CreateSubscription(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
-	var req CreateOrderRequest
+	var req CreateSubscriptionRequest
 	if err := c.BodyParser(&req); err != nil {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request")
 	}
 
-	amount, ok := pricing[req.PlanID][req.BillingCycle]
-	if !ok {
-		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid plan or billing cycle")
+	planID := getRazorpayPlanID(req.PlanID, req.BillingCycle)
+	if planID == "" {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "plan configuration missing")
 	}
 
-	// Create Razorpay Order
+	// Create Razorpay Subscription
+	// We set total_count to 120 (10 years) essentially "forever" until cancelled
 	data := map[string]interface{}{
-		"amount":   amount,
-		"currency": "INR",
-		"receipt":  fmt.Sprintf("rcpt_%d_%s", userID, req.PlanID),
+		"plan_id":     planID,
+		"total_count": 120,
+		"quantity":    1,
 		"notes": map[string]interface{}{
 			"user_id":       userID,
 			"plan":          req.PlanID,
@@ -78,42 +99,31 @@ func (h *PaymentHandler) CreateOrder(c *fiber.Ctx) error {
 		},
 	}
 
-	body, err := h.client.Order.Create(data, nil)
+	body, err := h.client.Subscription.Create(data, nil)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create razorpay order")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create razorpay subscription")
 	}
 
-	orderID, _ := body["id"].(string)
-
-	// Log intention to pay
-	_, err = h.db.Exec(`
-		INSERT INTO payments (user_id, razorpay_order_id, amount, currency, status)
-		VALUES ($1, $2, $3, $4, 'created')
-	`, userID, orderID, float64(amount)/100.0, "INR")
-
-	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
-	}
+	subID, _ := body["id"].(string)
 
 	return utils.SuccessResponse(c, fiber.Map{
-		"orderId":  orderID,
-		"amount":   amount,
-		"currency": "INR",
-		"key":      os.Getenv("RAZORPAY_KEY_ID"),
-	}, "order created")
+		"subscriptionId": subID,
+		"key":            os.Getenv("RAZORPAY_KEY_ID"),
+	}, "subscription created")
 }
 
-// VerifyPayment handles the success callback/verification from frontend
-func (h *PaymentHandler) VerifyPayment(c *fiber.Ctx) error {
+// VerifySubscription handles the success callback/verification from frontend
+func (h *PaymentHandler) VerifySubscription(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
-	var req VerifyPaymentRequest
+	var req VerifySubscriptionRequest
 	if err := c.BodyParser(&req); err != nil {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request")
 	}
 
 	// Verify Signature locally
+	// For subscriptions: payment_id + "|" + subscription_id
 	secret := os.Getenv("RAZORPAY_KEY_SECRET")
-	data := req.RazorpayOrderID + "|" + req.RazorpayPaymentID
+	data := req.RazorpayPaymentID + "|" + req.RazorpaySubscriptionID
 	expectedSignature := hmacSha256(data, secret)
 
 	if expectedSignature != req.RazorpaySignature {
@@ -127,54 +137,167 @@ func (h *PaymentHandler) VerifyPayment(c *fiber.Ctx) error {
 	}
 	defer tx.Rollback()
 
-	// 1. Update Payment Status
-	_, err = tx.Exec(`
-		UPDATE payments 
-		SET razorpay_payment_id = $1, status = 'captured' 
-		WHERE razorpay_order_id = $2
-	`, req.RazorpayPaymentID, req.RazorpayOrderID)
-	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update payment")
-	}
-
-	// 2. Update/Upsert Subscription
-	// Calculate period end
+	// 1. Calculate period end
 	interval := "1 month"
 	if req.BillingCycle == "yearly" {
 		interval = "1 year"
 	}
 
-	// Check if exists
+	// 2. Insert/Update Subscription
+	// We use UPSERT equivalent logic
 	var subID int
 	err = tx.QueryRow("SELECT id FROM subscriptions WHERE user_id = $1", userID).Scan(&subID)
 
 	if err == sql.ErrNoRows {
 		// Create new
 		_, err = tx.Exec(`
-			INSERT INTO subscriptions (user_id, plan, billing_cycle, status, current_period_end)
-			VALUES ($1, $2, $3, 'active', NOW() + $4::INTERVAL)
-		`, userID, req.PlanID, req.BillingCycle, interval)
+			INSERT INTO subscriptions (
+				user_id, plan, billing_cycle, status, 
+				razorpay_subscription_id, 
+				current_period_start, current_period_end
+			)
+			VALUES ($1, $2, $3, 'active', $4, NOW(), NOW() + $5::INTERVAL)
+		`, userID, req.PlanID, req.BillingCycle, req.RazorpaySubscriptionID, interval)
 	} else {
 		// Update existing
 		_, err = tx.Exec(`
 			UPDATE subscriptions 
 			SET plan = $1, billing_cycle = $2, status = 'active', 
+				razorpay_subscription_id = $3,
 			    current_period_start = NOW(),
-			    current_period_end = NOW() + $3::INTERVAL,
+			    current_period_end = NOW() + $4::INTERVAL,
 				updated_at = NOW()
-			WHERE user_id = $4
-		`, req.PlanID, req.BillingCycle, interval, userID)
+			WHERE user_id = $5
+		`, req.PlanID, req.BillingCycle, req.RazorpaySubscriptionID, interval, userID)
 	}
 
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update subscription")
 	}
 
+	// 3. Log Payment (Optional but good for history)
+	_, err = tx.Exec(`
+		INSERT INTO payments (user_id, razorpay_order_id, razorpay_payment_id, amount, currency, status)
+		VALUES ($1, $2, $3, 0, 'INR', 'captured')
+	`, userID, req.RazorpaySubscriptionID, req.RazorpayPaymentID)
+	// Note: amount 0 here because we rely on webhooks for actual charge details,
+	// or we could lookup plan price. For now, just logging the ID is sufficient proof.
+
 	if err := tx.Commit(); err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "transaction failed")
 	}
 
-	return utils.SuccessResponse(c, nil, "payment verified and subscription updated")
+	return utils.SuccessResponse(c, nil, "subscription verified and updated")
+}
+
+// UpdateSubscription handles upgrades/downgrades
+func (h *PaymentHandler) UpdateSubscription(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	var req UpdateSubscriptionRequest
+	if err := c.BodyParser(&req); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request")
+	}
+
+	var currentSubID string
+	err := h.db.QueryRow("SELECT razorpay_subscription_id FROM subscriptions WHERE user_id = $1 AND status = 'active'", userID).Scan(&currentSubID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no active subscription found to update")
+	}
+
+	newPlanID := getRazorpayPlanID(req.TargetPlanID, req.BillingCycle)
+	if newPlanID == "" {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "plan configuration missing")
+	}
+
+	// Call Razorpay Subscription Update
+	// schedule_change_at = "now" handles proration automatically
+	data := map[string]interface{}{
+		"plan_id":            newPlanID,
+		"schedule_change_at": "now",
+		"quantity":           1,
+	}
+
+	body, err := h.client.Subscription.Update(currentSubID, data, nil)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update razorpay subscription")
+	}
+
+	// Update local DB immediately or wait for webhook?
+	// It's safer to update local DB optimistically or returns success and let verify/webhook handle it.
+	// But since it's "now", we can update our local plan reference.
+	_, err = h.db.Exec(`
+		UPDATE subscriptions 
+		SET plan = $1, billing_cycle = $2, updated_at = NOW()
+		WHERE user_id = $3
+	`, req.TargetPlanID, req.BillingCycle, userID)
+
+	if err != nil {
+		// Log error but don't fail request since RP update succeeded
+		fmt.Printf("Error updating local sub for user %d: %v\n", userID, err)
+	}
+
+	return utils.SuccessResponse(c, body, "subscription updated")
+}
+
+// HandleWebhook processes Razorpay webhooks
+func (h *PaymentHandler) HandleWebhook(c *fiber.Ctx) error {
+	secret := os.Getenv("RAZORPAY_WEBHOOK_SECRET")
+	signature := c.Get("X-Razorpay-Signature")
+	body := c.Body()
+
+	// Verify signature
+	if !utils.VerifyWebhookSignature(body, signature, secret) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid signature"})
+	}
+
+	// Parse JSON
+	var payload map[string]interface{}
+	if err := c.BodyParser(&payload); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid json"})
+	}
+
+	event, _ := payload["event"].(string)
+	payloadData := payload["payload"].(map[string]interface{})
+
+	// Handle events
+	switch event {
+	case "subscription.charged":
+		h.handleSubscriptionCharged(payloadData)
+	case "subscription.halted", "subscription.cancelled":
+		h.handleSubscriptionStatusChange(payloadData, event)
+	}
+
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func (h *PaymentHandler) handleSubscriptionCharged(data map[string]interface{}) {
+	subData := data["subscription"].(map[string]interface{})["entity"].(map[string]interface{})
+	subID := subData["id"].(string)
+	// endAt := subData["current_end"].(float64) // Unix timestamp
+
+	// Update subscription status and validity
+	// Ideally convert unix timestamp to time.Time
+	// For simplicity in this snippet, extending by interval logic or just trusting RP webhook flow
+	// We'll just set status active and update timestamp from DB side or parse properly
+
+	h.db.Exec(`
+		UPDATE subscriptions 
+		SET status = 'active', current_period_end = to_timestamp($2), updated_at = NOW()
+		WHERE razorpay_subscription_id = $1
+	`, subID, subData["current_end"])
+}
+
+func (h *PaymentHandler) handleSubscriptionStatusChange(data map[string]interface{}, event string) {
+	subData := data["subscription"].(map[string]interface{})["entity"].(map[string]interface{})
+	subID := subData["id"].(string)
+	status := "active"
+	if event == "subscription.halted" {
+		status = "halted"
+	} else if event == "subscription.cancelled" {
+		status = "cancelled"
+	}
+
+	h.db.Exec(`UPDATE subscriptions SET status = $1 WHERE razorpay_subscription_id = $2`, status, subID)
 }
 
 // GetSubscription returns the current user's subscription and entitlements
