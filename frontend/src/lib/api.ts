@@ -166,4 +166,7 @@ export const paymentsAPI = {
 
     getSubscription: () =>
         api.get('/payments/subscription'),
+
+    cancelSubscription: () =>
+        api.delete('/payments/subscription'),
 };

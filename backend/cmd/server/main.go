@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"example.com/creati/backend/internal/api"
+	"example.com/creati/backend/internal/features"
 	"example.com/creati/backend/internal/middleware"
 	"example.com/creati/backend/internal/services"
 
@@ -135,7 +136,15 @@ func main() {
 
 	// Platforms
 	protected.Get("/platforms", platformHandler.ListPlatforms)
-	protected.Get("/platforms/:platform/connect", platformHandler.InitiateConnection)
+	// Check account limit before allowing new connections
+	protected.Get("/platforms/:platform/connect",
+		middleware.RequireLimit(db, features.MaxConnectedAccounts, func(userID int) (int, error) {
+			var count int
+			err := db.QueryRow("SELECT COUNT(*) FROM platform_accounts WHERE user_id = $1 AND connected = true", userID).Scan(&count)
+			return count, err
+		}),
+		platformHandler.InitiateConnection,
+	)
 	protected.Put("/platforms/:platform/disconnect", platformHandler.DeactivatePlatform)
 	protected.Delete("/platforms/:platform", platformHandler.RemovePlatform)
 
@@ -147,17 +156,19 @@ func main() {
 	// Analytics
 	protected.Get("/analytics/overview", analyticsHandler.GetOverview)
 
-	// Automation
-	protected.Get("/automation", automationHandler.ListRules)
-	protected.Post("/automation", automationHandler.CreateRule)
-	protected.Put("/automation/:id", automationHandler.ToggleRule)
-	protected.Delete("/automation/:id", automationHandler.DeleteRule)
+	// Automation (Protected by Magic Sync entitlement)
+	automationGroup := protected.Group("/automation", middleware.RequireFeature(db, features.CanUseMagicSync))
+	automationGroup.Get("", automationHandler.ListRules)
+	automationGroup.Post("", automationHandler.CreateRule)
+	automationGroup.Put("/:id", automationHandler.ToggleRule)
+	automationGroup.Delete("/:id", automationHandler.DeleteRule)
 
 	// Payments
 	// Payments
 	protected.Post("/payments/create-subscription", paymentHandler.CreateSubscription)
 	protected.Post("/payments/verify-subscription", paymentHandler.VerifySubscription)
 	protected.Put("/payments/subscription", paymentHandler.UpdateSubscription)
+	protected.Delete("/payments/subscription", paymentHandler.CancelSubscription)
 	protected.Get("/payments/subscription", paymentHandler.GetSubscription)
 
 	// Start server

@@ -239,6 +239,66 @@ func (h *PaymentHandler) UpdateSubscription(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, body, "subscription updated")
 }
 
+// CancelSubscription cancels the user's active subscription
+func (h *PaymentHandler) CancelSubscription(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	var currentSubID string
+	var currentPlan string
+	err := h.db.QueryRow(`
+		SELECT razorpay_subscription_id, plan 
+		FROM subscriptions 
+		WHERE user_id = $1 AND status = 'active'
+	`, userID).Scan(&currentSubID, &currentPlan)
+
+	if err == sql.ErrNoRows {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no active subscription found")
+	}
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+	}
+
+	// Don't allow cancelling free plan
+	if currentPlan == features.PlanFree {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "cannot cancel free plan")
+	}
+
+	// Cancel on Razorpay
+	data := map[string]interface{}{
+		"cancel_at_cycle_end": false, // Cancel immediately
+	}
+
+	_, err = h.client.Subscription.Cancel(currentSubID, data, nil)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to cancel subscription with razorpay")
+	}
+
+	// Update local DB - set status to cancelled and reset to free plan
+	tx, err := h.db.Begin()
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec(`
+		UPDATE subscriptions 
+		SET status = 'cancelled', 
+		    plan = $1,
+		    updated_at = NOW()
+		WHERE user_id = $2
+	`, features.PlanFree, userID)
+
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update subscription status")
+	}
+
+	if err := tx.Commit(); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "transaction failed")
+	}
+
+	return utils.SuccessResponse(c, nil, "subscription cancelled successfully")
+}
+
 // HandleWebhook processes Razorpay webhooks
 func (h *PaymentHandler) HandleWebhook(c *fiber.Ctx) error {
 	secret := os.Getenv("RAZORPAY_WEBHOOK_SECRET")
@@ -337,14 +397,14 @@ func (h *PaymentHandler) GetSubscription(c *fiber.Ctx) error {
 	}
 
 	// Populate features based on plan
-	// We need to convert the map[Capability]interface{} to string keys for JSON
+	// Using the actual constant values (snake_case) as keys to match frontend expectations
 	entitlements := make(map[string]interface{})
 
-	// Magic Sync
-	entitlements["canUseMagicSync"] = features.HasFeature(sub.Plan, features.CanUseMagicSync)
-	entitlements["canUseAdvancedAnalytics"] = features.HasFeature(sub.Plan, features.CanUseAdvancedAnalytics)
-	entitlements["maxUploads"] = features.GetLimit(sub.Plan, features.MaxUploadsPerMonth)
-	entitlements["maxConnectedAccounts"] = features.GetLimit(sub.Plan, features.MaxConnectedAccounts)
+	// Convert Capability constants to string keys for JSON
+	entitlements[string(features.CanUseMagicSync)] = features.HasFeature(sub.Plan, features.CanUseMagicSync)
+	entitlements[string(features.CanUseAdvancedAnalytics)] = features.HasFeature(sub.Plan, features.CanUseAdvancedAnalytics)
+	entitlements[string(features.MaxUploadsPerMonth)] = features.GetLimit(sub.Plan, features.MaxUploadsPerMonth)
+	entitlements[string(features.MaxConnectedAccounts)] = features.GetLimit(sub.Plan, features.MaxConnectedAccounts)
 
 	sub.Features = entitlements
 

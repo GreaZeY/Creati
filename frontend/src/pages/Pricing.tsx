@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -36,6 +36,23 @@ export function Pricing() {
     useEffect(() => {
         loadRazorpay();
     }, []);
+
+    const cancelMutation = useMutation({
+        mutationFn: () => paymentsAPI.cancelSubscription(),
+        onSuccess: () => {
+            toast.success("Subscription cancelled. We'll miss you! 😢");
+            queryClient.invalidateQueries({ queryKey: ['subscription'] });
+        },
+        onError: () => {
+            toast.error("Failed to cancel subscription. Try again?");
+        }
+    });
+
+    const handleCancel = () => {
+        if (window.confirm("Are you sure you want to cancel your subscription? You'll lose access to premium features immediately.")) {
+            cancelMutation.mutate();
+        }
+    };
 
     const handleSubscription = async (planId: string) => {
         try {
@@ -75,10 +92,10 @@ export function Pricing() {
                 // Case 2: Upgrade / Downgrade
                 // Ideally show a confirmation modal, but for now we proceed directly
                 try {
-                     await paymentsAPI.updateSubscription(planId, billingCycle);
-                     toast.success("Plan updated successfully! The changes are pro-rated.");
-                     queryClient.invalidateQueries({ queryKey: ['subscription'] });
-                } catch(error) {
+                    await paymentsAPI.updateSubscription(planId, billingCycle);
+                    toast.success("Plan updated successfully! The changes are pro-rated.");
+                    queryClient.invalidateQueries({ queryKey: ['subscription'] });
+                } catch (error) {
                     toast.error("Failed to update plan.");
                 }
             }
@@ -221,6 +238,23 @@ export function Pricing() {
                     </Button>
                 </Card>
             </div>
+
+            {(currentPlan === 'creator' || currentPlan === 'pro') && (
+                <div className="max-w-2xl mx-auto text-center space-y-4">
+                    <div className="h-[1px] bg-border/30" />
+                    <div className="pt-4">
+                        <p className="text-sm text-muted-foreground mb-3">Need to cancel your subscription?</p>
+                        <Button
+                            onClick={handleCancel}
+                            isLoading={cancelMutation.isPending}
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                            Cancel Subscription
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             <div className="bg-secondary/30 rounded-2xl p-6 text-center text-sm text-muted-foreground max-w-2xl mx-auto">
                 <p>Secured payments via Payment Gateway. Cancel anytime, no beef. ✨</p>
