@@ -42,7 +42,7 @@ export function Pricing() {
     const cancelMutation = useMutation({
         mutationFn: () => paymentsAPI.cancelSubscription(),
         onSuccess: () => {
-            toast.success("Subscription cancelled. We'll miss you! 😢");
+            toast.success("Auto-renewal turned off. You'll keep access until your period ends! 👋");
             queryClient.invalidateQueries({ queryKey: ['subscription'] });
             setShowCancelDialog(false);
         },
@@ -130,6 +130,8 @@ export function Pricing() {
     );
 
     const currentPlan = subscription?.plan || 'free';
+    const isCancelled = subscription?.status === 'cancelled';
+    const periodEnd = subscription?.currentPeriodEnd;
 
     return (
         <div className="max-w-6xl mx-auto py-12 px-4 space-y-12">
@@ -158,7 +160,7 @@ export function Pricing() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {/* FREE PLAN */}
-                <Card className={cn("p-8 rounded-3xl flex flex-col relative overflow-hidden transition-all hover:-translate-y-2 duration-300", currentPlan === 'free' ? "border-primary/50 bg-primary/5" : "bg-card/50 border-input")}>
+                {/* <Card className={cn("p-8 rounded-3xl flex flex-col relative overflow-hidden transition-all hover:-translate-y-2 duration-300", currentPlan === 'free' ? "border-primary/50 bg-primary/5" : "bg-card/50 border-input")}>
                     <div className="mb-8">
                         <h3 className="text-2xl font-bold">Free</h3>
                         <p className="text-muted-foreground mt-2">Try it. See what works.</p>
@@ -180,11 +182,12 @@ export function Pricing() {
                     >
                         {currentPlan === 'free' ? "Current Plan" : "Downgrade"}
                     </Button>
-                </Card>
+                </Card> */}
 
                 {/* CREATOR PLAN */}
                 <Card className={cn("p-8 rounded-3xl flex flex-col relative overflow-hidden transition-all hover:-translate-y-2 duration-300 ring-1", currentPlan === 'creator' ? "ring-primary border-primary bg-primary/10" : "bg-card border-input ring-white/10")}>
-                    {currentPlan === 'creator' && <div className="absolute top-0 right-0 bg-primary text-slate-950 text-xs font-bold px-3 py-1 rounded-bl-xl">ACTIVE</div>}
+                    {currentPlan === 'creator' && !isCancelled && <div className="absolute top-0 right-0 bg-primary text-slate-950 text-xs font-bold px-3 py-1 rounded-bl-xl z-20">ACTIVE</div>}
+                    {currentPlan === 'creator' && isCancelled && <div className="absolute top-0 right-0 bg-amber-500/90 text-slate-950 text-xs font-bold px-3 py-1 rounded-bl-xl z-20">CANCELLED</div>}
                     <div className="mb-8 relative z-10">
                         <h3 className="text-2xl font-bold text-primary">Creator</h3>
                         <p className="text-muted-foreground mt-2">The everyday creator pack.</p>
@@ -202,16 +205,17 @@ export function Pricing() {
                     </ul>
                     <Button
                         onClick={() => handleSubscription(PLANS.CREATOR)}
-                        disabled={currentPlan === 'creator'}
-                        className={cn("w-full rounded-xl py-6 font-bold shadow-lg shadow-primary/25", currentPlan === 'creator' ? "bg-primary/20 text-primary" : "bg-primary text-slate-950")}
+                        disabled={currentPlan === 'creator' && !isCancelled}
+                        className="w-full rounded-xl py-6 font-bold shadow-lg shadow-primary/25"
                     >
-                        {currentPlan === 'creator' ? "Current Plan" : (currentPlan === 'pro' ? "Downgrade to Creator" : "Get Creator")}
+                        {currentPlan === 'creator' && isCancelled ? "Enable Auto-Pay Again" : currentPlan === 'creator' ? "Current Plan" : (currentPlan === 'pro' ? "Downgrade to Creator" : "Get Creator")}
                     </Button>
                 </Card>
 
                 {/* PRO PLAN */}
                 <Card className={cn("p-8 rounded-3xl flex flex-col relative overflow-hidden transition-all hover:-translate-y-2 duration-300", currentPlan === 'pro' ? "border-purple-500/50 bg-purple-500/5" : "bg-card/50 border-input")}>
-                    {currentPlan === 'pro' && <div className="absolute top-0 right-0 bg-purple-500 text-white text-xs font-bold px-3 py-1 rounded-bl-xl">ACTIVE</div>}
+                    {currentPlan === 'pro' && !isCancelled && <div className="absolute top-0 right-0 bg-purple-500 text-white text-xs font-bold px-3 py-1 rounded-bl-xl">ACTIVE</div>}
+                    {currentPlan === 'pro' && isCancelled && <div className="absolute top-0 right-0 bg-amber-500/90 text-slate-950 text-xs font-bold px-3 py-1 rounded-bl-xl">CANCELLED</div>}
                     <div className="mb-8">
                         <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">Pro</h3>
                         <p className="text-muted-foreground mt-2">Build your brand like a pro.</p>
@@ -228,25 +232,45 @@ export function Pricing() {
                     </ul>
                     <Button
                         onClick={() => handleSubscription(PLANS.PRO)}
-                        disabled={currentPlan === 'pro'}
-                        className={cn("w-full rounded-xl py-6 font-bold", currentPlan === 'pro' ? "bg-secondary text-foreground" : "bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/25")}
+                        disabled={currentPlan === 'pro' && !isCancelled}
+                        variant="ghost"
+                        className="w-full rounded-xl py-6 font-bold bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/25"
                     >
-                        {currentPlan === 'pro' ? "Current Plan" : (currentPlan === 'creator' ? "Upgrade to Pro" : "Go Pro 🚀")}
+                        {currentPlan === 'pro' && isCancelled ? "Enable Auto-Pay Again" : currentPlan === 'pro' ? "Current Plan" : (currentPlan === 'creator' ? "Upgrade to Pro" : "Go Pro 🚀")}
                     </Button>
                 </Card>
             </div>
 
-            {(currentPlan === 'creator' || currentPlan === 'pro') && (
+            {isCancelled && periodEnd && (
+                <div className="max-w-4xl mx-auto">
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-6 flex items-center gap-4">
+                        <div className="p-3 rounded-xl bg-amber-500/20">
+                            <svg className="w-6 h-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                        </div>
+                        <div className="flex-1">
+                            <h4 className="font-bold text-amber-500 mb-1">Subscription Cancelled - Auto-Renewal Disabled</h4>
+                            <p className="text-sm text-muted-foreground">
+                                You'll keep access to all premium features until <span className="font-bold text-foreground">{new Date(periodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>.
+                                Want to keep your perks? Click "Enable Auto-Pay Again" on your plan card above.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {(currentPlan === 'creator' || currentPlan === 'pro') && !isCancelled && (
                 <div className="max-w-2xl mx-auto text-center space-y-4">
                     <div className="h-[1px] bg-border/30" />
                     <div className="pt-4">
-                        <p className="text-sm text-muted-foreground mb-3">Need to cancel your subscription?</p>
+                        <p className="text-sm text-muted-foreground mb-3">Need to turn off auto-renewal?</p>
                         <Button
                             onClick={() => setShowCancelDialog(true)}
                             variant="ghost"
                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
                         >
-                            Cancel Subscription
+                            Turn Off Auto-Renewal
                         </Button>
                     </div>
                 </div>
@@ -264,10 +288,10 @@ export function Pricing() {
                     }
                 }}
                 onConfirm={() => setShowCancelDialog(false)}
-                title="Cancel Subscription?"
-                description="You'll lose access to premium features immediately. We'll miss you, but you can always come back! 💔"
+                title="Turn off Auto-Renewal?"
+                description="You'll keep all premium features until your billing period ends. No more charges after that. You can resubscribe anytime! 💙"
                 confirmText="Keep My Plan"
-                cancelText="Yes, Cancel"
+                cancelText="Turn Off Renewal"
                 variant="info"
                 isLoading={cancelMutation.isPending}
             />

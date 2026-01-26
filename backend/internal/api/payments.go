@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"strings"
 
 	"example.com/creati/backend/internal/features"
 	"example.com/creati/backend/internal/middleware"
@@ -190,7 +191,7 @@ func (h *PaymentHandler) VerifySubscription(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, nil, "subscription verified and updated")
 }
 
-// UpdateSubscription handles upgrades/downgrades
+// UpdateSubscription handles upgrades/downgrades and resuming cancelled subscriptions
 func (h *PaymentHandler) UpdateSubscription(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	var req UpdateSubscriptionRequest
@@ -199,9 +200,17 @@ func (h *PaymentHandler) UpdateSubscription(c *fiber.Ctx) error {
 	}
 
 	var currentSubID string
-	err := h.db.QueryRow("SELECT razorpay_subscription_id FROM subscriptions WHERE user_id = $1 AND status = 'active'", userID).Scan(&currentSubID)
+	var currentPlan string
+	var currentStatus string
+	// Check for both active and cancelled subscriptions
+	err := h.db.QueryRow(`
+		SELECT razorpay_subscription_id, plan, status 
+		FROM subscriptions 
+		WHERE user_id = $1 AND (status = 'active' OR status = 'cancelled')
+	`, userID).Scan(&currentSubID, &currentPlan, &currentStatus)
+
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no active subscription found to update")
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no active or cancelled subscription found to update")
 	}
 
 	newPlanID := getRazorpayPlanID(req.TargetPlanID, req.BillingCycle)
@@ -209,7 +218,29 @@ func (h *PaymentHandler) UpdateSubscription(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "plan configuration missing")
 	}
 
-	// Call Razorpay Subscription Update
+	// Case 1: Resuming a cancelled subscription to the same plan
+	if currentStatus == "cancelled" && currentPlan == req.TargetPlanID {
+		// Since Razorpay subscription is still active (cancel_at_cycle_end doesn't actually cancel it),
+		// we just need to update our local DB status back to active
+		// The subscription will auto-renew normally on Razorpay's side
+
+		_, err = h.db.Exec(`
+			UPDATE subscriptions 
+			SET status = 'active', updated_at = NOW()
+			WHERE user_id = $1
+		`, userID)
+
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update subscription status")
+		}
+
+		return utils.SuccessResponse(c, fiber.Map{
+			"message": "auto-renewal resumed successfully",
+		}, "subscription resumed")
+	}
+
+	// Case 2: Plan change (upgrade/downgrade) - works for both active and cancelled
+	// Call Razorpay Subscription Update with new plan
 	// schedule_change_at = "now" handles proration automatically
 	data := map[string]interface{}{
 		"plan_id":            newPlanID,
@@ -219,15 +250,22 @@ func (h *PaymentHandler) UpdateSubscription(c *fiber.Ctx) error {
 
 	body, err := h.client.Subscription.Update(currentSubID, data, nil)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update razorpay subscription")
+		// Log the actual error from Razorpay
+		fmt.Printf("Razorpay subscription update error: %v\n", err)
+
+		// Check if it's a UPI payment method limitation
+		errStr := err.Error()
+		if strings.Contains(errStr, "upi") || strings.Contains(errStr, "UPI") {
+			return utils.ErrorResponse(c, fiber.StatusBadRequest, "Plan changes aren't supported for UPI subscriptions. Please cancel your current plan and subscribe to the new plan.")
+		}
+
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, fmt.Sprintf("failed to update razorpay subscription: %v", err))
 	}
 
-	// Update local DB immediately or wait for webhook?
-	// It's safer to update local DB optimistically or returns success and let verify/webhook handle it.
-	// But since it's "now", we can update our local plan reference.
+	// Update local DB
 	_, err = h.db.Exec(`
 		UPDATE subscriptions 
-		SET plan = $1, billing_cycle = $2, updated_at = NOW()
+		SET plan = $1, billing_cycle = $2, status = 'active', updated_at = NOW()
 		WHERE user_id = $3
 	`, req.TargetPlanID, req.BillingCycle, userID)
 
@@ -239,7 +277,7 @@ func (h *PaymentHandler) UpdateSubscription(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, body, "subscription updated")
 }
 
-// CancelSubscription cancels the user's active subscription
+// CancelSubscription cancels the user's active subscription at the end of billing period
 func (h *PaymentHandler) CancelSubscription(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
@@ -263,9 +301,9 @@ func (h *PaymentHandler) CancelSubscription(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "cannot cancel free plan")
 	}
 
-	// Cancel on Razorpay
+	// Cancel on Razorpay - at end of billing cycle
 	data := map[string]interface{}{
-		"cancel_at_cycle_end": false, // Cancel immediately
+		"cancel_at_cycle_end": true, // Cancel at end of period
 	}
 
 	_, err = h.client.Subscription.Cancel(currentSubID, data, nil)
@@ -273,30 +311,23 @@ func (h *PaymentHandler) CancelSubscription(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to cancel subscription with razorpay")
 	}
 
-	// Update local DB - set status to cancelled and reset to free plan
-	tx, err := h.db.Begin()
-	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
-	}
-	defer tx.Rollback()
-
-	_, err = tx.Exec(`
+	// Update local DB - mark as cancelled but keep plan active until period ends
+	_, err = h.db.Exec(`
 		UPDATE subscriptions 
 		SET status = 'cancelled', 
-		    plan = $1,
 		    updated_at = NOW()
-		WHERE user_id = $2
-	`, features.PlanFree, userID)
+		WHERE user_id = $1
+	`, userID)
 
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update subscription status")
 	}
 
-	if err := tx.Commit(); err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "transaction failed")
-	}
-
-	return utils.SuccessResponse(c, nil, "subscription cancelled successfully")
+	return utils.SuccessResponse(c, fiber.Map{
+		"message":           "subscription will be cancelled at end of billing period",
+		"access_until":      "current_period_end",
+		"auto_renew_status": "disabled",
+	}, "subscription scheduled for cancellation")
 }
 
 // HandleWebhook processes Razorpay webhooks
@@ -396,7 +427,16 @@ func (h *PaymentHandler) GetSubscription(c *fiber.Ctx) error {
 		sub.CurrentPeriodEnd = currentPeriodEnd.String
 	}
 
-	// Populate features based on plan
+	// If subscription is cancelled but period hasn't ended, treat as active for entitlements
+	// This allows users to keep their benefits until the billing period ends
+	effectiveStatus := sub.Status
+	if sub.Status == "cancelled" && currentPeriodEnd.Valid {
+		// Check if period has ended
+		// For now, we'll let the frontend/entitlements check current_period_end
+		// Status stays 'cancelled' but they still get features
+	}
+
+	// Populate features based on plan (even if cancelled, until period ends)
 	// Using the actual constant values (snake_case) as keys to match frontend expectations
 	entitlements := make(map[string]interface{})
 
@@ -407,6 +447,8 @@ func (h *PaymentHandler) GetSubscription(c *fiber.Ctx) error {
 	entitlements[string(features.MaxConnectedAccounts)] = features.GetLimit(sub.Plan, features.MaxConnectedAccounts)
 
 	sub.Features = entitlements
+	// Add effective status for frontend
+	sub.Status = effectiveStatus
 
 	return utils.SuccessResponse(c, sub, "")
 }
