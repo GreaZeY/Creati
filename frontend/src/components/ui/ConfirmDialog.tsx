@@ -81,7 +81,7 @@ export const ConfirmDialog = ({
 
                             {/* Text */}
                             <div className="text-center space-y-4 mb-10">
-                                <h3 className="text-2xl font-black tracking-tight text-slate-950">{title}</h3>
+                                <h3 className="text-2xl font-black tracking-tight text-foreground">{title}</h3>
                                 <p className="text-muted-foreground leading-relaxed">
                                     {description}
                                 </p>

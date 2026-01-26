@@ -4,6 +4,7 @@ import { Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/events';
 import { paymentsAPI } from '@/lib/api';
@@ -23,6 +24,7 @@ const loadRazorpay = () => {
 
 export function Pricing() {
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+    const [showCancelDialog, setShowCancelDialog] = useState(false);
     const queryClient = useQueryClient();
 
     const { data: subscription, isLoading } = useQuery({
@@ -42,17 +44,12 @@ export function Pricing() {
         onSuccess: () => {
             toast.success("Subscription cancelled. We'll miss you! 😢");
             queryClient.invalidateQueries({ queryKey: ['subscription'] });
+            setShowCancelDialog(false);
         },
         onError: () => {
             toast.error("Failed to cancel subscription. Try again?");
         }
     });
-
-    const handleCancel = () => {
-        if (window.confirm("Are you sure you want to cancel your subscription? You'll lose access to premium features immediately.")) {
-            cancelMutation.mutate();
-        }
-    };
 
     const handleSubscription = async (planId: string) => {
         try {
@@ -245,8 +242,7 @@ export function Pricing() {
                     <div className="pt-4">
                         <p className="text-sm text-muted-foreground mb-3">Need to cancel your subscription?</p>
                         <Button
-                            onClick={handleCancel}
-                            isLoading={cancelMutation.isPending}
+                            onClick={() => setShowCancelDialog(true)}
                             variant="ghost"
                             className="text-destructive hover:text-destructive hover:bg-destructive/10"
                         >
@@ -259,6 +255,22 @@ export function Pricing() {
             <div className="bg-secondary/30 rounded-2xl p-6 text-center text-sm text-muted-foreground max-w-2xl mx-auto">
                 <p>Secured payments via Payment Gateway. Cancel anytime, no beef. ✨</p>
             </div>
+
+            <ConfirmDialog
+                isOpen={showCancelDialog}
+                onClose={() => {
+                    if (!cancelMutation.isPending) {
+                        cancelMutation.mutate();
+                    }
+                }}
+                onConfirm={() => setShowCancelDialog(false)}
+                title="Cancel Subscription?"
+                description="You'll lose access to premium features immediately. We'll miss you, but you can always come back! 💔"
+                confirmText="Keep My Plan"
+                cancelText="Yes, Cancel"
+                variant="info"
+                isLoading={cancelMutation.isPending}
+            />
         </div>
     );
 }
