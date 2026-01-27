@@ -49,7 +49,7 @@ func (h *PlatformHandler) GetPlatformCounts(c *fiber.Ctx) error {
 		if err := rows.Scan(&platform); err != nil {
 			continue
 		}
-		counts[platform] = 1
+		counts[platform]++
 		totalConnected++
 	}
 
