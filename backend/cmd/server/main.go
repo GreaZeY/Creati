@@ -153,7 +153,7 @@ func main() {
 	protected.Get("/platforms/:platform/connect",
 		middleware.RequireLimit(db, features.MaxConnectedAccounts, func(userID int) (int, error) {
 			var count int
-			err := db.QueryRow("SELECT COUNT(*) FROM platform_accounts WHERE user_id = $1 AND connected = true", userID).Scan(&count)
+			err := db.QueryRow("SELECT COUNT(*) FROM platform_accounts WHERE user_id = $1 AND status IN ('active', 'connected')", userID).Scan(&count)
 			return count, err
 		}),
 		platformHandler.InitiateConnection,

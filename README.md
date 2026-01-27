@@ -9,6 +9,7 @@ A unified creator tool for uploading content to YouTube (and more platforms soon
 Upload once, publish to multiple platforms. Currently supports **YouTube**, with extensible architecture for Instagram, Facebook, X, and LinkedIn.
 
 **Key Features:**
+
 - ✨ Beautiful Gen Z-inspired UI with delightful animations
 - 🎬 Unified upload to multiple platforms
 - 📊 Real-time status tracking
@@ -22,11 +23,13 @@ Upload once, publish to multiple platforms. Currently supports **YouTube**, with
 This project follows strict **SOLID principles** and **zero code duplication**. See [`architecture_principles.md`](./brain/architecture_principles.md) for details.
 
 **Adding a new platform requires:**
+
 1. Create one new service file implementing the `Platform` interface
 2. Register in platform factory
 3. Add OAuth config
 
 **Should NOT require:**
+
 - Modifying core upload/job logic
 - Touching other platform implementations
 
@@ -35,6 +38,7 @@ This project follows strict **SOLID principles** and **zero code duplication**. 
 ## 🛠️ Tech Stack
 
 ### Frontend
+
 - **Vite** + **React 18** + **TypeScript**
 - **Tailwind CSS** (custom theme)
 - **Framer Motion** (animations)
@@ -42,6 +46,7 @@ This project follows strict **SOLID principles** and **zero code duplication**. 
 - **Axios** (HTTP client)
 
 ### Backend
+
 - **Go** + **Fiber** (web framework)
 - **PostgreSQL** (database)
 - **Redis** (job queue)
@@ -170,16 +175,19 @@ VITE_API_BASE_URL=http://localhost:8080/api
 ## 🎨 Design System
 
 ### Colors
+
 - **Primary:** `#08cea8` (used ONLY for CTAs, progress, success)
 - **Dark BG:** `#121212`
 - **Dark Card:** `#1a1a1a`
 
 ### Animations
+
 - **Duration:** 200-400ms
 - **Easing:** `easeOut`
 - **Motion:** Framer Motion variants in `lib/animations.ts`
 
 ### Confetti Triggers
+
 - Platform connection success (80 particles)
 - Upload success (150 particles)
 - Milestones: 1st upload, 5 uploads, 100 views (200 particles)
@@ -189,16 +197,19 @@ VITE_API_BASE_URL=http://localhost:8080/api
 ## 🧪 API Endpoints
 
 ### Auth
+
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - Login
 
 ### Platforms
+
 - `GET /api/platforms` - List platforms and connection status
 - `GET /api/platforms/:platform/connect` - Get OAuth URL
 - `GET /api/platforms/:platform/callback` - OAuth callback
 - `DELETE /api/platforms/:platform` - Disconnect platform
 
 ### Videos & Dashboard
+
 - `POST /api/upload/init` - Initialize S3 upload (returns presigned URL)
 - `POST /api/upload/confirm` - Save metadata and queue platform jobs
 - `GET /api/videos` - List user videos with aggregated status
@@ -233,6 +244,7 @@ go test ./...              # Run tests
 Example: Adding Instagram
 
 1. **Create service** (`internal/services/instagram.go`):
+
 ```go
 type InstagramService struct {
     db *sql.DB
@@ -245,18 +257,21 @@ func (i *InstagramService) Upload(video *models.Video) (string, error) {
 ```
 
 2. **Register in factory** (`internal/services/factory.go`):
+
 ```go
 case "instagram":
     return NewInstagramService(db), nil
 ```
 
 3. **Add OAuth config** (`.env`):
+
 ```bash
-INSTAGRAM_CLIENT_ID=...
-INSTAGRAM_CLIENT_SECRET=...
+META_CLIENT_ID=...
+META_CLIENT_SECRET=...
 ```
 
 4. **Update constants** (`frontend/src/lib/constants.ts`):
+
 ```ts
 instagram: {
     enabled: true,
@@ -270,14 +285,17 @@ That's it! No core logic changes needed.
 ## 🐛 Troubleshooting
 
 **Frontend won't connect to backend:**
+
 - Check CORS settings in `backend/cmd/server/main.go`
 - Verify `VITE_API_BASE_URL` in `.env.local`
 
 **Database connection fails:**
+
 - Ensure PostgreSQL is running: `pg_isready`
 - Check `DATABASE_URL` format
 
 **YouTube OAuth fails:**
+
 - Verify redirect URL matches exactly in Google Console
 - Check OAuth credentials are correct
 

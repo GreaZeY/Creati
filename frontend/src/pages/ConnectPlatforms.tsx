@@ -47,6 +47,8 @@ export const ConnectPlatforms = () => {
     },
   });
 
+  const message = searchParams.get("message");
+
   return (
     <div className="max-w-5xl space-y-8 pb-10">
       <div className="flex items-center justify-between">
@@ -69,6 +71,36 @@ export const ConnectPlatforms = () => {
       </div>
 
       <AnimatePresence mode="wait">
+        {status === "error" && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -20 }}
+            className="bg-destructive/10 border-2 border-destructive/20 p-6 rounded-3xl flex items-center gap-5 shadow-2xl shadow-destructive/10 backdrop-blur-md"
+          >
+            <div className="p-3 bg-destructive rounded-2xl text-white shadow-lg shadow-destructive/20">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-black text-xl text-destructive capitalize leading-none">
+                Connection Failed
+              </h3>
+              <p className="text-destructive/80 font-bold text-sm mt-1">
+                {message ||
+                  "An unknown error occurred while connecting the platform."}
+              </p>
+            </div>
+            <Button
+              asChild
+              size="sm"
+              variant="ghost"
+              className="ml-auto rounded-xl hover:bg-destructive/10 text-destructive font-bold"
+            >
+              <Link to="/connect">Dismiss</Link>
+            </Button>
+          </motion.div>
+        )}
+
         {status === "success" && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: -20 }}

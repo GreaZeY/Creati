@@ -37,7 +37,7 @@ func NewFacebookService(db *sql.DB) *FacebookService {
 				"pages_show_list",
 				"pages_read_engagement",
 				"pages_manage_posts",
-				"publish_video",
+				// "publish_video",
 			},
 			Endpoint: facebook.Endpoint,
 		},
