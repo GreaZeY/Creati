@@ -32,7 +32,6 @@ func NewLinkedInService(db *sql.DB) *LinkedInService {
 		oauthConfig: &oauth2.Config{
 			ClientID:     os.Getenv("LINKEDIN_CLIENT_ID"),
 			ClientSecret: os.Getenv("LINKEDIN_CLIENT_SECRET"),
-			RedirectURL:  os.Getenv("LINKEDIN_REDIRECT_URL"),
 			Scopes: []string{
 				"openid",
 				"profile",
@@ -45,13 +44,18 @@ func NewLinkedInService(db *sql.DB) *LinkedInService {
 
 // GetAuthURL returns the OAuth URL for user authorization
 func (l *LinkedInService) GetAuthURL(state string) string {
-	return l.oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
+	config := *l.oauthConfig
+	config.RedirectURL = fmt.Sprintf("%s/platforms/linkedin/callback", os.Getenv("FRONTEND_URL"))
+	return config.AuthCodeURL(state, oauth2.AccessTypeOffline)
 }
 
 // Authenticate implements Platform interface
 func (l *LinkedInService) Authenticate(code string, userID int) error {
+	config := *l.oauthConfig
+	config.RedirectURL = fmt.Sprintf("%s/platforms/linkedin/callback", os.Getenv("FRONTEND_URL"))
+
 	// Exchange code for token
-	token, err := l.oauthConfig.Exchange(context.Background(), code)
+	token, err := config.Exchange(context.Background(), code)
 	if err != nil {
 		return fmt.Errorf("oauth exchange failed: %w", err)
 	}

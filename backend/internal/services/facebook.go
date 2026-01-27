@@ -32,7 +32,6 @@ func NewFacebookService(db *sql.DB) *FacebookService {
 		oauthConfig: &oauth2.Config{
 			ClientID:     os.Getenv("FACEBOOK_CLIENT_ID"),
 			ClientSecret: os.Getenv("FACEBOOK_CLIENT_SECRET"),
-			RedirectURL:  os.Getenv("FACEBOOK_REDIRECT_URL"),
 			Scopes: []string{
 				"pages_show_list",
 				"pages_read_engagement",
@@ -46,13 +45,18 @@ func NewFacebookService(db *sql.DB) *FacebookService {
 
 // GetAuthURL returns the OAuth URL for user authorization
 func (f *FacebookService) GetAuthURL(state string) string {
-	return f.oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
+	config := *f.oauthConfig
+	config.RedirectURL = fmt.Sprintf("%s/platforms/facebook/callback", os.Getenv("FRONTEND_URL"))
+	return config.AuthCodeURL(state, oauth2.AccessTypeOffline)
 }
 
 // Authenticate implements Platform interface
 func (f *FacebookService) Authenticate(code string, userID int) error {
+	config := *f.oauthConfig
+	config.RedirectURL = fmt.Sprintf("%s/platforms/facebook/callback", os.Getenv("FRONTEND_URL"))
+
 	// Exchange code for token
-	token, err := f.oauthConfig.Exchange(context.Background(), code)
+	token, err := config.Exchange(context.Background(), code)
 	if err != nil {
 		return fmt.Errorf("oauth exchange failed: %w", err)
 	}

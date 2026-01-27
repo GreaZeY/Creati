@@ -54,7 +54,7 @@ api.interceptors.request.use(
 // Response interceptor - handle errors consistently
 api.interceptors.response.use(
     (response) => response,
-    (error: AxiosError<{ message: string }>) => {
+    (error: AxiosError<{ message: string, error: string }>) => {
         // Logout on 401
         if (error.response?.status === 401) {
             // No local storage to clear, just redirect
@@ -64,7 +64,7 @@ api.interceptors.response.use(
             }
         }
 
-        const message = error.response?.data?.message || error.message || 'An error occurred';
+        const message = error.response?.data?.message || error.response?.data?.error || error.message || 'Something went wrong!';
 
         // Check config to see if alerts should be shown (default: true)
         // Note: config might be undefined if error happened before request
@@ -118,6 +118,9 @@ export const platformsAPI = {
 
     remove: (platform: string) =>
         api.delete(`/platforms/${platform}`),
+
+    exchange: (platform: string, code: string, state: string) =>
+        api.post(`/platforms/${platform}/callback`, { code, state }),
 };
 
 export const uploadAPI = {

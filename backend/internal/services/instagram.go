@@ -34,7 +34,6 @@ func NewInstagramService(db *sql.DB) *InstagramService {
 		oauthConfig: &oauth2.Config{
 			ClientID:     os.Getenv("INSTAGRAM_CLIENT_ID"),
 			ClientSecret: os.Getenv("INSTAGRAM_CLIENT_SECRET"),
-			RedirectURL:  os.Getenv("INSTAGRAM_REDIRECT_URL"),
 			Scopes: []string{
 				"instagram_basic",
 				"instagram_content_publish",
@@ -48,14 +47,19 @@ func NewInstagramService(db *sql.DB) *InstagramService {
 
 // GetAuthURL returns the OAuth URL for user authorization
 func (i *InstagramService) GetAuthURL(state string) string {
-	return i.oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
+	config := *i.oauthConfig
+	config.RedirectURL = fmt.Sprintf("%s/platforms/instagram/callback", os.Getenv("FRONTEND_URL"))
+	return config.AuthCodeURL(state, oauth2.AccessTypeOffline)
 }
 
 // Authenticate implements Platform interface
 // Exchanges OAuth code for tokens and stores them
 func (i *InstagramService) Authenticate(code string, userID int) error {
+	config := *i.oauthConfig
+	config.RedirectURL = fmt.Sprintf("%s/platforms/instagram/callback", os.Getenv("FRONTEND_URL"))
+
 	// Exchange code for token using Facebook OAuth
-	token, err := i.oauthConfig.Exchange(context.Background(), code)
+	token, err := config.Exchange(context.Background(), code)
 	if err != nil {
 		return fmt.Errorf("oauth exchange failed: %w", err)
 	}

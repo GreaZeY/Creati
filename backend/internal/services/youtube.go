@@ -33,7 +33,6 @@ func NewYouTubeService(db *sql.DB) *YouTubeService {
 		oauthConfig: &oauth2.Config{
 			ClientID:     os.Getenv("YOUTUBE_CLIENT_ID"),
 			ClientSecret: os.Getenv("YOUTUBE_CLIENT_SECRET"),
-			RedirectURL:  os.Getenv("YOUTUBE_REDIRECT_URL"),
 			Scopes: []string{
 				youtube.YoutubeUploadScope,
 				youtube.YoutubeReadonlyScope,
@@ -46,11 +45,15 @@ func NewYouTubeService(db *sql.DB) *YouTubeService {
 
 // GetAuthURL returns the OAuth URL for user authorization
 func (y *YouTubeService) GetAuthURL(state string) string {
-	return y.oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
+	config := *y.oauthConfig
+	config.RedirectURL = fmt.Sprintf("%s/platforms/youtube/callback", os.Getenv("FRONTEND_URL"))
+	return config.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
 }
 
 // GetAuthURLWithHint returns the OAuth URL with login_hint to skip account picker
 func (y *YouTubeService) GetAuthURLWithHint(state, prompt, loginHint string) string {
+	config := *y.oauthConfig
+	config.RedirectURL = fmt.Sprintf("%s/platforms/youtube/callback", os.Getenv("FRONTEND_URL"))
 	opts := []oauth2.AuthCodeOption{
 		oauth2.AccessTypeOffline,
 		oauth2.ApprovalForce,
@@ -64,14 +67,17 @@ func (y *YouTubeService) GetAuthURLWithHint(state, prompt, loginHint string) str
 	if len(prompt) > 0 {
 		opts = append(opts, oauth2.SetAuthURLParam("prompt", prompt))
 	}
-	return y.oauthConfig.AuthCodeURL(state, opts...)
+	return config.AuthCodeURL(state, opts...)
 }
 
 // Authenticate implements Platform interface
 // Exchanges OAuth code for tokens and stores them
 func (y *YouTubeService) Authenticate(code string, userID int) error {
+	config := *y.oauthConfig
+	config.RedirectURL = fmt.Sprintf("%s/platforms/youtube/callback", os.Getenv("FRONTEND_URL"))
+
 	// Exchange code for token
-	token, err := y.oauthConfig.Exchange(context.Background(), code)
+	token, err := config.Exchange(context.Background(), code)
 	if err != nil {
 		return fmt.Errorf("oauth exchange failed: %w", err)
 	}

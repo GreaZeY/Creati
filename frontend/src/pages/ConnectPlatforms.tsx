@@ -1,4 +1,7 @@
-import { useMutation } from "@tanstack/react-query";
+import { Modal } from "@/components/ui/Modal";
+import { useState } from "react";
+
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { platformsAPI } from "@/lib/api";
 import {
   CheckCheck,
@@ -13,7 +16,6 @@ import { PLATFORMS } from "@/lib/constants";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, useSearchParams } from "react-router-dom";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
-import { useQuery } from "@tanstack/react-query";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { CAPABILITIES } from "@/lib/features";
 
@@ -21,6 +23,9 @@ export const ConnectPlatforms = () => {
   const [searchParams] = useSearchParams();
   const status = searchParams.get("status");
   const platformParam = searchParams.get("platform");
+  const message = searchParams.get("message");
+
+  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
 
   const { limit } = useEntitlement();
   const maxAccounts = limit(CAPABILITIES.MAX_CONNECTED_ACCOUNTS);
@@ -47,10 +52,23 @@ export const ConnectPlatforms = () => {
     },
   });
 
-  const message = searchParams.get("message");
+  const handleConnectClick = (platformId: string) => {
+    // Show guidance for Meta platforms
+    if (platformId === "instagram" || platformId === "facebook") {
+      setSelectedPlatform(platformId);
+    } else {
+      // Direct connect for others (YouTube etc)
+      connectMutation.mutate(platformId);
+    }
+  };
+
+  const selectedPlatformName = selectedPlatform
+    ? PLATFORMS[selectedPlatform as keyof typeof PLATFORMS]?.name
+    : "";
 
   return (
     <div className="max-w-5xl space-y-8 pb-10">
+      {/* ... (Header) */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-6">
           <div>
@@ -70,6 +88,115 @@ export const ConnectPlatforms = () => {
         </div>
       </div>
 
+      {/* Guidance Modal */}
+      <Modal
+        isOpen={!!selectedPlatform}
+        onClose={() => setSelectedPlatform(null)}
+        title={`Connect ${selectedPlatformName}`}
+      >
+        <div className="space-y-6">
+          <div className="bg-primary/5 p-4 rounded-xl border border-primary/10">
+            <h4 className="font-bold text-primary mb-2 flex items-center gap-2">
+              <Zap size={16} />
+              Pre-Flight Checklist
+            </h4>
+            <p className="text-sm text-muted-foreground">
+              To ensure a successful connection with{" "}
+              <strong>{selectedPlatformName}</strong>, please confirm the
+              following:
+            </p>
+          </div>
+
+          <ul className="space-y-4">
+            {selectedPlatform === "instagram" && (
+              <>
+                <li className="flex gap-3 text-sm">
+                  <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center shrink-0 font-bold text-xs">
+                    1
+                  </div>
+                  <span>
+                    Your Instagram account must be a{" "}
+                    <strong className="text-foreground">Business</strong> or{" "}
+                    <strong className="text-foreground">Creator</strong>{" "}
+                    account. Personal accounts cannot publish content via API.
+                  </span>
+                </li>
+                <li className="flex gap-3 text-sm">
+                  <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center shrink-0 font-bold text-xs">
+                    2
+                  </div>
+                  <span>
+                    Your Instagram account must be linked to a{" "}
+                    <strong className="text-foreground">Facebook Page</strong>.
+                  </span>
+                </li>
+              </>
+            )}
+            {selectedPlatform === "facebook" && (
+              <>
+                <li className="flex gap-3 text-sm">
+                  <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center shrink-0 font-bold text-xs">
+                    1
+                  </div>
+                  <span>
+                    You are connecting a{" "}
+                    <strong className="text-foreground">Facebook Page</strong>,
+                    not a personal profile.
+                  </span>
+                </li>
+                <li className="flex gap-3 text-sm">
+                  <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center shrink-0 font-bold text-xs">
+                    2
+                  </div>
+                  <span>
+                    You have <strong className="text-foreground">Admin</strong>{" "}
+                    access to the Page.
+                  </span>
+                </li>
+              </>
+            )}
+            <li className="flex gap-3 text-sm">
+              <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center shrink-0 font-bold text-xs">
+                !
+              </div>
+              <span>
+                During the Facebook login popup, please{" "}
+                <strong className="text-foreground">
+                  Grant All Permissions
+                </strong>
+                . Unchecking boxes will cause the connection to fail.
+              </span>
+            </li>
+          </ul>
+
+          <div className="flex gap-3 pt-2">
+            <Button
+              variant="ghost"
+              className="flex-1"
+              onClick={() => setSelectedPlatform(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="flex-1 font-bold"
+              onClick={() => {
+                if (selectedPlatform) {
+                  connectMutation.mutate(selectedPlatform);
+                  setSelectedPlatform(null);
+                }
+              }}
+              disabled={connectMutation.isPending}
+            >
+              {connectMutation.isPending
+                ? "Connecting..."
+                : "I Understand, Connect"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ... (Rest of UI) */}
+
       <AnimatePresence mode="wait">
         {status === "error" && (
           <motion.div
@@ -78,6 +205,7 @@ export const ConnectPlatforms = () => {
             exit={{ opacity: 0, scale: 0.95, y: -20 }}
             className="bg-destructive/10 border-2 border-destructive/20 p-6 rounded-3xl flex items-center gap-5 shadow-2xl shadow-destructive/10 backdrop-blur-md"
           >
+            {/* ... */}
             <div className="p-3 bg-destructive rounded-2xl text-white shadow-lg shadow-destructive/20">
               <AlertTriangle className="w-6 h-6" />
             </div>
@@ -178,7 +306,7 @@ export const ConnectPlatforms = () => {
 
                     <div className="pt-4 flex items-center gap-4">
                       <Button
-                        onClick={() => connectMutation.mutate(platform.id)}
+                        onClick={() => handleConnectClick(platform.id)} // Changed handler
                         disabled={finalDisabled}
                         variant="default"
                         className="h-12 px-10 rounded-2xl font-black transition-all"
@@ -204,6 +332,7 @@ export const ConnectPlatforms = () => {
                 </div>
 
                 {!platform.enabled && (
+                  // ... disabled UI kept same
                   <div className="absolute inset-0 bg-background/40 backdrop-blur-[16px] flex items-center justify-center p-8 text-center z-20 rounded-[2rem] transition-all duration-500 border border-white/5">
                     <div className="space-y-4">
                       <div className="bg-primary/20 text-primary px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest w-fit mx-auto shadow-lg shadow-primary/10 ring-1 ring-primary/20">
@@ -222,7 +351,9 @@ export const ConnectPlatforms = () => {
         })}
       </div>
 
+      {/* ... Footer Card kept same */}
       <Card className="p-8 border-primary/20 bg-primary/[0.02] mt-10 rounded-3xl relative overflow-hidden group">
+        {/* ... */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-primary/10 transition-colors" />
         <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
           <div className="p-5 rounded-2xl bg-primary/10 text-primary">

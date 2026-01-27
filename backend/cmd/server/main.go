@@ -128,7 +128,8 @@ func main() {
 	apiRoutes.Post("/auth/logout", authHandler.Logout) // Logout can be public or protected, technically public to clear cookie is fine
 
 	// OAuth callback (public)
-	apiRoutes.Get("/platforms/:platform/callback", platformHandler.HandleCallback)
+	// OAuth callback (public - invoked by frontend)
+	apiRoutes.Post("/platforms/:platform/callback", platformHandler.HandleCallback)
 
 	// Webhooks (public - unauthenticated)
 	webhooks := app.Group("/webhooks")

@@ -35,7 +35,6 @@ func NewTwitterService(db *sql.DB) *TwitterService {
 		oauthConfig: &oauth2.Config{
 			ClientID:     os.Getenv("TWITTER_CLIENT_ID"),
 			ClientSecret: os.Getenv("TWITTER_CLIENT_SECRET"),
-			RedirectURL:  os.Getenv("TWITTER_REDIRECT_URL"),
 			Scopes: []string{
 				"tweet.read",
 				"tweet.write",
@@ -52,8 +51,11 @@ func NewTwitterService(db *sql.DB) *TwitterService {
 
 // GetAuthURL returns the OAuth URL for user authorization
 func (t *TwitterService) GetAuthURL(state string) string {
+	config := *t.oauthConfig
+	config.RedirectURL = fmt.Sprintf("%s/platforms/twitter/callback", os.Getenv("FRONTEND_URL"))
+
 	// Twitter OAuth 2.0 requires PKCE
-	return t.oauthConfig.AuthCodeURL(state,
+	return config.AuthCodeURL(state,
 		oauth2.SetAuthURLParam("code_challenge", generateCodeChallenge()),
 		oauth2.SetAuthURLParam("code_challenge_method", "plain"),
 	)
@@ -67,8 +69,11 @@ func generateCodeChallenge() string {
 
 // Authenticate implements Platform interface
 func (t *TwitterService) Authenticate(code string, userID int) error {
+	config := *t.oauthConfig
+	config.RedirectURL = fmt.Sprintf("%s/platforms/twitter/callback", os.Getenv("FRONTEND_URL"))
+
 	// Exchange code for token with PKCE verifier
-	token, err := t.oauthConfig.Exchange(context.Background(), code,
+	token, err := config.Exchange(context.Background(), code,
 		oauth2.SetAuthURLParam("code_verifier", "twitter_pkce_challenge_verifier"),
 	)
 	if err != nil {

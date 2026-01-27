@@ -189,11 +189,21 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 	}, "")
 }
 
-// HandleCallback processes OAuth callback
+// HandleCallback processes OAuth callback (JSON POST from frontend)
 func (h *PlatformHandler) HandleCallback(c *fiber.Ctx) error {
 	platform := c.Params("platform")
-	code := c.Query("code")
-	state := c.Query("state") // Contains userID in simplified version
+
+	var payload struct {
+		Code  string `json:"code"`
+		State string `json:"state"`
+	}
+
+	if err := c.BodyParser(&payload); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
+	}
+
+	code := payload.Code
+	state := payload.State
 
 	if code == "" {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "missing authorization code")
@@ -217,8 +227,11 @@ func (h *PlatformHandler) HandleCallback(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "authentication failed: "+err.Error())
 	}
 
-	// Redirect to frontend success page
-	return c.Redirect("http://localhost:5173/connect?status=success&platform=" + platform)
+	// Return success JSON
+	return utils.SuccessResponse(c, fiber.Map{
+		"platform": platform,
+		"status":   "connected",
+	}, "Successfully connected to "+platform)
 }
 
 // disconnectPlatformInternal handles token revocation and status updates (reusable logic)
