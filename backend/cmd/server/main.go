@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"example.com/creati/backend/internal/api"
 	"example.com/creati/backend/internal/features"
 	"example.com/creati/backend/internal/middleware"
 	"example.com/creati/backend/internal/services"
+	"example.com/creati/backend/internal/workers"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -44,6 +47,13 @@ func main() {
 		os.Exit(1)
 	}
 	log.Println("✓ Database connected")
+
+	// Start background workers
+	ctx := context.Background()
+
+	// Event processor for upload detection
+	eventProcessor := workers.NewEventProcessor(db, 30*time.Second, 50)
+	go eventProcessor.Start(ctx)
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
@@ -107,6 +117,7 @@ func main() {
 	automationService := services.NewAutomationService(db, queueService)
 	automationHandler := api.NewAutomationHandler(db, automationService)
 	paymentHandler := api.NewPaymentHandler(db)
+	webhookHandler := api.NewWebhookHandler(db)
 
 	// API routes
 	apiRoutes := app.Group("/api")
@@ -119,10 +130,11 @@ func main() {
 	// OAuth callback (public)
 	apiRoutes.Get("/platforms/:platform/callback", platformHandler.HandleCallback)
 
-	// Webhooks (public)
-	apiRoutes.Get("/webhooks/youtube", automationHandler.HandleYouTubeWebhook)
-	apiRoutes.Post("/webhooks/youtube", automationHandler.HandleYouTubeWebhook)
-	apiRoutes.Post("/webhooks/razorpay", paymentHandler.HandleWebhook)
+	// Webhooks (public - unauthenticated)
+	webhooks := app.Group("/webhooks")
+	webhooks.Get("/youtube", webhookHandler.YouTubeWebhookVerification)  // WebSub subscription verification
+	webhooks.Post("/youtube", webhookHandler.YouTubeWebhookNotification) // WebSub content notifications
+	webhooks.Post("/razorpay", paymentHandler.HandleWebhook)
 
 	// Protected routes (require authentication)
 	protected := apiRoutes.Use(middleware.AuthMiddleware)
@@ -135,6 +147,7 @@ func main() {
 	protected.Post("/upload/confirm", uploadHandler.ConfirmUpload)
 
 	// Platforms
+	protected.Get("/platforms/count", platformHandler.GetPlatformCounts)
 	protected.Get("/platforms", platformHandler.ListPlatforms)
 	// Check account limit before allowing new connections
 	protected.Get("/platforms/:platform/connect",
@@ -155,6 +168,15 @@ func main() {
 
 	// Analytics
 	protected.Get("/analytics/overview", analyticsHandler.GetOverview)
+
+	// Platform Events (Upload Detection)
+	protected.Get("/events", webhookHandler.ListEvents)              // List user's events
+	protected.Get("/events/:id", webhookHandler.GetEvent)            // Get single event
+	protected.Post("/events/:id/replay", webhookHandler.ReplayEvent) // Replay failed event
+	// Dev/testing only - should be gated by env var in production
+	if os.Getenv("ENABLE_EVENT_SIMULATOR") == "true" {
+		protected.Post("/events/simulate", webhookHandler.SimulateEvent)
+	}
 
 	// Automation (Protected by Magic Sync entitlement)
 	automationGroup := protected.Group("/automation", middleware.RequireFeature(db, features.CanUseMagicSync))

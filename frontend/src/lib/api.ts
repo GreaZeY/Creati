@@ -107,6 +107,9 @@ export const platformsAPI = {
     list: () =>
         api.get<ApiResponse<any[]>>('/platforms'),
 
+    getCount: () =>
+        api.get<ApiResponse<Record<string, number>>>('/platforms/count'),
+
     connect: (platform: string) =>
         api.get(`/platforms/${platform}/connect`),
 

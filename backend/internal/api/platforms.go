@@ -26,6 +26,41 @@ func NewPlatformHandler(db *sql.DB) *PlatformHandler {
 	return &PlatformHandler{db: db}
 }
 
+// GetPlatformCounts returns count of connected and total platform accounts
+func (h *PlatformHandler) GetPlatformCounts(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	// Fetch all connected platforms
+	rows, err := h.db.Query(`
+		SELECT platform
+		FROM platform_accounts 
+		WHERE user_id = $1 AND status IN ('active', 'connected')
+	`, userID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int)
+	totalConnected := 0
+
+	for rows.Next() {
+		var platform string
+		if err := rows.Scan(&platform); err != nil {
+			continue
+		}
+		counts[platform] = 1
+		totalConnected++
+	}
+
+	// Add total to the map
+	counts["total"] = totalConnected
+
+	return c.JSON(fiber.Map{
+		"data": counts,
+	})
+}
+
 // ListPlatforms returns list of available platforms and all connected accounts
 func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)

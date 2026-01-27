@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { platformsAPI } from '@/lib/api';
-import { ArrowLeft, CheckCheck, Link as LinkIcon, Network, Zap } from 'lucide-react';
+import { ArrowLeft, CheckCheck, Link as LinkIcon, Network, Zap, AlertTriangle } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { PLATFORMS } from '@/lib/constants';
@@ -20,16 +20,16 @@ export const ConnectPlatforms = () => {
     const { limit } = useEntitlement();
     const maxAccounts = limit(CAPABILITIES.MAX_CONNECTED_ACCOUNTS);
 
-    // Fetch current connected count (we need to know if limit reached)
-    const { data: platformStats = [] } = useQuery({
-        queryKey: ['platforms'],
+    // Fetch counts and platform-wise connection status (lightweight endpoint)
+    const { data: countsData = {} } = useQuery({
+        queryKey: ['platforms-count'],
         queryFn: async () => {
-            const response = await platformsAPI.list();
-            return response.data.data as any[];
+            const response = await platformsAPI.getCount();
+            return response.data.data;
         },
     });
 
-    const connectedCount = platformStats.filter(p => p.connected).length;
+    const connectedCount = countsData['total'] ?? 0;
     const isLimitReached = maxAccounts > 0 && connectedCount >= maxAccounts;
 
     const connectMutation = useMutation({
@@ -37,7 +37,7 @@ export const ConnectPlatforms = () => {
             const { data } = await platformsAPI.connect(platformId);
             const { authUrl } = data.data;
             if (authUrl) {
-                window.location.assign(authUrl);
+                window.location.href = authUrl;
             }
         },
     });
@@ -47,19 +47,13 @@ export const ConnectPlatforms = () => {
         <div className="max-w-5xl space-y-8 pb-10">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-6">
-                    <Button asChild variant="ghost" size="icon" className="h-12 w-12 rounded-2xl bg-secondary/50 hover:bg-secondary transition-all active:scale-90">
-                        <Link to="/platforms">
-                            <ArrowLeft className="w-5 h-5" />
-                        </Link>
-                    </Button>
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             <span className="p-1.5 rounded-lg bg-primary/10 text-primary">
                                 <Network size={18} />
                             </span>
-                            <span className="text-xs font-black uppercase tracking-[0.3em] text-primary">Ecosystem Expansion</span>
+                            <span className="text-4xl font-black uppercase text-primary">Ecosystem Expansion</span>
                         </div>
-                        <h1 className="text-4xl font-black tracking-tight bg-gradient-to-r from-foreground to-foreground/60 bg-clip-text text-transparent italic">Global Node Connection</h1>
                         <p className="text-muted-foreground mt-2 text-lg font-medium opacity-80">Link new delivery nodes to broadcast your message across the digital fabric.</p>
                     </div>
                 </div>
@@ -89,30 +83,27 @@ export const ConnectPlatforms = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
                 {isLimitReached && (
-                    <div className="md:col-span-2 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-4 text-amber-500">
-                        <div className="p-2 bg-amber-500/20 rounded-lg">
-                            <Zap size={20} />
+                    <div className="md:col-span-2 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-3 mb-4">
+                        <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                        <div>
+                            <p className="text-sm font-medium text-amber-200">
+                                Account Limit Reached ({connectedCount}/{maxAccounts})
+                            </p>
+                            <p className="text-xs text-amber-300/70 mt-0.5">
+                                You've connected the maximum number of accounts for your plan.
+                                Upgrade to connect more platforms.
+                            </p>
                         </div>
-                        <div className="flex-1">
-                            <h4 className="font-bold">Connection Limit Reached</h4>
-                            <p className="text-sm opacity-90">You've hit the limit of {maxAccounts} connected accounts on your current plan.</p>
-                        </div>
-                        <Button asChild variant="outline" size="sm" className="border-amber-500/30 hover:bg-amber-500/10 text-amber-500">
-                            <Link to="/pricing">Upgrade</Link>
-                        </Button>
                     </div>
                 )}
-
                 {Object.values(PLATFORMS).map((platform: any, i: number) => {
 
 
                     const isSyncing = connectMutation.isPending && connectMutation.variables === platform.id;
-                    // isDisabled removed as it was unused and replaced by finalDisabled
-                    // Actually, ConnectPlatforms shows ALL platforms. We need to know if THIS platform is connected to disable or change button text.
-                    // platformStats element has `platform` (name) and `connected` boolean.
-                    // platform.id in loop is 'youtube', 'instagram' etc.
-                    // platformStats check:
-                    const isConnected = platformStats.some(p => p.platform === platform.id && p.connected);
+
+                    // Check if this specific platform is connected using the platforms map
+                    // Key existence implies count > 0 (since we put 1 for connected platforms)
+                    const isConnected = (countsData[platform.id] || 0) > 0;
 
                     // Re-evaluate disabled state
                     const finalDisabled = !platform.enabled || isSyncing || (isLimitReached && !isConnected);
@@ -206,6 +197,6 @@ export const ConnectPlatforms = () => {
                     </div>
                 </div>
             </Card>
-        </div>
+        </div >
     );
 };
