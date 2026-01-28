@@ -12,9 +12,7 @@ import (
 	"strings"
 
 	"example.com/creati/backend/internal/db/models"
-
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/facebook"
 
 	"example.com/creati/backend/internal/utils"
 )
@@ -37,12 +35,15 @@ func NewInstagramService(db *sql.DB) *InstagramService {
 			ClientID:     os.Getenv("INSTAGRAM_CLIENT_ID"),
 			ClientSecret: os.Getenv("INSTAGRAM_CLIENT_SECRET"),
 			Scopes: []string{
-				"instagram_basic",
-				"instagram_content_publish",
-				"pages_show_list",
-				"pages_read_engagement",
+				"instagram_business_basic",
+				"instagram_business_content_publish",
+				"instagram_business_manage_comments",
+				"instagram_business_manage_insights",
 			},
-			Endpoint: facebook.Endpoint,
+			Endpoint: oauth2.Endpoint{
+				AuthURL:  "https://www.instagram.com/oauth/authorize",
+				TokenURL: "https://api.instagram.com/oauth/access_token",
+			},
 		},
 	}
 }
@@ -58,9 +59,8 @@ func (i *InstagramService) GetAuthURLWithHint(state, prompt, loginHint string) s
 	config.RedirectURL = fmt.Sprintf("%s/platforms/instagram/callback", os.Getenv("FRONTEND_URL"))
 
 	opts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline}
-	if prompt == "reauthenticate" || prompt == "consent" {
-		opts = append(opts, oauth2.SetAuthURLParam("auth_type", "reauthenticate"))
-	}
+	// Note: Direct Instagram OAuth might use 'enable_fb_login=0' to force Instagram login window
+	// but usually the endpoint itself handles it.
 	return config.AuthCodeURL(state, opts...)
 }
 
@@ -157,7 +157,7 @@ func (i *InstagramService) getInstagramBusinessAccount(accessToken string) (stri
 	}
 
 	if len(pagesResult.Data) == 0 {
-		return "", "", "", fmt.Errorf("no Facebook Pages found. Instagram Business Account requires a linked Facebook Page")
+		return "", "", "", fmt.Errorf("INSTAGRAM_NO_PAGES: No Facebook Pages found. You need a Facebook Page linked to your professional Instagram account to connect correctly.")
 	}
 
 	// For each page, check for linked IG account
@@ -207,7 +207,7 @@ func (i *InstagramService) getInstagramBusinessAccount(accessToken string) (stri
 		}
 	}
 
-	return "", "", "", fmt.Errorf("no linked instagram business account found")
+	return "", "", "", fmt.Errorf("INSTAGRAM_NOT_PROFESSIONAL: No linked Instagram Business or Creator account found. Please switch your Instagram account to Professional and link it to a Facebook Page.")
 }
 
 // Upload implements Platform interface

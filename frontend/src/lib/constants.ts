@@ -39,14 +39,14 @@ export const PLATFORMS = {
         name: 'Instagram',
         color: '#E4405F',
         enabled: true,
-        hasEvents: false,
+        hasEvents: true,
     },
     facebook: {
         id: 'facebook',
         name: 'Facebook',
         color: '#1877F2',
         enabled: true,
-        hasEvents: false,
+        hasEvents: true,
     },
     x: {
         id: 'x',
