@@ -73,12 +73,12 @@ func (t *TwitterService) Authenticate(code string, userID int) error {
 	config.RedirectURL = fmt.Sprintf("%s/platforms/x/callback", os.Getenv("FRONTEND_URL"))
 
 	// Exchange code for token with PKCE verifier
-	// token, err := config.Exchange(context.Background(), code,
-	// 	oauth2.SetAuthURLParam("code_verifier", "twitter_pkce_challenge_verifier"),
-	// )
-	// if err != nil {
-	// 	return fmt.Errorf("oauth exchange failed: %w", err)
-	// }
+	token, err := config.Exchange(context.Background(), code,
+		oauth2.SetAuthURLParam("code_verifier", "twitter_pkce_challenge_verifier"),
+	)
+	if err != nil {
+		return fmt.Errorf("oauth exchange failed: %w", err)
+	}
 
 	// Get user profile
 	twitterUserID, username, err := t.getUserProfile(token.AccessToken)
