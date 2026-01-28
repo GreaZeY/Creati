@@ -131,7 +131,6 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 	platform := c.Params("platform")
 	userID := middleware.GetUserID(c)
-	fmt.Println(platform)
 	// Generate state token for security (should include userID)
 	state := strconv.Itoa(userID) // Simplified - use secure state generation in production
 

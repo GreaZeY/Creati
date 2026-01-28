@@ -9,9 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
-
 	"example.com/creati/backend/internal/db/models"
-
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/linkedin"
 )
@@ -45,14 +43,14 @@ func NewLinkedInService(db *sql.DB) *LinkedInService {
 // GetAuthURL returns the OAuth URL for user authorization
 func (l *LinkedInService) GetAuthURL(state string) string {
 	config := *l.oauthConfig
-	config.RedirectURL = fmt.Sprintf("%s/platforms/linkedin/callback", os.Getenv("FRONTEND_URL"))
+	config.RedirectURL = fmt.Sprintf("%s/platforms/x/callback", os.Getenv("FRONTEND_URL"))
 	return config.AuthCodeURL(state, oauth2.AccessTypeOffline)
 }
 
 // Authenticate implements Platform interface
 func (l *LinkedInService) Authenticate(code string, userID int) error {
 	config := *l.oauthConfig
-	config.RedirectURL = fmt.Sprintf("%s/platforms/linkedin/callback", os.Getenv("FRONTEND_URL"))
+	config.RedirectURL = fmt.Sprintf("%s/platforms/x/callback", os.Getenv("FRONTEND_URL"))
 
 	// Exchange code for token
 	token, err := config.Exchange(context.Background(), code)

@@ -23,7 +23,7 @@ func GetPlatformService(platform string, db *sql.DB) (Platform, error) {
 		return NewFacebookService(db), nil
 	case "linkedin":
 		return NewLinkedInService(db), nil
-	case "twitter":
+	case "x":
 		return NewTwitterService(db), nil
 	case "discord":
 		return NewDiscordService(db), nil

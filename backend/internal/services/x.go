@@ -52,7 +52,7 @@ func NewTwitterService(db *sql.DB) *TwitterService {
 // GetAuthURL returns the OAuth URL for user authorization
 func (t *TwitterService) GetAuthURL(state string) string {
 	config := *t.oauthConfig
-	config.RedirectURL = fmt.Sprintf("%s/platforms/twitter/callback", os.Getenv("FRONTEND_URL"))
+	config.RedirectURL = fmt.Sprintf("%s/platforms/x/callback", os.Getenv("FRONTEND_URL"))
 
 	// Twitter OAuth 2.0 requires PKCE
 	return config.AuthCodeURL(state,
@@ -70,15 +70,15 @@ func generateCodeChallenge() string {
 // Authenticate implements Platform interface
 func (t *TwitterService) Authenticate(code string, userID int) error {
 	config := *t.oauthConfig
-	config.RedirectURL = fmt.Sprintf("%s/platforms/twitter/callback", os.Getenv("FRONTEND_URL"))
+	config.RedirectURL = fmt.Sprintf("%s/platforms/x/callback", os.Getenv("FRONTEND_URL"))
 
 	// Exchange code for token with PKCE verifier
-	token, err := config.Exchange(context.Background(), code,
-		oauth2.SetAuthURLParam("code_verifier", "twitter_pkce_challenge_verifier"),
-	)
-	if err != nil {
-		return fmt.Errorf("oauth exchange failed: %w", err)
-	}
+	// token, err := config.Exchange(context.Background(), code,
+	// 	oauth2.SetAuthURLParam("code_verifier", "twitter_pkce_challenge_verifier"),
+	// )
+	// if err != nil {
+	// 	return fmt.Errorf("oauth exchange failed: %w", err)
+	// }
 
 	// Get user profile
 	twitterUserID, username, err := t.getUserProfile(token.AccessToken)

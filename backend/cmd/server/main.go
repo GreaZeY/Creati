@@ -43,7 +43,6 @@ func main() {
 	if err := db.Ping(); err != nil {
 		log.Println("❌ Database ping failed:", err)
 		log.Println("💡 Make sure PostgreSQL is running and DATABASE_URL is correct")
-		log.Println("   Run: psql -U postgres -d creati -f internal/db/migrations/001_init.sql")
 		os.Exit(1)
 	}
 	log.Println("✓ Database connected")
