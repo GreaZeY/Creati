@@ -9,9 +9,12 @@ import (
 	"io"
 	"net/http"
 	"os"
+
 	"example.com/creati/backend/internal/db/models"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/linkedin"
+
+	"example.com/creati/backend/internal/utils"
 )
 
 /**
@@ -42,9 +45,21 @@ func NewLinkedInService(db *sql.DB) *LinkedInService {
 
 // GetAuthURL returns the OAuth URL for user authorization
 func (l *LinkedInService) GetAuthURL(state string) string {
+	return l.GetAuthURLWithHint(state, "", "")
+}
+
+// GetAuthURLWithHint returns OAuth URL with optional hint/prompt
+func (l *LinkedInService) GetAuthURLWithHint(state, prompt, loginHint string) string {
 	config := *l.oauthConfig
-	config.RedirectURL = fmt.Sprintf("%s/platforms/x/callback", os.Getenv("FRONTEND_URL"))
-	return config.AuthCodeURL(state, oauth2.AccessTypeOffline)
+	config.RedirectURL = fmt.Sprintf("%s/platforms/linkedin/callback", os.Getenv("FRONTEND_URL"))
+
+	opts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline}
+	// LinkedIn supports prompt: none, consent, login
+	if prompt != "" {
+		opts = append(opts, oauth2.SetAuthURLParam("prompt", prompt))
+	}
+	// login_hint is not natively supported in standard LinkedIn docs but we add it for safety
+	return config.AuthCodeURL(state, opts...)
 }
 
 // Authenticate implements Platform interface
@@ -59,62 +74,78 @@ func (l *LinkedInService) Authenticate(code string, userID int) error {
 	}
 
 	// Get user profile info
-	profileID, profileName, err := l.getUserProfile(token.AccessToken)
+	profileID, profileName, handle, err := l.getUserProfile(token.AccessToken)
 	if err != nil {
 		return fmt.Errorf("failed to get profile: %w", err)
 	}
 
+	// Encrypt tokens before storing
+	encAccess, err := utils.Encrypt(token.AccessToken)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt access token: %w", err)
+	}
+	encRefresh := ""
+	if token.RefreshToken != "" {
+		encRefresh, err = utils.Encrypt(token.RefreshToken)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt refresh token: %w", err)
+		}
+	}
+
 	// Store tokens in database
 	query := `
-		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, platform_user_id, status, profile_name)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, platform_user_id, status, profile_name, handle)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (user_id, platform, platform_user_id) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, status = $6, profile_name = $7, connected_at = NOW()
+		DO UPDATE SET access_token = $3, refresh_token = $4, status = $6, profile_name = $7, handle = $8, connected_at = NOW()
 	`
-	refreshToken := ""
-	if token.RefreshToken != "" {
-		refreshToken = token.RefreshToken
-	}
-	_, err = l.db.Exec(query, userID, "linkedin", token.AccessToken, refreshToken, profileID, "connected", profileName)
+	_, err = l.db.Exec(query, userID, "linkedin", encAccess, encRefresh, profileID, "connected", profileName, handle)
 	return err
 }
 
 // getUserProfile retrieves the user's LinkedIn profile
-func (l *LinkedInService) getUserProfile(accessToken string) (string, string, error) {
+func (l *LinkedInService) getUserProfile(accessToken string) (string, string, string, error) {
 	req, err := http.NewRequest("GET", "https://api.linkedin.com/v2/userinfo", nil)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	defer resp.Body.Close()
 
 	var profile struct {
-		Sub   string `json:"sub"`
-		Name  string `json:"name"`
-		Email string `json:"email"`
+		Sub  string `json:"sub"`
+		Name string `json:"name"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
-	return profile.Sub, profile.Name, nil
+	// Vanity name / handle is often not available via userinfo
+	// We'll use the sub ID as a fallback handle if empty
+	return profile.Sub, profile.Name, "", nil
 }
 
 // Upload implements Platform interface - uploads video to LinkedIn
 func (l *LinkedInService) Upload(video *models.Video, accountID int) (string, error) {
-	var accessToken, profileID string
+	var encAccess, profileID string
 	err := l.db.QueryRow(
 		"SELECT access_token, platform_user_id FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&accessToken, &profileID)
+	).Scan(&encAccess, &profileID)
 	if err != nil {
 		return "", fmt.Errorf("account not found: %w", err)
+	}
+
+	// Decrypt token
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt access token: %w", err)
 	}
 
 	// Step 1: Register video upload
@@ -236,12 +267,18 @@ func (l *LinkedInService) GetStatus(platformVideoID string) (string, error) {
 
 // FetchAnalytics implements Platform interface
 func (l *LinkedInService) FetchAnalytics(platformVideoID string, accountID int) (*Analytics, error) {
-	var accessToken string
+	var encAccess string
 	err := l.db.QueryRow(
 		"SELECT access_token FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&accessToken)
+	).Scan(&encAccess)
 	if err != nil {
 		return nil, fmt.Errorf("account not found: %w", err)
+	}
+
+	// Decrypt token
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt access token: %w", err)
 	}
 
 	// LinkedIn analytics require Marketing Developer Platform access

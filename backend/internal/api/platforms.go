@@ -2,7 +2,7 @@ package api
 
 import (
 	"database/sql"
-	"fmt"
+	"log"
 	"strconv"
 
 	"example.com/creati/backend/internal/middleware"
@@ -143,11 +143,15 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 
 	if isReconnect {
 		// Reconnect specific account: get platform name and email hint
-		var email string
-		err := h.db.QueryRow("SELECT platform, email FROM platform_accounts WHERE id = $1 AND user_id = $2", accountID, userID).Scan(&targetPlatform, &email)
+		var dbPlatform string
+		var email sql.NullString
+		err := h.db.QueryRow("SELECT platform, email FROM platform_accounts WHERE id = $1 AND user_id = $2", accountID, userID).Scan(&dbPlatform, &email)
 		if err != nil {
-			return utils.ErrorResponse(c, fiber.StatusNotFound, "account not found")
+			log.Printf("Reconnect lookup failed for account %d (user %d): %v", accountID, userID, err)
+			return utils.ErrorResponse(c, fiber.StatusNotFound, "account not found or unauthorized")
 		}
+		targetPlatform = dbPlatform
+		emailHint := email.String
 
 		// Initialize service with correct platform
 		platformService, errSvc := services.GetPlatformService(targetPlatform, h.db)
@@ -155,14 +159,9 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 			return utils.ErrorResponse(c, fiber.StatusBadRequest, errSvc.Error())
 		}
 
-		if targetPlatform == "youtube" {
-			ytService := platformService.(*services.YouTubeService)
-			// For reconnect, use login_hint but still force consent to ensure token refresh
-			authURL = ytService.GetAuthURLWithHint(state, "consent", email)
-		} else {
-			// For other platforms, just use default auth URL
-			authURL = platformService.GetAuthURL(state)
-		}
+		// Use standardized GetAuthURLWithHint for all platforms
+		// For reconnect, we use "consent" prompt to ensure fresh token acquisition
+		authURL = platformService.GetAuthURLWithHint(state, "consent", emailHint)
 	} else {
 		// New connection
 		platformService, errSvc := services.GetPlatformService(targetPlatform, h.db)

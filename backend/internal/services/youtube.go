@@ -15,6 +15,8 @@ import (
 	v2 "google.golang.org/api/oauth2/v2"
 	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
+
+	"example.com/creati/backend/internal/utils"
 )
 
 /**
@@ -120,15 +122,23 @@ func (y *YouTubeService) Authenticate(code string, userID int) error {
 		}
 	}
 
-	// Store tokens in database using 'connected' status to match list logic
-	// Update: use (user_id, platform, platform_user_id) for conflict resolution to allow multiple accounts
+	// Encrypt tokens before storing
+	encAccess, err := utils.Encrypt(token.AccessToken)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt access token: %w", err)
+	}
+	encRefresh, err := utils.Encrypt(token.RefreshToken)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt refresh token: %w", err)
+	}
+
 	query := `
 		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, status, profile_name, email, platform_user_id, handle)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (user_id, platform, platform_user_id) 
 		DO UPDATE SET access_token = $3, refresh_token = $4, status = $5, profile_name = $6, email = $7, handle = $9, connected_at = NOW()
 	`
-	_, err = y.db.Exec(query, userID, "youtube", token.AccessToken, token.RefreshToken, "connected", channelName, userEmail, channelID, handle)
+	_, err = y.db.Exec(query, userID, "youtube", encAccess, encRefresh, "connected", channelName, userEmail, channelID, handle)
 	if err != nil {
 		return err
 	}
@@ -146,13 +156,22 @@ func (y *YouTubeService) Authenticate(code string, userID int) error {
 // Upload implements Platform interface
 // Uploads video to YouTube and returns YouTube video ID
 func (y *YouTubeService) Upload(video *models.Video, accountID int) (string, error) {
-	// Get specific account's tokens
-	var accessToken, refreshToken string
+	var encAccess, encRefresh string
 	err := y.db.QueryRow(
 		"SELECT access_token, refresh_token FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&accessToken, &refreshToken)
+	).Scan(&encAccess, &encRefresh)
 	if err != nil {
 		return "", fmt.Errorf("account not found: %w", err)
+	}
+
+	// Decrypt tokens
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt access token: %w", err)
+	}
+	refreshToken, err := utils.Decrypt(encRefresh)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt refresh token: %w", err)
 	}
 
 	// Create OAuth2 token
@@ -206,13 +225,21 @@ func (y *YouTubeService) GetStatus(platformVideoID string) (string, error) {
 
 // FetchAnalytics implements Platform interface
 func (y *YouTubeService) FetchAnalytics(platformVideoID string, accountID int) (*Analytics, error) {
-	// Get specific account's tokens
-	var accessToken, refreshToken string
+	var encAccess, encRefresh string
 	err := y.db.QueryRow(
 		"SELECT access_token, refresh_token FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&accessToken, &refreshToken)
+	).Scan(&encAccess, &encRefresh)
 	if err != nil {
 		return nil, fmt.Errorf("account not found: %w", err)
+	}
+
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt access token: %w", err)
+	}
+	refreshToken, err := utils.Decrypt(encRefresh)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt refresh token: %w", err)
 	}
 
 	token := &oauth2.Token{

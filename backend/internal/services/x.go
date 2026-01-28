@@ -16,6 +16,8 @@ import (
 	"example.com/creati/backend/internal/db/models"
 
 	"golang.org/x/oauth2"
+
+	"example.com/creati/backend/internal/utils"
 )
 
 /**
@@ -42,8 +44,9 @@ func NewTwitterService(db *sql.DB) *TwitterService {
 				"offline.access",
 			},
 			Endpoint: oauth2.Endpoint{
-				AuthURL:  "https://twitter.com/i/oauth2/authorize",
-				TokenURL: "https://api.twitter.com/2/oauth2/token",
+				AuthURL:   "https://twitter.com/i/oauth2/authorize",
+				TokenURL:  "https://api.twitter.com/2/oauth2/token",
+				AuthStyle: oauth2.AuthStyleInHeader,
 			},
 		},
 	}
@@ -51,20 +54,31 @@ func NewTwitterService(db *sql.DB) *TwitterService {
 
 // GetAuthURL returns the OAuth URL for user authorization
 func (t *TwitterService) GetAuthURL(state string) string {
+	return t.GetAuthURLWithHint(state, "", "")
+}
+
+// GetAuthURLWithHint returns OAuth URL with optional hint/prompt
+func (t *TwitterService) GetAuthURLWithHint(state, prompt, loginHint string) string {
 	config := *t.oauthConfig
 	config.RedirectURL = fmt.Sprintf("%s/platforms/x/callback", os.Getenv("FRONTEND_URL"))
 
-	// Twitter OAuth 2.0 requires PKCE
-	return config.AuthCodeURL(state,
+	opts := []oauth2.AuthCodeOption{
 		oauth2.SetAuthURLParam("code_challenge", generateCodeChallenge()),
 		oauth2.SetAuthURLParam("code_challenge_method", "plain"),
-	)
+	}
+
+	if prompt != "" {
+		opts = append(opts, oauth2.SetAuthURLParam("prompt", prompt))
+	}
+
+	// Twitter doesn't strictly follow login_hint but we add it if needed
+	return config.AuthCodeURL(state, opts...)
 }
 
-// generateCodeChallenge generates a simple code challenge for PKCE
 func generateCodeChallenge() string {
 	// In production, generate a proper random challenge and store verifier
-	return base64.RawURLEncoding.EncodeToString([]byte("twitter_pkce_challenge_verifier"))
+	// For Method "plain", the challenge MUST match the verifier exactly.
+	return "twitter_pkce_challenge_verifier"
 }
 
 // Authenticate implements Platform interface
@@ -81,34 +95,44 @@ func (t *TwitterService) Authenticate(code string, userID int) error {
 	}
 
 	// Get user profile
-	twitterUserID, username, err := t.getUserProfile(token.AccessToken)
+	twitterUserID, name, username, err := t.getUserProfile(token.AccessToken)
 	if err != nil {
 		return fmt.Errorf("failed to get profile: %w", err)
 	}
 
+	// Encrypt tokens before storing
+	encAccess, err := utils.Encrypt(token.AccessToken)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt access token: %w", err)
+	}
+	encRefresh, err := utils.Encrypt(token.RefreshToken)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt refresh token: %w", err)
+	}
+
 	// Store tokens in database
 	query := `
-		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, platform_user_id, status, profile_name)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, platform_user_id, status, profile_name, handle)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (user_id, platform, platform_user_id) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, status = $6, profile_name = $7, connected_at = NOW()
+		DO UPDATE SET access_token = $3, refresh_token = $4, status = $6, profile_name = $7, handle = $8, connected_at = NOW()
 	`
-	_, err = t.db.Exec(query, userID, "twitter", token.AccessToken, token.RefreshToken, twitterUserID, "connected", "@"+username)
+	_, err = t.db.Exec(query, userID, "twitter", encAccess, encRefresh, twitterUserID, "connected", name, "@"+username)
 	return err
 }
 
 // getUserProfile retrieves the user's Twitter profile
-func (t *TwitterService) getUserProfile(accessToken string) (string, string, error) {
+func (t *TwitterService) getUserProfile(accessToken string) (string, string, string, error) {
 	req, err := http.NewRequest("GET", "https://api.twitter.com/2/users/me", nil)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	defer resp.Body.Close()
 
@@ -121,20 +145,26 @@ func (t *TwitterService) getUserProfile(accessToken string) (string, string, err
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
-	return profile.Data.ID, profile.Data.Username, nil
+	return profile.Data.ID, profile.Data.Name, profile.Data.Username, nil
 }
 
 // Upload implements Platform interface - uploads video to Twitter/X
 func (t *TwitterService) Upload(video *models.Video, accountID int) (string, error) {
-	var accessToken, twitterUserID string
+	var encAccess, twitterUserID string
 	err := t.db.QueryRow(
 		"SELECT access_token, platform_user_id FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&accessToken, &twitterUserID)
+	).Scan(&encAccess, &twitterUserID)
 	if err != nil {
 		return "", fmt.Errorf("account not found: %w", err)
+	}
+
+	// Decrypt token
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt access token: %w", err)
 	}
 
 	// Step 1: Initialize media upload
@@ -330,12 +360,18 @@ func (t *TwitterService) GetStatus(platformVideoID string) (string, error) {
 
 // FetchAnalytics implements Platform interface
 func (t *TwitterService) FetchAnalytics(platformVideoID string, accountID int) (*Analytics, error) {
-	var accessToken string
+	var encAccess string
 	err := t.db.QueryRow(
 		"SELECT access_token FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&accessToken)
+	).Scan(&encAccess)
 	if err != nil {
 		return nil, fmt.Errorf("account not found: %w", err)
+	}
+
+	// Decrypt token
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt access token: %w", err)
 	}
 
 	// Get tweet metrics

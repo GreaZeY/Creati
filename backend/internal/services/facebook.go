@@ -14,6 +14,8 @@ import (
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/facebook"
+
+	"example.com/creati/backend/internal/utils"
 )
 
 /**
@@ -45,9 +47,20 @@ func NewFacebookService(db *sql.DB) *FacebookService {
 
 // GetAuthURL returns the OAuth URL for user authorization
 func (f *FacebookService) GetAuthURL(state string) string {
+	return f.GetAuthURLWithHint(state, "", "")
+}
+
+// GetAuthURLWithHint returns OAuth URL with optional hint/prompt
+func (f *FacebookService) GetAuthURLWithHint(state, prompt, loginHint string) string {
 	config := *f.oauthConfig
 	config.RedirectURL = fmt.Sprintf("%s/platforms/facebook/callback", os.Getenv("FRONTEND_URL"))
-	return config.AuthCodeURL(state, oauth2.AccessTypeOffline)
+
+	opts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline}
+	if prompt == "reauthenticate" || prompt == "consent" {
+		opts = append(opts, oauth2.SetAuthURLParam("auth_type", "reauthenticate"))
+	}
+	// Meta doesn't support login_hint but we accept it for interface compliance
+	return config.AuthCodeURL(state, opts...)
 }
 
 // Authenticate implements Platform interface
@@ -68,19 +81,28 @@ func (f *FacebookService) Authenticate(code string, userID int) error {
 	}
 
 	// Get user's Facebook Page info
-	pageID, pageName, pageToken, err := f.getPageInfo(longLivedToken)
+	pageID, pageName, pageToken, username, err := f.getPageInfo(longLivedToken)
 	if err != nil {
 		return fmt.Errorf("failed to get page info: %w", err)
 	}
 
-	// Store tokens in database - store page token for posting
+	// Encrypt tokens before storing
+	encPageToken, err := utils.Encrypt(pageToken)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt page token: %w", err)
+	}
+	encLongLived, err := utils.Encrypt(longLivedToken)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt long-lived token: %w", err)
+	}
+
 	query := `
-		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, platform_user_id, status, profile_name)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, platform_user_id, status, profile_name, handle)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (user_id, platform, platform_user_id) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, status = $6, profile_name = $7, connected_at = NOW()
+		DO UPDATE SET access_token = $3, refresh_token = $4, status = $6, profile_name = $7, handle = $8, connected_at = NOW()
 	`
-	_, err = f.db.Exec(query, userID, "facebook", pageToken, longLivedToken, pageID, "connected", pageName)
+	_, err = f.db.Exec(query, userID, "facebook", encPageToken, encLongLived, pageID, "connected", pageName, username)
 	return err
 }
 
@@ -111,11 +133,11 @@ func (f *FacebookService) exchangeForLongLivedToken(shortLivedToken string) (str
 }
 
 // getPageInfo retrieves the user's Facebook Page
-func (f *FacebookService) getPageInfo(accessToken string) (string, string, string, error) {
-	pagesURL := fmt.Sprintf("https://graph.facebook.com/v18.0/me/accounts?access_token=%s", accessToken)
+func (f *FacebookService) getPageInfo(accessToken string) (string, string, string, string, error) {
+	pagesURL := fmt.Sprintf("https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token,username&access_token=%s", accessToken)
 	resp, err := http.Get(pagesURL)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 	defer resp.Body.Close()
 
@@ -124,30 +146,37 @@ func (f *FacebookService) getPageInfo(accessToken string) (string, string, strin
 			ID          string `json:"id"`
 			Name        string `json:"name"`
 			AccessToken string `json:"access_token"`
+			Username    string `json:"username"`
 		} `json:"data"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&pagesResult); err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 
 	if len(pagesResult.Data) == 0 {
-		return "", "", "", fmt.Errorf("no Facebook Pages found. Please create a Facebook Page first")
+		return "", "", "", "", fmt.Errorf("no Facebook Pages found. Please create a Facebook Page first")
 	}
 
 	// Return first page info
 	page := pagesResult.Data[0]
-	return page.ID, page.Name, page.AccessToken, nil
+	return page.ID, page.Name, page.AccessToken, page.Username, nil
 }
 
 // Upload implements Platform interface - uploads video to Facebook Page
 func (f *FacebookService) Upload(video *models.Video, accountID int) (string, error) {
-	var pageToken, pageID string
+	var encPageToken, pageID string
 	err := f.db.QueryRow(
 		"SELECT access_token, platform_user_id FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&pageToken, &pageID)
+	).Scan(&encPageToken, &pageID)
 	if err != nil {
 		return "", fmt.Errorf("account not found: %w", err)
+	}
+
+	// Decrypt token
+	pageToken, err := utils.Decrypt(encPageToken)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt page token: %w", err)
 	}
 
 	// Upload video using resumable upload API
@@ -215,12 +244,17 @@ func (f *FacebookService) Upload(video *models.Video, accountID int) (string, er
 
 // GetStatus implements Platform interface
 func (f *FacebookService) GetStatus(platformVideoID string) (string, error) {
-	var pageToken string
+	var encPageToken string
 	err := f.db.QueryRow(
 		"SELECT access_token FROM platform_accounts WHERE platform = 'facebook' LIMIT 1",
-	).Scan(&pageToken)
+	).Scan(&encPageToken)
 	if err != nil {
 		return "", fmt.Errorf("no facebook account found: %w", err)
+	}
+
+	pageToken, err := utils.Decrypt(encPageToken)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt page token: %w", err)
 	}
 
 	statusURL := fmt.Sprintf(
@@ -249,12 +283,17 @@ func (f *FacebookService) GetStatus(platformVideoID string) (string, error) {
 
 // FetchAnalytics implements Platform interface
 func (f *FacebookService) FetchAnalytics(platformVideoID string, accountID int) (*Analytics, error) {
-	var pageToken string
+	var encPageToken string
 	err := f.db.QueryRow(
 		"SELECT access_token FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&pageToken)
+	).Scan(&encPageToken)
 	if err != nil {
 		return nil, fmt.Errorf("account not found: %w", err)
+	}
+
+	pageToken, err := utils.Decrypt(encPageToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt page token: %w", err)
 	}
 
 	insightsURL := fmt.Sprintf(

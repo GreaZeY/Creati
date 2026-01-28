@@ -14,6 +14,9 @@ type Platform interface {
 	// GetAuthURL returns the OAuth URL for user authorization
 	GetAuthURL(state string) string
 
+	// GetAuthURLWithHint returns OAuth URL with optional hint/prompt (used for reconnection)
+	GetAuthURLWithHint(state, prompt, loginHint string) string
+
 	// Authenticate handles OAuth flow and stores tokens
 	Authenticate(code string, userID int) error
 

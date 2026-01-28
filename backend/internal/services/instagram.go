@@ -15,6 +15,8 @@ import (
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/facebook"
+
+	"example.com/creati/backend/internal/utils"
 )
 
 /**
@@ -47,9 +49,19 @@ func NewInstagramService(db *sql.DB) *InstagramService {
 
 // GetAuthURL returns the OAuth URL for user authorization
 func (i *InstagramService) GetAuthURL(state string) string {
+	return i.GetAuthURLWithHint(state, "", "")
+}
+
+// GetAuthURLWithHint returns OAuth URL with optional hint/prompt
+func (i *InstagramService) GetAuthURLWithHint(state, prompt, loginHint string) string {
 	config := *i.oauthConfig
 	config.RedirectURL = fmt.Sprintf("%s/platforms/instagram/callback", os.Getenv("FRONTEND_URL"))
-	return config.AuthCodeURL(state, oauth2.AccessTypeOffline)
+
+	opts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline}
+	if prompt == "reauthenticate" || prompt == "consent" {
+		opts = append(opts, oauth2.SetAuthURLParam("auth_type", "reauthenticate"))
+	}
+	return config.AuthCodeURL(state, opts...)
 }
 
 // Authenticate implements Platform interface
@@ -72,19 +84,25 @@ func (i *InstagramService) Authenticate(code string, userID int) error {
 	}
 
 	// Get Instagram Business Account ID and username
-	igAccountID, username, err := i.getInstagramBusinessAccount(longLivedToken)
+	igAccountID, username, profileName, err := i.getInstagramBusinessAccount(longLivedToken)
 	if err != nil {
 		return fmt.Errorf("failed to get instagram account: %w", err)
 	}
 
+	// Encrypt tokens before storing
+	encAccess, err := utils.Encrypt(longLivedToken)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt access token: %w", err)
+	}
+
 	// Store tokens in database
 	query := `
-		INSERT INTO platform_accounts (user_id, platform, access_token, platform_user_id, status, profile_name)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO platform_accounts (user_id, platform, access_token, platform_user_id, status, profile_name, handle)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (user_id, platform, platform_user_id) 
-		DO UPDATE SET access_token = $3, status = $5, profile_name = $6, connected_at = NOW()
+		DO UPDATE SET access_token = $3, status = $5, profile_name = $6, handle = $7, connected_at = NOW()
 	`
-	_, err = i.db.Exec(query, userID, "instagram", longLivedToken, igAccountID, "connected", username)
+	_, err = i.db.Exec(query, userID, "instagram", encAccess, igAccountID, "connected", profileName, username)
 	return err
 }
 
@@ -117,12 +135,12 @@ func (i *InstagramService) exchangeForLongLivedToken(shortLivedToken string) (st
 }
 
 // getInstagramBusinessAccount retrieves the Instagram Business Account ID linked to the user's Facebook Page
-func (i *InstagramService) getInstagramBusinessAccount(accessToken string) (string, string, error) {
+func (i *InstagramService) getInstagramBusinessAccount(accessToken string) (string, string, string, error) {
 	// First, get the user's Facebook Pages
-	pagesURL := fmt.Sprintf("https://graph.facebook.com/v18.0/me/accounts?access_token=%s", accessToken)
+	pagesURL := fmt.Sprintf("https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token&access_token=%s", accessToken)
 	resp, err := http.Get(pagesURL)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	defer resp.Body.Close()
 
@@ -135,65 +153,79 @@ func (i *InstagramService) getInstagramBusinessAccount(accessToken string) (stri
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&pagesResult); err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 
 	if len(pagesResult.Data) == 0 {
-		return "", "", fmt.Errorf("no Facebook Pages found. Instagram Business Account requires a linked Facebook Page")
+		return "", "", "", fmt.Errorf("no Facebook Pages found. Instagram Business Account requires a linked Facebook Page")
 	}
 
-	// Get the Instagram Business Account linked to the first page
-	pageID := pagesResult.Data[0].ID
-	pageToken := pagesResult.Data[0].AccessToken
+	// For each page, check for linked IG account
+	for _, page := range pagesResult.Data {
+		pageID := page.ID
+		pageToken := page.AccessToken
+		pageName := page.Name
 
-	igURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s?fields=instagram_business_account&access_token=%s", pageID, pageToken)
-	resp, err = http.Get(igURL)
-	if err != nil {
-		return "", "", err
+		igURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s?fields=instagram_business_account&access_token=%s", pageID, pageToken)
+		resp, err = http.Get(igURL)
+		if err != nil {
+			continue
+		}
+		defer resp.Body.Close()
+
+		var igResult struct {
+			InstagramBusinessAccount struct {
+				ID string `json:"id"`
+			} `json:"instagram_business_account"`
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&igResult); err != nil {
+			continue
+		}
+
+		igAccountID := igResult.InstagramBusinessAccount.ID
+		if igAccountID != "" {
+			// Fetch username and name
+			usernameURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s?fields=username,name&access_token=%s",
+				igAccountID, pageToken)
+			userResp, err := http.Get(usernameURL)
+			if err == nil {
+				defer userResp.Body.Close()
+				var user struct {
+					Username string `json:"username"`
+					Name     string `json:"name"`
+				}
+				if err := json.NewDecoder(userResp.Body).Decode(&user); err == nil {
+					displayName := user.Name
+					if displayName == "" {
+						displayName = pageName
+					}
+					return igAccountID, user.Username, displayName, nil
+				}
+			}
+			return igAccountID, "unknown", pageName, nil
+		}
 	}
-	defer resp.Body.Close()
 
-	var igResult struct {
-		InstagramBusinessAccount struct {
-			ID string `json:"id"`
-		} `json:"instagram_business_account"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&igResult); err != nil {
-		return "", "", err
-	}
-
-	if igResult.InstagramBusinessAccount.ID == "" {
-		return "", "", fmt.Errorf("no Instagram Business Account linked to Facebook Page")
-	}
-
-	// Get Instagram username
-	usernameURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s?fields=username&access_token=%s",
-		igResult.InstagramBusinessAccount.ID, pageToken)
-	resp, err = http.Get(usernameURL)
-	if err != nil {
-		return igResult.InstagramBusinessAccount.ID, "", err
-	}
-	defer resp.Body.Close()
-
-	var usernameResult struct {
-		Username string `json:"username"`
-	}
-	json.NewDecoder(resp.Body).Decode(&usernameResult)
-
-	return igResult.InstagramBusinessAccount.ID, usernameResult.Username, nil
+	return "", "", "", fmt.Errorf("no linked instagram business account found")
 }
 
 // Upload implements Platform interface
 // Uploads a Reel to Instagram
 func (i *InstagramService) Upload(video *models.Video, accountID int) (string, error) {
 	// Get specific account's tokens and Instagram account ID
-	var accessToken, igAccountID string
+	var encAccess, igAccountID string
 	err := i.db.QueryRow(
 		"SELECT access_token, platform_user_id FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&accessToken, &igAccountID)
+	).Scan(&encAccess, &igAccountID)
 	if err != nil {
 		return "", fmt.Errorf("account not found: %w", err)
+	}
+
+	// Decrypt token
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt access token: %w", err)
 	}
 
 	// Step 1: Create media container for Reel
@@ -265,12 +297,18 @@ func (i *InstagramService) GetStatus(platformVideoID string) (string, error) {
 
 // FetchAnalytics implements Platform interface
 func (i *InstagramService) FetchAnalytics(platformVideoID string, accountID int) (*Analytics, error) {
-	var accessToken string
+	var encAccess string
 	err := i.db.QueryRow(
 		"SELECT access_token FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&accessToken)
+	).Scan(&encAccess)
 	if err != nil {
 		return nil, fmt.Errorf("account not found: %w", err)
+	}
+
+	// Decrypt token
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt access token: %w", err)
 	}
 
 	// Get media insights

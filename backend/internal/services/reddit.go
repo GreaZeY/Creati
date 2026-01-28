@@ -12,6 +12,8 @@ import (
 
 	"example.com/creati/backend/internal/db/models"
 	"golang.org/x/oauth2"
+
+	"example.com/creati/backend/internal/utils"
 )
 
 /**
@@ -31,7 +33,6 @@ func NewRedditService(db *sql.DB) *RedditService {
 		oauthConfig: &oauth2.Config{
 			ClientID:     os.Getenv("REDDIT_CLIENT_ID"),
 			ClientSecret: os.Getenv("REDDIT_CLIENT_SECRET"),
-			RedirectURL:  os.Getenv("REDDIT_REDIRECT_URL"),
 			Scopes: []string{
 				"identity",
 				"submit",
@@ -49,14 +50,34 @@ func NewRedditService(db *sql.DB) *RedditService {
 
 // GetAuthURL returns the OAuth URL for user authorization
 func (r *RedditService) GetAuthURL(state string) string {
-	return r.oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.SetAuthURLParam("duration", "permanent"))
+	return r.GetAuthURLWithHint(state, "", "")
+}
+
+// GetAuthURLWithHint returns OAuth URL with optional hint/prompt
+func (r *RedditService) GetAuthURLWithHint(state, prompt, loginHint string) string {
+	config := *r.oauthConfig
+	config.RedirectURL = fmt.Sprintf("%s/platforms/reddit/callback", os.Getenv("FRONTEND_URL"))
+
+	opts := []oauth2.AuthCodeOption{
+		oauth2.AccessTypeOffline,
+		oauth2.SetAuthURLParam("duration", "permanent"),
+	}
+
+	if prompt != "" {
+		opts = append(opts, oauth2.SetAuthURLParam("prompt", prompt))
+	}
+
+	return config.AuthCodeURL(state, opts...)
 }
 
 // Authenticate implements Platform interface
 func (r *RedditService) Authenticate(code string, userID int) error {
 	ctx := context.Background()
+	config := *r.oauthConfig
+	config.RedirectURL = fmt.Sprintf("%s/platforms/reddit/callback", os.Getenv("FRONTEND_URL"))
+
 	// Reddit requires Basic Auth for token exchange
-	token, err := r.oauthConfig.Exchange(ctx, code)
+	token, err := config.Exchange(ctx, code)
 	if err != nil {
 		return fmt.Errorf("oauth exchange failed: %w", err)
 	}
@@ -75,19 +96,37 @@ func (r *RedditService) Authenticate(code string, userID int) error {
 	var user struct {
 		Name string `json:"name"`
 		ID   string `json:"id"`
+		Sub  struct {
+			Title string `json:"title"`
+		} `json:"subreddit"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
 		return fmt.Errorf("failed to decode user info: %w", err)
 	}
 
+	displayName := user.Sub.Title
+	if displayName == "" {
+		displayName = user.Name
+	}
+
+	// Encrypt tokens before storing
+	encAccess, err := utils.Encrypt(token.AccessToken)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt access token: %w", err)
+	}
+	encRefresh, err := utils.Encrypt(token.RefreshToken)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt refresh token: %w", err)
+	}
+
 	// Store tokens in database
 	query := `
-		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, status, profile_name, platform_user_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, status, profile_name, platform_user_id, handle)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		ON CONFLICT (user_id, platform, platform_user_id) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, status = $5, profile_name = $6, connected_at = NOW()
+		DO UPDATE SET access_token = $3, refresh_token = $4, status = $5, profile_name = $6, handle = $8, connected_at = NOW()
 	`
-	_, err = r.db.Exec(query, userID, "reddit", token.AccessToken, token.RefreshToken, "connected", user.Name, user.ID)
+	_, err = r.db.Exec(query, userID, "reddit", encAccess, encRefresh, "connected", displayName, user.ID, "u/"+user.Name)
 	return err
 }
 
@@ -95,12 +134,18 @@ func (r *RedditService) Authenticate(code string, userID int) error {
 // Since Reddit video uploads are complex (require websocket/handshake),
 // we initially support posting the S3 URL as a link post or using Reddit's submit API for links.
 func (r *RedditService) Upload(video *models.Video, accountID int) (string, error) {
-	var accessToken string
+	var encAccess string
 	err := r.db.QueryRow(
 		"SELECT access_token FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&accessToken)
+	).Scan(&encAccess)
 	if err != nil {
 		return "", fmt.Errorf("account not found: %w", err)
+	}
+
+	// Decrypt token
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt access token: %w", err)
 	}
 
 	// In a real app, we'd let user choose a subreddit.
@@ -160,12 +205,18 @@ func (r *RedditService) GetStatus(platformVideoID string) (string, error) {
 
 // FetchAnalytics implements Platform interface
 func (r *RedditService) FetchAnalytics(platformVideoID string, accountID int) (*Analytics, error) {
-	var accessToken string
+	var encAccess string
 	err := r.db.QueryRow(
 		"SELECT access_token FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&accessToken)
+	).Scan(&encAccess)
 	if err != nil {
 		return nil, fmt.Errorf("account not found: %w", err)
+	}
+
+	// Decrypt token
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt access token: %w", err)
 	}
 
 	// https://www.reddit.com/dev/api/#GET_api_info

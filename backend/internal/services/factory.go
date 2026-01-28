@@ -23,7 +23,7 @@ func GetPlatformService(platform string, db *sql.DB) (Platform, error) {
 		return NewFacebookService(db), nil
 	case "linkedin":
 		return NewLinkedInService(db), nil
-	case "x":
+	case "x", "twitter":
 		return NewTwitterService(db), nil
 	case "discord":
 		return NewDiscordService(db), nil
@@ -39,5 +39,5 @@ func GetPlatformService(platform string, db *sql.DB) (Platform, error) {
 
 // GetSupportedPlatforms returns list of currently supported platforms
 func GetSupportedPlatforms() []string {
-	return []string{"youtube", "instagram", "facebook", "linkedin", "twitter", "discord", "reddit"}
+	return []string{"youtube", "instagram", "facebook", "linkedin", "x", "discord", "reddit"}
 }

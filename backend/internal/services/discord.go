@@ -13,6 +13,8 @@ import (
 
 	"example.com/creati/backend/internal/db/models"
 	"golang.org/x/oauth2"
+
+	"example.com/creati/backend/internal/utils"
 )
 
 /**
@@ -27,6 +29,7 @@ type DiscordService struct {
 type discordUser struct {
 	ID            string `json:"id"`
 	Username      string `json:"username"`
+	GlobalName    string `json:"global_name"` // Display name
 	Avatar        string `json:"avatar"`
 	Discriminator string `json:"discriminator"`
 	Email         string `json:"email"`
@@ -47,7 +50,6 @@ func NewDiscordService(db *sql.DB) *DiscordService {
 		oauthConfig: &oauth2.Config{
 			ClientID:     os.Getenv("DISCORD_CLIENT_ID"),
 			ClientSecret: os.Getenv("DISCORD_CLIENT_SECRET"),
-			RedirectURL:  os.Getenv("DISCORD_REDIRECT_URL"),
 			Scopes: []string{
 				"identify",
 				"email",
@@ -63,12 +65,27 @@ func NewDiscordService(db *sql.DB) *DiscordService {
 
 // GetAuthURL returns the OAuth URL for user authorization
 func (d *DiscordService) GetAuthURL(state string) string {
-	return d.oauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
+	return d.GetAuthURLWithHint(state, "", "")
+}
+
+// GetAuthURLWithHint returns OAuth URL with optional hint/prompt
+func (d *DiscordService) GetAuthURLWithHint(state, prompt, loginHint string) string {
+	config := *d.oauthConfig
+	config.RedirectURL = fmt.Sprintf("%s/platforms/discord/callback", os.Getenv("FRONTEND_URL"))
+
+	opts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline}
+	if prompt != "" {
+		opts = append(opts, oauth2.SetAuthURLParam("prompt", prompt))
+	}
+	return config.AuthCodeURL(state, opts...)
 }
 
 // Authenticate implements Platform interface
 func (d *DiscordService) Authenticate(code string, userID int) error {
-	token, err := d.oauthConfig.Exchange(context.Background(), code)
+	config := *d.oauthConfig
+	config.RedirectURL = fmt.Sprintf("%s/platforms/discord/callback", os.Getenv("FRONTEND_URL"))
+
+	token, err := config.Exchange(context.Background(), code)
 	if err != nil {
 		return fmt.Errorf("oauth exchange failed: %w", err)
 	}
@@ -94,19 +111,33 @@ func (d *DiscordService) Authenticate(code string, userID int) error {
 		webhookURL, _ = webhookData["url"].(string)
 	}
 
-	profileName := user.Username
-	if user.Discriminator != "" && user.Discriminator != "0" {
-		profileName = fmt.Sprintf("%s#%s", user.Username, user.Discriminator)
+	profileName := user.GlobalName
+	if profileName == "" {
+		profileName = user.Username
+		if user.Discriminator != "" && user.Discriminator != "0" {
+			profileName = fmt.Sprintf("%s#%s", user.Username, user.Discriminator)
+		}
+	}
+	handle := user.Username
+
+	// Encrypt tokens before storing
+	encAccess, err := utils.Encrypt(token.AccessToken)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt access token: %w", err)
+	}
+	encRefresh, err := utils.Encrypt(token.RefreshToken)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt refresh token: %w", err)
 	}
 
 	// Store tokens in database
 	query := `
-		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, status, profile_name, email, webhook_url, platform_user_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, status, profile_name, email, webhook_url, platform_user_id, handle)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT (user_id, platform, platform_user_id) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, status = $5, profile_name = $6, email = $7, webhook_url = $8, connected_at = NOW()
+		DO UPDATE SET access_token = $3, refresh_token = $4, status = $5, profile_name = $6, email = $7, webhook_url = $8, handle = $10, connected_at = NOW()
 	`
-	_, err = d.db.Exec(query, userID, "discord", token.AccessToken, token.RefreshToken, "connected", profileName, user.Email, webhookURL, user.ID)
+	_, err = d.db.Exec(query, userID, "discord", encAccess, encRefresh, "connected", profileName, user.Email, webhookURL, user.ID, handle)
 	return err
 }
 
