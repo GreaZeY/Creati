@@ -11,7 +11,9 @@ import { Analytics } from "./pages/Analytics";
 import { Settings } from "./pages/Settings";
 import { Upload } from "./pages/Upload";
 import { Automation } from "./pages/Automation";
+import { ArchiveBlast } from "./pages/ArchiveBlast";
 import { RuleBuilder } from "./pages/RuleBuilder";
+import { BlastBuilder } from "./pages/BlastBuilder";
 import { Pricing } from "./pages/Pricing";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PublicRoute } from "./components/PublicRoute";
@@ -51,6 +53,8 @@ const AppRoutes = () => {
     "/upload",
     "/automation",
     "/automation/new",
+    "/blast",
+    "/blast/new",
     "/pricing",
   ];
   const isProtectedPath = protectedPaths.includes(location.pathname);
@@ -177,11 +181,31 @@ const AppRoutes = () => {
           }
         />
         <Route
+          path="/blast"
+          element={
+            <ProtectedRoute>
+              <PageTransition>
+                <ArchiveBlast />
+              </PageTransition>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/automation/new"
           element={
             <ProtectedRoute>
               <PageTransition>
                 <RuleBuilder />
+              </PageTransition>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/blast/new"
+          element={
+            <ProtectedRoute>
+              <PageTransition>
+                <BlastBuilder />
               </PageTransition>
             </ProtectedRoute>
           }

@@ -121,6 +121,9 @@ export const platformsAPI = {
 
     exchange: (platform: string, code: string, state: string) =>
         api.post(`/platforms/${platform}/callback`, { code, state }),
+
+    getVideos: (platform: string, accountId: number) =>
+        api.get<ApiResponse<any[]>>(`/platforms/${platform}/videos?accountId=${accountId}`),
 };
 
 export const uploadAPI = {
@@ -158,6 +161,12 @@ export const automationAPI = {
 
     delete: (id: number) =>
         api.delete<ApiResponse>(`/automation/${id}`),
+
+    blast: (data: { sourceAccountId: number; videoIds: string[]; targets: { accountId: number; captionTemplate: string }[] }) =>
+        api.post<ApiResponse>(`/automation/blast`, data),
+
+    getBlastSummary: (id: number) =>
+        api.get<ApiResponse>(`/automation/rules/${id}/summary`),
 };
 
 export const paymentsAPI = {

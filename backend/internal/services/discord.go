@@ -214,9 +214,13 @@ func (d *DiscordService) GetStatus(platformVideoID string) (string, error) {
 
 // FetchAnalytics implements Platform interface
 func (d *DiscordService) FetchAnalytics(platformVideoID string, accountID int) (*Analytics, error) {
-	// Discord webhooks don't easily allow fetching reactions back unless we have a bot token
 	// or use the webhook URL with /messages/ID? wait=true but identifying which message is hard
 	// without storing guild/channel.
 	// For now, returning empty analytics as Discord is mainly for distribution.
 	return &Analytics{}, nil
+}
+
+// FetchRecentVideos retrieves past videos (not yet implemented for Discord)
+func (d *DiscordService) FetchRecentVideos(accountID int) ([]ExternalVideo, error) {
+	return nil, fmt.Errorf("archive blast not supported for discord yet")
 }

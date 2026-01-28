@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"example.com/creati/backend/internal/db/models"
 	"golang.org/x/oauth2"
@@ -353,4 +354,94 @@ func (i *InstagramService) FetchAnalytics(platformVideoID string, accountID int)
 	}
 
 	return analytics, nil
+}
+
+// FetchRecentVideos retrieves past videos from Instagram
+func (i *InstagramService) FetchRecentVideos(accountID int) ([]ExternalVideo, error) {
+	var encAccess, igAccountID string
+	err := i.db.QueryRow(
+		"SELECT access_token, platform_user_id FROM platform_accounts WHERE id = $1", accountID,
+	).Scan(&encAccess, &igAccountID)
+	if err != nil {
+		return nil, fmt.Errorf("account not found: %w", err)
+	}
+
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt access token: %w", err)
+	}
+
+	// Fetch media from Instagram Graph API
+	// Fields: id, media_type, media_url, thumbnail_url, caption, timestamp, permalink
+	mediaURL := fmt.Sprintf(
+		"https://graph.facebook.com/v18.0/%s/media?fields=id,media_type,media_url,thumbnail_url,caption,timestamp,permalink&access_token=%s",
+		igAccountID, accessToken,
+	)
+
+	resp, err := http.Get(mediaURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch instagram media: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Data []struct {
+			ID           string `json:"id"`
+			MediaType    string `json:"media_type"`
+			MediaURL     string `json:"media_url"`
+			ThumbnailURL string `json:"thumbnail_url"`
+			Caption      string `json:"caption"`
+			Timestamp    string `json:"timestamp"`
+			Permalink    string `json:"permalink"`
+		} `json:"data"`
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to parse instagram response: %w", err)
+	}
+
+	if result.Error.Message != "" {
+		return nil, fmt.Errorf("instagram API error: %s", result.Error.Message)
+	}
+
+	videos := make([]ExternalVideo, 0)
+	for _, item := range result.Data {
+		// We only want videos/reels
+		if item.MediaType != "VIDEO" {
+			continue
+		}
+
+		publishedAt, _ := time.Parse(time.RFC3339, item.Timestamp)
+
+		// Title for Instagram is often just the first line of caption or generic
+		title := item.Caption
+		if idx := strings.Index(title, "\n"); idx != -1 {
+			title = title[:idx]
+		}
+		if len(title) > 50 {
+			title = title[:50] + "..."
+		}
+		if title == "" {
+			title = "Instagram Video"
+		}
+
+		thumbnail := item.ThumbnailURL
+		if thumbnail == "" {
+			thumbnail = item.MediaURL // Fallback, though media_url is often the video itself
+		}
+
+		videos = append(videos, ExternalVideo{
+			ID:          item.ID,
+			Title:       title,
+			Description: item.Caption,
+			Thumbnail:   thumbnail,
+			URL:         item.Permalink,
+			PublishedAt: publishedAt,
+		})
+	}
+
+	return videos, nil
 }

@@ -8,11 +8,17 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 )
 
 type AutomationService struct {
 	db    *sql.DB
 	queue *QueueService
+}
+
+type RuleTarget struct {
+	AccountID       int    `json:"accountId"`
+	CaptionTemplate string `json:"captionTemplate"`
 }
 
 func NewAutomationService(db *sql.DB, q *QueueService) *AutomationService {
@@ -168,4 +174,31 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 	}
 
 	log.Printf("Automation Job %d enqueued for rule %d -> target %d (%s)", jobID, ruleID, targetAccountID, platform)
+}
+
+// BlastVideos initiates a one-off distribution of multiple past videos
+func (s *AutomationService) BlastVideos(userID int, sourceAccountID int, videoIDs []string, targets []RuleTarget) (int, error) {
+	// 1. Create a "Manual" rule to link these jobs (unique for each blast)
+	var ruleID int
+	name := fmt.Sprintf("Quick Blast - %s", time.Now().Format("Jan 02, 15:04"))
+
+	err := s.db.QueryRow(`
+		INSERT INTO automation_rules (user_id, name, source_account_id, trigger_type, filters, targets, is_active)
+		VALUES ($1, $2, $3, 'manual', '{}', '[]', false)
+		RETURNING id
+	`, userID, name, sourceAccountID).Scan(&ruleID)
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to create blast rule: %w", err)
+	}
+
+	// 2. Enqueue jobs for each video and each target
+	for _, videoID := range videoIDs {
+		// Fetch title from source if possible (optional, worker handles it)
+		for _, target := range targets {
+			s.createAutomationJob(ruleID, videoID, target.AccountID, "Archive Blast Video")
+		}
+	}
+
+	return ruleID, nil
 }

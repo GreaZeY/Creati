@@ -160,6 +160,7 @@ func main() {
 	)
 	protected.Put("/platforms/:platform/disconnect", platformHandler.DeactivatePlatform)
 	protected.Delete("/platforms/:platform", platformHandler.RemovePlatform)
+	protected.Get("/platforms/:platform/videos", platformHandler.GetRecentVideos)
 
 	// Videos & Dashboard
 	protected.Get("/videos", videosHandler.ListVideos)
@@ -182,6 +183,8 @@ func main() {
 	automationGroup := protected.Group("/automation", middleware.RequireFeature(db, features.CanUseMagicSync))
 	automationGroup.Get("", automationHandler.ListRules)
 	automationGroup.Post("", automationHandler.CreateRule)
+	automationGroup.Post("/blast", automationHandler.HandleBlast)
+	automationGroup.Get("/rules/:id/summary", automationHandler.GetRuleJobSummary)
 	automationGroup.Put("/:id", automationHandler.ToggleRule)
 	automationGroup.Delete("/:id", automationHandler.DeleteRule)
 

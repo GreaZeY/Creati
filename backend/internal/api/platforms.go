@@ -298,3 +298,31 @@ func (h *PlatformHandler) RemovePlatform(c *fiber.Ctx) error {
 
 	return utils.SuccessResponse(c, nil, "Platform removed successfully")
 }
+
+// GetRecentVideos (GET /api/platforms/:platform/videos?accountId=...)
+func (h *PlatformHandler) GetRecentVideos(c *fiber.Ctx) error {
+	platformName := c.Params("platform")
+	accountIDStr := c.Query("accountId")
+
+	if accountIDStr == "" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "accountId is required")
+	}
+
+	accountID, err := strconv.Atoi(accountIDStr)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid accountId")
+	}
+
+	// Create platform service using factory
+	svc, err := services.GetPlatformService(platformName, h.db)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid platform")
+	}
+
+	videos, err := svc.FetchRecentVideos(accountID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+	}
+
+	return utils.SuccessResponse(c, videos, "Videos fetched successfully")
+}

@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
+	"time"
 
 	"example.com/creati/backend/internal/db/models"
 
@@ -346,4 +348,94 @@ func (f *FacebookService) FetchAnalytics(platformVideoID string, accountID int) 
 	}
 
 	return analytics, nil
+}
+
+// FetchRecentVideos retrieves past videos from the Facebook Page
+func (f *FacebookService) FetchRecentVideos(accountID int) ([]ExternalVideo, error) {
+	var encPageToken, pageID string
+	err := f.db.QueryRow(
+		"SELECT access_token, platform_user_id FROM platform_accounts WHERE id = $1", accountID,
+	).Scan(&encPageToken, &pageID)
+	if err != nil {
+		return nil, fmt.Errorf("account not found: %w", err)
+	}
+
+	pageToken, err := utils.Decrypt(encPageToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt page token: %w", err)
+	}
+
+	// Fetch videos from Facebook Page
+	// Fields: id,title,description,thumbnails,source,created_time
+	videosURL := fmt.Sprintf(
+		"https://graph.facebook.com/v18.0/%s/videos?fields=id,title,description,thumbnails,source,created_time&access_token=%s",
+		pageID, pageToken,
+	)
+
+	resp, err := http.Get(videosURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch facebook videos: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Data []struct {
+			ID          string `json:"id"`
+			Title       string `json:"title"`
+			Description string `json:"description"`
+			Thumbnails  struct {
+				Data []struct {
+					URI string `json:"uri"`
+				} `json:"data"`
+			} `json:"thumbnails"`
+			Source      string `json:"source"`
+			CreatedTime string `json:"created_time"`
+		} `json:"data"`
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to parse facebook response: %w", err)
+	}
+
+	if result.Error.Message != "" {
+		return nil, fmt.Errorf("facebook API error: %s", result.Error.Message)
+	}
+
+	videos := make([]ExternalVideo, 0, len(result.Data))
+	for _, item := range result.Data {
+		publishedAt, _ := time.Parse(time.RFC3339, item.CreatedTime)
+
+		thumbnail := ""
+		if len(item.Thumbnails.Data) > 0 {
+			thumbnail = item.Thumbnails.Data[0].URI
+		}
+
+		title := item.Title
+		if title == "" {
+			title = item.Description
+			if idx := strings.Index(title, "\n"); idx != -1 {
+				title = title[:idx]
+			}
+			if len(title) > 50 {
+				title = title[:50] + "..."
+			}
+		}
+		if title == "" {
+			title = "Facebook Video"
+		}
+
+		videos = append(videos, ExternalVideo{
+			ID:          item.ID,
+			Title:       title,
+			Description: item.Description,
+			Thumbnail:   thumbnail,
+			URL:         fmt.Sprintf("https://www.facebook.com/watch/?v=%s", item.ID),
+			PublishedAt: publishedAt,
+		})
+	}
+
+	return videos, nil
 }

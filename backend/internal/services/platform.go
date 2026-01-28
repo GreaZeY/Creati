@@ -1,6 +1,10 @@
 package services
 
-import "example.com/creati/backend/internal/db/models"
+import (
+	"time"
+
+	"example.com/creati/backend/internal/db/models"
+)
 
 /**
  * Platform interface - the contract all platforms must implement
@@ -30,6 +34,19 @@ type Platform interface {
 	// FetchAnalytics retrieves analytics data from platform for a specific account
 	// Returns view count, engagement metrics, etc.
 	FetchAnalytics(platformVideoID string, accountID int) (analytics *Analytics, err error)
+
+	// FetchRecentVideos retrieves past videos from the platform
+	FetchRecentVideos(accountID int) ([]ExternalVideo, error)
+}
+
+// ExternalVideo - standardized past video info
+type ExternalVideo struct {
+	ID          string    `json:"id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	Thumbnail   string    `json:"thumbnail"`
+	URL         string    `json:"url"`
+	PublishedAt time.Time `json:"publishedAt"`
 }
 
 // Analytics struct - standardized across platforms

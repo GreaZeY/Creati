@@ -416,3 +416,8 @@ func (t *TwitterService) FetchAnalytics(platformVideoID string, accountID int) (
 		Shares:   metrics.RetweetCount,
 	}, nil
 }
+
+// FetchRecentVideos retrieves past videos (not yet implemented for X)
+func (t *TwitterService) FetchRecentVideos(accountID int) ([]ExternalVideo, error) {
+	return nil, fmt.Errorf("archive blast not supported for x yet")
+}

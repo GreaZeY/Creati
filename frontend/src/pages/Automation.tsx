@@ -54,7 +54,9 @@ export function Automation() {
     queryKey: ["automation-rules"],
     queryFn: async () => {
       const resp = await automationAPI.list();
-      return resp.data.data || [];
+      return (resp.data.data || []).filter(
+        (r: any) => r.triggerType === "new_upload",
+      );
     },
     enabled: canUse(CAPABILITIES.CAN_USE_MAGIC_SYNC), // Only fetch if allowed
   });

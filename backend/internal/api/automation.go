@@ -195,6 +195,80 @@ func (h *AutomationHandler) DeleteRule(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, nil, "rule deleted")
 }
 
+type BlastRequest struct {
+	Name            string                `json:"name"`
+	SourceAccountID int                   `json:"sourceAccountId"`
+	VideoIDs        []string              `json:"videoIds"`
+	Targets         []services.RuleTarget `json:"targets"`
+}
+
+func (h *AutomationHandler) HandleBlast(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	var req BlastRequest
+	if err := c.BodyParser(&req); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request")
+	}
+
+	if len(req.VideoIDs) == 0 {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no videos selected")
+	}
+
+	if len(req.Targets) == 0 {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no targets selected")
+	}
+
+	ruleID, err := h.service.BlastVideos(userID, req.SourceAccountID, req.VideoIDs, req.Targets)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to initiate blast")
+	}
+
+	return utils.SuccessResponse(c, fiber.Map{"ruleID": ruleID}, "Quick Blast initiated successfully! 🚀")
+}
+
+func (h *AutomationHandler) GetRuleJobSummary(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	ruleID := c.Params("id")
+
+	// Verify rule belongs to user
+	var exists bool
+	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM automation_rules WHERE id = $1 AND user_id = $2)", ruleID, userID).Scan(&exists)
+	if err != nil || !exists {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "blast not found")
+	}
+
+	rows, err := h.db.Query(`
+		SELECT status, COUNT(*) 
+		FROM automation_jobs 
+		WHERE rule_id = $1 
+		GROUP BY status
+	`, ruleID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+	}
+	defer rows.Close()
+
+	summary := fiber.Map{
+		"pending":    0,
+		"processing": 0,
+		"completed":  0,
+		"failed":     0,
+		"total":      0,
+	}
+
+	total := 0
+	for rows.Next() {
+		var status string
+		var count int
+		if err := rows.Scan(&status, &count); err == nil {
+			summary[status] = count
+			total += count
+		}
+	}
+	summary["total"] = total
+
+	return utils.SuccessResponse(c, summary, "")
+}
+
 // HandleYouTubeWebhook handles PubSubHubbub verification and notifications
 func (h *AutomationHandler) HandleYouTubeWebhook(c *fiber.Ctx) error {
 	// 1. Subscription Verification (GET)

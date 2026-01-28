@@ -320,3 +320,8 @@ func (l *LinkedInService) FetchAnalytics(platformVideoID string, accountID int) 
 		Comments: stats.CommentsSummary.TotalFirstLevelComments,
 	}, nil
 }
+
+// FetchRecentVideos retrieves past videos (not yet implemented for LinkedIn)
+func (l *LinkedInService) FetchRecentVideos(accountID int) ([]ExternalVideo, error) {
+	return nil, fmt.Errorf("archive blast not supported for linkedin yet")
+}

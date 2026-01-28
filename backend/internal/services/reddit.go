@@ -263,3 +263,8 @@ func (r *RedditService) FetchAnalytics(platformVideoID string, accountID int) (*
 		Comments: post.NumComments,
 	}, nil
 }
+
+// FetchRecentVideos retrieves past videos (not yet implemented for Reddit)
+func (r *RedditService) FetchRecentVideos(accountID int) ([]ExternalVideo, error) {
+	return nil, fmt.Errorf("archive blast not supported for reddit yet")
+}

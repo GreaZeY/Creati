@@ -7,6 +7,7 @@ import (
 	"net/http"
 	url "net/url"
 	"os"
+	"time"
 
 	"example.com/creati/backend/internal/db/models"
 
@@ -303,4 +304,63 @@ func (y *YouTubeService) SubscribeToChannel(channelID string) error {
 	}
 
 	return nil
+}
+
+// FetchRecentVideos retrieves the most recent uploads from the channel
+func (y *YouTubeService) FetchRecentVideos(accountID int) ([]ExternalVideo, error) {
+	var encAccess string
+	err := y.db.QueryRow("SELECT access_token FROM platform_accounts WHERE id = $1", accountID).Scan(&encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("account not found: %w", err)
+	}
+
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt token: %w", err)
+	}
+
+	ctx := context.Background()
+	token := &oauth2.Token{AccessToken: accessToken}
+	client := y.oauthConfig.Client(ctx, token)
+	service, err := youtube.NewService(ctx, option.WithHTTPClient(client))
+	if err != nil {
+		return nil, err
+	}
+
+	// 1. Get the 'uploads' playlist ID for the channel
+	channelCall := service.Channels.List([]string{"contentDetails"}).Mine(true)
+	channelResp, err := channelCall.Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch channel details: %w", err)
+	}
+
+	if len(channelResp.Items) == 0 {
+		return nil, fmt.Errorf("no channel found")
+	}
+
+	uploadsPlaylistID := channelResp.Items[0].ContentDetails.RelatedPlaylists.Uploads
+
+	// 2. Fetch items from the uploads playlist
+	playlistCall := service.PlaylistItems.List([]string{"snippet", "contentDetails"}).
+		PlaylistId(uploadsPlaylistID).
+		MaxResults(50)
+	playlistResp, err := playlistCall.Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch playlist items: %w", err)
+	}
+
+	videos := make([]ExternalVideo, 0, len(playlistResp.Items))
+	for _, item := range playlistResp.Items {
+		publishedAt, _ := time.Parse(time.RFC3339, item.Snippet.PublishedAt)
+		videos = append(videos, ExternalVideo{
+			ID:          item.ContentDetails.VideoId,
+			Title:       item.Snippet.Title,
+			Description: item.Snippet.Description,
+			Thumbnail:   item.Snippet.Thumbnails.Default.Url,
+			URL:         fmt.Sprintf("https://youtube.com/watch?v=%s", item.ContentDetails.VideoId),
+			PublishedAt: publishedAt,
+		})
+	}
+
+	return videos, nil
 }
