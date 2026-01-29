@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"example.com/creati/backend/internal/events"
 	"example.com/creati/backend/internal/logger"
+	"github.com/sirupsen/logrus"
 )
 
 /**
@@ -42,7 +42,10 @@ func NewEventProcessor(db *sql.DB, interval time.Duration, batchSize int) *Event
 
 // Start begins processing events in a loop
 func (p *EventProcessor) Start(ctx context.Context) {
-	logger.Log("info", fmt.Sprintf("Event processor started (interval=%s, batch=%d)", p.interval, p.batchSize), nil, "event_processor")
+	logger.Get("event_processor").WithFields(logrus.Fields{
+		"interval": p.interval,
+		"batch":    p.batchSize,
+	}).Info("Event processor started")
 
 	ticker := time.NewTicker(p.interval)
 	defer ticker.Stop()
@@ -50,11 +53,11 @@ func (p *EventProcessor) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Log("info", "Event processor shutting down", nil, "event_processor")
+			logger.Get("event_processor").Info("Event processor shutting down")
 			return
 		case <-ticker.C:
 			if err := p.processBatch(ctx); err != nil {
-				logger.Log("error", "Event processor error", err, "event_processor")
+				logger.Get("event_processor").WithField("error", err).Error("Batch processing failed")
 			}
 		}
 	}
@@ -71,17 +74,20 @@ func (p *EventProcessor) processBatch(ctx context.Context) error {
 		return nil // No work
 	}
 
-	logger.Log("info", fmt.Sprintf("Processing %d pending events", len(pendingEvents)), nil, "event_processor")
+	logger.Get("event_processor").WithField("count", len(pendingEvents)).Info("Processing pending events")
 
 	for _, event := range pendingEvents {
 		if err := p.processEvent(ctx, event); err != nil {
 			// Log error and mark as failed
-			logger.Log("error", fmt.Sprintf("Failed to process event %s", event.ID), err, "event_processor")
+			logger.Get("event_processor").WithFields(logrus.Fields{
+				"event_id": event.ID,
+				"error":    err,
+			}).Error("Failed to process event")
 			p.eventStore.MarkEventFailed(ctx, event.ID, err.Error())
 		} else {
 			// Mark as processed
 			p.eventStore.MarkEventProcessed(ctx, event.ID)
-			logger.Log("info", fmt.Sprintf("Event %s processed successfully", event.ID), nil, "event_processor")
+			logger.Get("event_processor").WithField("event_id", event.ID).Info("Event processed successfully")
 		}
 	}
 
@@ -90,7 +96,11 @@ func (p *EventProcessor) processBatch(ctx context.Context) error {
 
 // processEvent handles a single event
 func (p *EventProcessor) processEvent(ctx context.Context, event *events.NormalizedEvent) error {
-	logger.Log("info", fmt.Sprintf("Processing event: platform=%s, type=%s, external_id=%s", event.Platform, event.EventType, event.ExternalID), nil, "event_processor")
+	logger.Get("event_processor").WithFields(logrus.Fields{
+		"platform":    event.Platform,
+		"type":        event.EventType,
+		"external_id": event.ExternalID,
+	}).Info("Processing event")
 
 	// Step 1: Create or update video record
 	videoID, err := p.createOrUpdateVideo(ctx, event)
@@ -100,7 +110,7 @@ func (p *EventProcessor) processEvent(ctx context.Context, event *events.Normali
 
 	// Step 2: Evaluate automation rules for this account/platform
 	if err := p.evaluateAutomationRules(ctx, event, videoID); err != nil {
-		logger.Log("error", "Failed to evaluate automation rules", err, "event_processor")
+		logger.Get("event_processor").WithField("error", err).Error("Failed to evaluate automation rules")
 		// Don't fail the entire event processing if rule evaluation fails
 	}
 
@@ -154,7 +164,10 @@ func (p *EventProcessor) createOrUpdateVideo(ctx context.Context, event *events.
 		return 0, err
 	}
 
-	logger.Log("info", fmt.Sprintf("Created video record: id=%d, external_id=%s", videoID, event.ExternalID), nil, "event_processor")
+	logger.Get("event_processor").WithFields(logrus.Fields{
+		"video_id":    videoID,
+		"external_id": event.ExternalID,
+	}).Info("Created video record")
 	return videoID, nil
 }
 
@@ -179,27 +192,33 @@ func (p *EventProcessor) evaluateAutomationRules(ctx context.Context, event *eve
 		var targetsJSON, filtersJSON []byte
 
 		if err := rows.Scan(&ruleID, &ruleName, &targetsJSON, &filtersJSON); err != nil {
-			logger.Log("error", "Error scanning rule", err, "event_processor")
+			logger.Get("event_processor").WithField("error", err).Error("Error scanning rule")
 			continue
 		}
 
 		// Parse filters
 		var filters map[string]interface{}
 		if err := json.Unmarshal(filtersJSON, &filters); err != nil {
-			logger.Log("error", fmt.Sprintf("Error parsing filters for rule %d", ruleID), err, "event_processor")
+			logger.Get("event_processor").WithFields(logrus.Fields{
+				"rule_id": ruleID,
+				"error":   err,
+			}).Error("Error parsing filters")
 			continue
 		}
 
 		// Apply filters (basic implementation - can be extended)
 		if !p.matchesFilters(event, filters) {
-			logger.Log("info", fmt.Sprintf("Event does not match rule %d filters", ruleID), nil, "event_processor")
+			logger.Get("event_processor").WithField("rule_id", ruleID).Info("Event does not match filter")
 			continue
 		}
 
 		// Parse targets
 		var targets []map[string]interface{}
 		if err := json.Unmarshal(targetsJSON, &targets); err != nil {
-			logger.Log("error", fmt.Sprintf("Error parsing targets for rule %d", ruleID), err, "event_processor")
+			logger.Get("event_processor").WithFields(logrus.Fields{
+				"rule_id": ruleID,
+				"error":   err,
+			}).Error("Error parsing targets")
 			continue
 		}
 
@@ -217,11 +236,14 @@ func (p *EventProcessor) evaluateAutomationRules(ctx context.Context, event *eve
 			`, ruleID, videoID, event.ExternalID, int(targetAccountID), time.Now())
 
 			if err != nil {
-				logger.Log("error", "Error creating automation job", err, "event_processor")
+				logger.Get("event_processor").WithField("error", err).Error("Error creating automation job")
 				continue
 			}
 
-			logger.Log("info", fmt.Sprintf("Created automation job: rule=%s, target_account=%d", ruleName, int(targetAccountID)), nil, "event_processor")
+			logger.Get("event_processor").WithFields(logrus.Fields{
+				"rule":           ruleName,
+				"target_account": int(targetAccountID),
+			}).Info("Created automation job")
 		}
 
 		// Update rule's last_run_at
@@ -229,7 +251,7 @@ func (p *EventProcessor) evaluateAutomationRules(ctx context.Context, event *eve
 			UPDATE automation_rules SET last_run_at = $1 WHERE id = $2
 		`, time.Now(), ruleID)
 		if err != nil {
-			logger.Log("error", "Error updating rule last_run_at", err, "event_processor")
+			logger.Get("event_processor").WithField("error", err).Error("Error updating rule last_run_at")
 		}
 	}
 

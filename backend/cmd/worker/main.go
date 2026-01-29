@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"math"
 	"os"
 	"os/signal"
@@ -17,6 +16,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/kkdai/youtube/v2"
 	_ "github.com/lib/pq"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -26,34 +26,34 @@ const (
 func main() {
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
-		log.Println("⚠️  No .env file found, using system environment")
+		logger.Get("worker").Warn("⚠️  No .env file found, using system environment")
 	}
 
 	// Connect to database
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		log.Fatal("❌ DATABASE_URL not set.")
+		logger.Get("worker").Fatal("❌ DATABASE_URL not set.")
 	}
 
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
-		log.Fatal("❌ Failed to connect to database:", err)
+		logger.Get("worker").WithField("error", err).Fatal("❌ Failed to connect to database")
 	}
 	defer db.Close()
 
 	// Initialize services
 	queueService, err := services.NewQueueService()
 	if err != nil {
-		log.Fatal("❌ Failed to initialize queue service:", err)
+		logger.Get("worker").WithField("error", err).Fatal("❌ Failed to initialize queue service")
 	}
 
 	storageService, err := services.NewStorageService()
 	if err != nil {
-		log.Printf("⚠️  Storage service failed to initialize: %v", err)
+		logger.Get("worker").WithField("error", err).Warn("⚠️  Storage service failed to initialize")
 	}
 
 	fmt.Println("\n========================================")
-	logger.Log("info", "Worker starting...", nil, "worker")
+	logger.Get("worker").Info("Worker starting...")
 	fmt.Println("========================================")
 
 	// Context for graceful shutdown
@@ -81,38 +81,48 @@ func main() {
 				if ctx.Err() != nil {
 					return
 				}
-				log.Printf("❌ Error dequeuing job: %v", err)
+				logger.Get("worker").WithField("error", err).Error("❌ Error dequeuing job")
 				time.Sleep(2 * time.Second)
 				continue
 			}
 
-			logger.Log("info", fmt.Sprintf("Processing job: VideoID=%d, Platform=%s", job.VideoID, job.Platform), nil, "worker")
+			logger.Get("worker").WithFields(logrus.Fields{
+				"video_id": job.VideoID,
+				"platform": job.Platform,
+			}).Info("Processing job")
 
 			// Process job
 			err = processJob(db, storageService, job)
 			if err != nil {
-				logger.Log("error", fmt.Sprintf("Job failed: %v", err), err, "worker")
+				logger.Get("worker").WithField("error", err).Error("Job failed")
 
 				if job.RetryCount < MaxRetries {
 					job.RetryCount++
 					// Exponential backoff: 30s, 2m, 8m...
 					delay := time.Duration(math.Pow(4, float64(job.RetryCount))) * time.Second * 30
-					logger.Log("info", fmt.Sprintf("Retrying in %v (Attempt %d/%d)", delay, job.RetryCount, MaxRetries), nil, "worker")
+					logger.Get("worker").WithFields(logrus.Fields{
+						"attempt":     job.RetryCount,
+						"max_retries": MaxRetries,
+						"delay":       delay,
+					}).Info("Retrying job")
 
 					go func(j services.UploadJob, d time.Duration) {
 						time.Sleep(d)
 						if err := queueService.EnqueueUpload(context.Background(), j); err != nil {
-							logger.Log("error", fmt.Sprintf("Failed to re-enqueue job: %v", err), err, "worker")
+							logger.Get("worker").WithField("error", err).Error("Failed to re-enqueue job")
 						}
 					}(*job, delay)
 				} else {
-					logger.Log("error", fmt.Sprintf("Max retries reached for job %d", job.JobID), nil, "worker")
+					logger.Get("worker").WithField("job_id", job.JobID).Error("Max retries reached")
 					if job.AutomationJobID > 0 {
 						db.Exec("UPDATE automation_jobs SET status = 'failed', error = $1 WHERE id = $2", err.Error(), job.AutomationJobID)
 					}
 				}
 			} else {
-				logger.Log("info", fmt.Sprintf("Job completed: VideoID=%d, Platform=%s", job.VideoID, job.Platform), nil, "worker")
+				logger.Get("worker").WithFields(logrus.Fields{
+					"video_id": job.VideoID,
+					"platform": job.Platform,
+				}).Info("Job completed")
 			}
 		}
 	}
@@ -171,7 +181,10 @@ func processJob(db *sql.DB, storage *services.StorageService, job *services.Uplo
 }
 
 func handleAutomationJob(db *sql.DB, storage *services.StorageService, job *services.UploadJob) error {
-	logger.Log("info", fmt.Sprintf("Processing Automation Job %d (Source: %s)", job.AutomationJobID, job.SourceVideoID), nil, "automation")
+	logger.Get("automation").WithFields(logrus.Fields{
+		"automation_job_id": job.AutomationJobID,
+		"source_video_id":   job.SourceVideoID,
+	}).Info("Processing Automation Job")
 
 	// Update status
 	_, err := db.Exec("UPDATE automation_jobs SET status = 'processing', updated_at = NOW() WHERE id = $1", job.AutomationJobID)
@@ -231,7 +244,10 @@ func handleAutomationJob(db *sql.DB, storage *services.StorageService, job *serv
 		return err
 	}
 
-	logger.Log("info", fmt.Sprintf("Automation redistributed to %s (ID: %s)", job.Platform, platformVideoID), nil, "automation")
+	logger.Get("automation").WithFields(logrus.Fields{
+		"platform":          job.Platform,
+		"platform_video_id": platformVideoID,
+	}).Info("Automation redistributed")
 
 	// 6. Final Status Update
 	_, err = db.Exec(`

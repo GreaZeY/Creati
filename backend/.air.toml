@@ -2,11 +2,11 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "go build -o ./tmp/main.exe ./cmd/server/main.go"
+cmd = "go build -o ./tmp/main.exe ./cmd/app/main.go"
 bin = "./tmp/main.exe"
 include_ext = ["go"]
 include_file = [".env"]
-exclude_dir = ["tmp", "vendor"]
+exclude_dir = ["tmp", "vendor", "logs"]
 
 [log]
 time = true
