@@ -9,6 +9,8 @@ import (
 	"os"
 	"time"
 
+	"sort"
+
 	"creati.in/creati/backend/internal/db/models"
 	"creati.in/creati/backend/internal/logger"
 	"creati.in/creati/backend/internal/services"
@@ -165,7 +167,18 @@ func HandleAutomationJob(db *sql.DB, storage *services.StorageService, job *serv
 		return fmt.Errorf("no suitable video formats found")
 	}
 
-	stream, _, err := client.GetStreamContext(ytCtx, videoMetadata, &formats[0])
+	// Sort formats by resolution (Height) descending to get best quality muxed stream
+	sort.Slice(formats, func(i, j int) bool {
+		return formats[i].Height > formats[j].Height
+	})
+
+	bestFormat := &formats[0]
+	logger.Get("automation").WithFields(logrus.Fields{
+		"resolution": fmt.Sprintf("%dx%d", bestFormat.Width, bestFormat.Height),
+		"fps":        bestFormat.FPS,
+	}).Info("Selected best quality muxed stream")
+
+	stream, _, err := client.GetStreamContext(ytCtx, videoMetadata, bestFormat)
 	if err != nil {
 		return fmt.Errorf("failed to get youtube stream: %w", err)
 	}
