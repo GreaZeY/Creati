@@ -8,6 +8,7 @@ import (
 
 	"creati.in/creati/backend/internal/events"
 	"creati.in/creati/backend/internal/logger"
+	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 )
 
@@ -26,14 +27,16 @@ import (
 
 type EventProcessor struct {
 	db         *sql.DB
+	dsn        string
 	eventStore *events.Store
 	interval   time.Duration
 	batchSize  int
 }
 
-func NewEventProcessor(db *sql.DB, interval time.Duration, batchSize int) *EventProcessor {
+func NewEventProcessor(db *sql.DB, dsn string, interval time.Duration, batchSize int) *EventProcessor {
 	return &EventProcessor{
 		db:         db,
+		dsn:        dsn,
 		eventStore: events.NewStore(db),
 		interval:   interval,
 		batchSize:  batchSize,
@@ -42,22 +45,52 @@ func NewEventProcessor(db *sql.DB, interval time.Duration, batchSize int) *Event
 
 // Start begins processing events in a loop
 func (p *EventProcessor) Start(ctx context.Context) {
-	logger.Get("event_processor").WithFields(logrus.Fields{
+	log := logger.Get("event_processor")
+	log.WithFields(logrus.Fields{
 		"interval": p.interval,
 		"batch":    p.batchSize,
-	}).Info("Event processor started")
+	}).Info("Event processor started with LISTEN/NOTIFY support")
 
+	// 1. Set up pq Listener for instant updates
+	reportProblem := func(ev pq.ListenerEventType, err error) {
+		if err != nil {
+			log.Errorf("pq listener error: %v", err)
+		}
+	}
+
+	listener := pq.NewListener(p.dsn, 10*time.Second, time.Minute, reportProblem)
+	err := listener.Listen("platform_event_inserted")
+	if err != nil {
+		log.Errorf("Failed to listen to channel: %v", err)
+	}
+	defer listener.UnlistenAll()
+
+	// 2. Ticker for fallback polling (heartbeat)
 	ticker := time.NewTicker(p.interval)
 	defer ticker.Stop()
+
+	// Initial run
+	if err := p.processBatch(ctx); err != nil {
+		log.Errorf("Initial batch processing failed: %v", err)
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Get("event_processor").Info("Event processor shutting down")
+			log.Info("Event processor shutting down")
 			return
 		case <-ticker.C:
+			// Regular heartbeat fallback
 			if err := p.processBatch(ctx); err != nil {
-				logger.Get("event_processor").WithField("error", err).Error("Batch processing failed")
+				log.WithField("error", err).Error("Heartbeat batch processing failed")
+			}
+		case n := <-listener.Notify:
+			if n == nil {
+				continue
+			}
+			log.WithField("channel", n.Channel).Debug("Received notification, processing...")
+			if err := p.processBatch(ctx); err != nil {
+				log.WithField("error", err).Error("Triggered batch processing failed")
 			}
 		}
 	}

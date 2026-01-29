@@ -31,7 +31,7 @@ func getMaxRetries() int {
 	return retries
 }
 
-func RunWorker(ctx context.Context, db *sql.DB) error {
+func RunWorker(ctx context.Context, db *sql.DB, throttle *services.ThrottleService) error {
 	queueService, err := services.NewQueueService()
 	if err != nil {
 		return err
@@ -65,7 +65,7 @@ func RunWorker(ctx context.Context, db *sql.DB) error {
 				"platform": job.Platform,
 			}).Info("Processing job")
 
-			err = ProcessJob(db, storageService, job)
+			err = ProcessJob(db, storageService, throttle, job)
 			if err != nil {
 				handleJobError(db, queueService, job, err)
 			} else {
@@ -78,9 +78,27 @@ func RunWorker(ctx context.Context, db *sql.DB) error {
 	}
 }
 
-func ProcessJob(db *sql.DB, storage *services.StorageService, job *services.UploadJob) error {
+func ProcessJob(db *sql.DB, storage *services.StorageService, throttle *services.ThrottleService, job *services.UploadJob) error {
+	// 0. Global Platform Rate Limiting
+	// Define limits (could be per-platform, here generic for demo)
+	// YouTube: 60 uploads per hour global, Instagram: 30 per hour global
+	limit := 10                               // fallback
+	window := 1 * time.Hour                   // fallback
+	quotaKey := fmt.Sprintf("global:%s", job.Platform)
+	
+	if job.Platform == "youtube" {
+		limit = 60
+	} else if job.Platform == "instagram" {
+		limit = 30
+	}
+
+	logger.Get("worker").WithField("key", quotaKey).Debug("Checking quota...")
+	if err := throttle.Wait(context.Background(), quotaKey, limit, window); err != nil {
+		return fmt.Errorf("throttle wait failed: %w", err)
+	}
+
 	if job.AutomationJobID > 0 {
-		return HandleAutomationJob(db, storage, job)
+		return HandleAutomationJob(db, storage, throttle, job)
 	}
 
 	// 1. Get Video details
@@ -124,7 +142,7 @@ func ProcessJob(db *sql.DB, storage *services.StorageService, job *services.Uplo
 	return err
 }
 
-func HandleAutomationJob(db *sql.DB, storage *services.StorageService, job *services.UploadJob) error {
+func HandleAutomationJob(db *sql.DB, storage *services.StorageService, throttle *services.ThrottleService, job *services.UploadJob) error {
 	logger.Get("automation").WithFields(logrus.Fields{
 		"automation_job_id": job.AutomationJobID,
 		"source_video_id":   job.SourceVideoID,

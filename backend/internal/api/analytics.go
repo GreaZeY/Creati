@@ -11,11 +11,13 @@ import (
 
 type AnalyticsHandler struct {
 	service *services.AnalyticsService
+	queue   *services.QueueService
 }
 
-func NewAnalyticsHandler(db *sql.DB) *AnalyticsHandler {
+func NewAnalyticsHandler(db *sql.DB, queue *services.QueueService) *AnalyticsHandler {
 	return &AnalyticsHandler{
 		service: services.NewAnalyticsService(db),
+		queue:   queue,
 	}
 }
 
@@ -36,4 +38,21 @@ func (h *AnalyticsHandler) GetOverview(c *fiber.Ctx) error {
 	go h.service.SyncUserAnalytics(userID)
 
 	return utils.SuccessResponse(c, stats, "")
+}
+
+// GetQueueStatus returns the current depth of the upload queue (for autoscaling)
+func (h *AnalyticsHandler) GetQueueStatus(c *fiber.Ctx) error {
+	depth, err := h.queue.GetQueueDepth(c.Context())
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to fetch queue depth")
+	}
+
+	return c.JSON(fiber.Map{
+		"success": true,
+		"data": fiber.Map{
+			"queue_name": "upload_queue",
+			"depth":      depth,
+			"status":     "healthy",
+		},
+	})
 }

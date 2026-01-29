@@ -9,6 +9,7 @@ import (
 
 	"creati.in/creati/backend/internal/app"
 	"creati.in/creati/backend/internal/logger"
+	"creati.in/creati/backend/internal/services"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
@@ -33,7 +34,16 @@ func main() {
 		cancel()
 	}()
 
-	if err := app.RunWorker(ctx, db); err != nil {
+	// 1. Initialize Redis/Queue
+	queueService, err := services.NewQueueService()
+	if err != nil {
+		logger.Get("worker").Fatal(err)
+	}
+
+	// 2. Initialize Throttler
+	throttleService := services.NewThrottleService(queueService.Client)
+
+	if err := app.RunWorker(ctx, db, throttleService); err != nil {
 		logger.Get("worker").Fatal(err)
 	}
 }

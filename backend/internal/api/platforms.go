@@ -8,6 +8,7 @@ import (
 	"creati.in/creati/backend/internal/middleware"
 	"creati.in/creati/backend/internal/services"
 	"creati.in/creati/backend/internal/utils"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -19,16 +20,24 @@ import (
  */
 
 type PlatformHandler struct {
-	db *sql.DB
+	db    *sql.DB
+	cache *services.CacheService
 }
 
-func NewPlatformHandler(db *sql.DB) *PlatformHandler {
-	return &PlatformHandler{db: db}
+func NewPlatformHandler(db *sql.DB, cache *services.CacheService) *PlatformHandler {
+	return &PlatformHandler{db: db, cache: cache}
 }
 
 // GetPlatformCounts returns count of connected and total platform accounts
 func (h *PlatformHandler) GetPlatformCounts(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
+
+	// Try Cache First
+	var counts map[string]int
+	cacheKey := services.UserAccountsKey(userID) + ":counts"
+	if err := h.cache.Get(c.Context(), cacheKey, &counts); err == nil {
+		return c.JSON(fiber.Map{"data": counts})
+	}
 
 	// Fetch all connected platforms
 	rows, err := h.db.Query(`
@@ -41,7 +50,7 @@ func (h *PlatformHandler) GetPlatformCounts(c *fiber.Ctx) error {
 	}
 	defer rows.Close()
 
-	counts := make(map[string]int)
+	counts = make(map[string]int)
 	totalConnected := 0
 
 	for rows.Next() {
@@ -56,6 +65,9 @@ func (h *PlatformHandler) GetPlatformCounts(c *fiber.Ctx) error {
 	// Add total to the map
 	counts["total"] = totalConnected
 
+	// Update Cache (5 min TTL)
+	_ = h.cache.Set(c.Context(), cacheKey, counts, 5*time.Minute)
+
 	return c.JSON(fiber.Map{
 		"data": counts,
 	})
@@ -64,17 +76,6 @@ func (h *PlatformHandler) GetPlatformCounts(c *fiber.Ctx) error {
 // ListPlatforms returns list of available platforms and all connected accounts
 func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
-
-	// Get all connected accounts for user
-	rows, err := h.db.Query(`
-		SELECT id, platform, status, COALESCE(profile_name, '') as profile_name, platform_user_id, COALESCE(handle, '') as handle
-		FROM platform_accounts 
-		WHERE user_id = $1
-	`, userID)
-	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
-	}
-	defer rows.Close()
 
 	type PlatformData struct {
 		AccountID      int    `json:"accountId,omitempty"`
@@ -87,7 +88,25 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 		Handle         string `json:"handle"`
 	}
 
-	results := make([]PlatformData, 0)
+	// Try Cache First
+	var results []PlatformData
+	cacheKey := services.UserAccountsKey(userID) + ":list"
+	if err := h.cache.Get(c.Context(), cacheKey, &results); err == nil {
+		return utils.SuccessResponse(c, results, "")
+	}
+
+	// Get all connected accounts for user from DB
+	rows, err := h.db.Query(`
+		SELECT id, platform, status, COALESCE(profile_name, '') as profile_name, platform_user_id, COALESCE(handle, '') as handle
+		FROM platform_accounts 
+		WHERE user_id = $1
+	`, userID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+	}
+	defer rows.Close()
+
+	results = make([]PlatformData, 0)
 	connectedPlatforms := make(map[string]bool)
 
 	// 1. Add all connected accounts
@@ -123,6 +142,9 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 			Handle:         handle,
 		})
 	}
+
+	// Update Cache (5 min TTL)
+	_ = h.cache.Set(c.Context(), cacheKey, results, 5*time.Minute)
 
 	return utils.SuccessResponse(c, results, "")
 }
@@ -225,6 +247,10 @@ func (h *PlatformHandler) HandleCallback(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "authentication failed: "+err.Error())
 	}
 
+	// Invalidate Cache
+	_ = h.cache.Delete(c.Context(), services.UserAccountsKey(userID)+":list")
+	_ = h.cache.Delete(c.Context(), services.UserAccountsKey(userID)+":counts")
+
 	// Return success JSON
 	return utils.SuccessResponse(c, fiber.Map{
 		"platform": platform,
@@ -265,6 +291,10 @@ func (h *PlatformHandler) DeactivatePlatform(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to disconnect platform")
 	}
 
+	// Invalidate Cache
+	_ = h.cache.Delete(c.Context(), services.UserAccountsKey(userID)+":list")
+	_ = h.cache.Delete(c.Context(), services.UserAccountsKey(userID)+":counts")
+
 	return utils.SuccessResponse(c, nil, "Platform disconnected successfully")
 }
 
@@ -295,6 +325,10 @@ func (h *PlatformHandler) RemovePlatform(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to remove platform")
 	}
+
+	// Invalidate Cache
+	_ = h.cache.Delete(c.Context(), services.UserAccountsKey(userID)+":list")
+	_ = h.cache.Delete(c.Context(), services.UserAccountsKey(userID)+":counts")
 
 	return utils.SuccessResponse(c, nil, "Platform removed successfully")
 }

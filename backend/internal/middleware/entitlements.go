@@ -4,20 +4,31 @@ import (
 	"database/sql"
 
 	"creati.in/creati/backend/internal/features"
+	"creati.in/creati/backend/internal/services"
 	"creati.in/creati/backend/internal/utils"
 	"github.com/gofiber/fiber/v2"
 )
 
 // RequireFeature returns a middleware that checks if the user has access to a specific feature
-func RequireFeature(db *sql.DB, capability features.Capability) fiber.Handler {
+func RequireFeature(db *sql.DB, cache *services.CacheService, capability features.Capability) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		userID := GetUserID(c)
 		if userID == 0 {
 			return utils.ErrorResponse(c, fiber.StatusUnauthorized, "authentication required")
 		}
 
-		// Fetch user's current plan
+		// 1. Try Cache First
 		var plan string
+		cacheKey := services.UserFeatureKey(userID, "plan")
+		if err := cache.Get(c.Context(), cacheKey, &plan); err == nil && plan != "" {
+			// Cache hit!
+			if !features.HasFeature(plan, capability) {
+				return utils.ErrorResponse(c, fiber.StatusForbidden, "upgrade required to access this feature")
+			}
+			return c.Next()
+		}
+
+		// 2. Fetch user's current plan from DB
 		err := db.QueryRow(`
 			SELECT plan 
 			FROM subscriptions 
@@ -31,6 +42,9 @@ func RequireFeature(db *sql.DB, capability features.Capability) fiber.Handler {
 			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
 		}
 
+		// 3. Update Cache (10 min TTL)
+		_ = cache.Set(c.Context(), cacheKey, plan, 10*time.Minute)
+
 		// Check if plan has the required feature
 		if !features.HasFeature(plan, capability) {
 			return utils.ErrorResponse(c, fiber.StatusForbidden, "upgrade required to access this feature")
@@ -41,25 +55,31 @@ func RequireFeature(db *sql.DB, capability features.Capability) fiber.Handler {
 }
 
 // RequireLimit returns a middleware that checks if user is within their usage limit
-func RequireLimit(db *sql.DB, capability features.Capability, getCurrentUsage func(int) (int, error)) fiber.Handler {
+func RequireLimit(db *sql.DB, cache *services.CacheService, capability features.Capability, getCurrentUsage func(int) (int, error)) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		userID := GetUserID(c)
 		if userID == 0 {
 			return utils.ErrorResponse(c, fiber.StatusUnauthorized, "authentication required")
 		}
 
-		// Fetch user's current plan
+		// Try Cache First
 		var plan string
-		err := db.QueryRow(`
-			SELECT plan 
-			FROM subscriptions 
-			WHERE user_id = $1 AND status = 'active'
-		`, userID).Scan(&plan)
+		cacheKey := services.UserFeatureKey(userID, "plan")
+		if err := cache.Get(c.Context(), cacheKey, &plan); err != nil {
+			// Fetch user's current plan from DB
+			err = db.QueryRow(`
+				SELECT plan 
+				FROM subscriptions 
+				WHERE user_id = $1 AND status = 'active'
+			`, userID).Scan(&plan)
 
-		if err == sql.ErrNoRows {
-			plan = features.PlanFree
-		} else if err != nil {
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+			if err == sql.ErrNoRows {
+				plan = features.PlanFree
+			} else if err != nil {
+				return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+			}
+			// Update Cache
+			_ = cache.Set(c.Context(), cacheKey, plan, 10*time.Minute)
 		}
 
 		// Get the limit for this plan

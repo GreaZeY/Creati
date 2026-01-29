@@ -79,3 +79,8 @@ func (q *QueueService) DequeueUpload(ctx context.Context) (*UploadJob, error) {
 
 	return &job, nil
 }
+
+// GetQueueDepth returns the number of pending jobs in the queue
+func (q *QueueService) GetQueueDepth(ctx context.Context) (int64, error) {
+	return q.Client.LLen(ctx, "upload_queue").Result()
+}

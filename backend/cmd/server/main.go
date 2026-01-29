@@ -47,53 +47,7 @@ func main() {
 	}
 	log.Println("✓ Database connected")
 
-	// Start background workers
-	ctx := context.Background()
-
-	// Event processor for upload detection
-	eventProcessor := workers.NewEventProcessor(db, 30*time.Second, 50)
-	go eventProcessor.Start(ctx)
-
-	// Create Fiber app
-	app := fiber.New(fiber.Config{
-		ErrorHandler: customErrorHandler,
-	})
-
-	// Middleware
-	app.Use(logger.New(logger.Config{
-		Format: "[${time}] ${status} - ${method} ${path}\n",
-	}))
-
-	frontendURL := os.Getenv("FRONTEND_URL")
-	if frontendURL == "" {
-		frontendURL = "http://localhost:5173"
-	}
-
-	app.Use(cors.New(cors.Config{
-		AllowOrigins:     frontendURL,
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-CSRF-Token",
-		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS",
-		AllowCredentials: true,
-	}))
-
-	// Health check
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{
-			"status":   "ok",
-			"database": "connected",
-		})
-	})
-
-	// Pre-flight check
-	fmt.Println("\n📋 Pre-flight Checks:")
-
-	storageService, err := services.NewStorageService()
-	if err != nil {
-		fmt.Printf("  ❌ S3 Storage: Failed (%v)\n", err)
-	} else {
-		fmt.Println("  ✅ S3 Storage: Initialized")
-	}
-
+	// 1. Initialize Redis/Queue first (needed for Cache and Handlers)
 	queueService, err := services.NewQueueService()
 	if err != nil {
 		fmt.Printf("  ❌ Redis Queue: Failed (%v)\n", err)
@@ -101,25 +55,83 @@ func main() {
 		fmt.Println("  ✅ Redis Queue: Initialized")
 	}
 
-	if os.Getenv("YOUTUBE_CLIENT_ID") == "" {
-		fmt.Println("  ⚠️  YouTube API: Credentials missing")
+	// 2. Initialize CacheService (needed for Handlers)
+	cacheService := services.NewCacheService(queueService.Client)
+
+	// 3. Initialize Storage
+	storageService, err := services.NewStorageService()
+	if err != nil {
+		fmt.Printf("  ❌ S3 Storage: Failed (%v)\n", err)
 	} else {
-		fmt.Println("  ✅ YouTube API: Credentials found")
+		fmt.Println("  ✅ S3 Storage: Initialized")
 	}
 
-	// Initialize handlers
-	authHandler := api.NewAuthHandler(db)
-	platformHandler := api.NewPlatformHandler(db)
-	uploadHandler := api.NewUploadHandler(storageService, queueService, db)
-	videosHandler := api.NewVideosHandler(db)
-	analyticsHandler := api.NewAnalyticsHandler(db)
-	automationService := services.NewAutomationService(db, queueService)
-	automationHandler := api.NewAutomationHandler(db, automationService)
-	paymentHandler := api.NewPaymentHandler(db)
-	webhookHandler := api.NewWebhookHandler(db)
+	// Start background workers (Conditional based on START_MODE)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	// API routes
-	apiRoutes := app.Group("/api")
+	startMode := os.Getenv("START_MODE") // api, worker, all (default)
+	if startMode == "" {
+		startMode = "all"
+	}
+
+	if startMode == "worker" || startMode == "all" {
+		// Event processor for upload detection
+		eventProcessor := workers.NewEventProcessor(db, dbURL, 30*time.Second, 50)
+		go eventProcessor.Start(ctx)
+		log.Println("✓ Event Processor started")
+	}
+
+	if startMode == "api" || startMode == "all" {
+		// Create Fiber app
+		app := fiber.New(fiber.Config{
+			ErrorHandler: customErrorHandler,
+		})
+
+		frontendURL := os.Getenv("FRONTEND_URL")
+		if frontendURL == "" {
+			frontendURL = "http://localhost:5173"
+		}
+
+		app.Use(cors.New(cors.Config{
+			AllowOrigins:     frontendURL,
+			AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-CSRF-Token",
+			AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS",
+			AllowCredentials: true,
+		}))
+
+		app.Use(logger.New(logger.Config{
+			Format: "[${time}] ${status} - ${method} ${path}\n",
+		}))
+
+		// Health check
+		app.Get("/health", func(c *fiber.Ctx) error {
+			return c.JSON(fiber.Map{
+				"status":   "ok",
+				"database": "connected",
+			})
+		})
+
+		// Pre-flight check log
+		if os.Getenv("YOUTUBE_CLIENT_ID") == "" {
+			fmt.Println("  ⚠️  YouTube API: Credentials missing")
+		} else {
+			fmt.Println("  ✅ YouTube API: Credentials found")
+		}
+
+		// Initialize handlers
+		authHandler := api.NewAuthHandler(db)
+		platformHandler := api.NewPlatformHandler(db, cacheService)
+		uploadHandler := api.NewUploadHandler(storageService, queueService, db)
+		videosHandler := api.NewVideosHandler(db)
+		analyticsHandler := api.NewAnalyticsHandler(db, queueService)
+		automationService := services.NewAutomationService(db, queueService)
+		automationHandler := api.NewAutomationHandler(db, automationService)
+		paymentHandler := api.NewPaymentHandler(db)
+		webhookHandler := api.NewWebhookHandler(db)
+
+		// API routes
+		apiRoutes := app.Group("/api")
 
 	// Public routes
 	apiRoutes.Post("/auth/register", authHandler.Register)
@@ -151,7 +163,7 @@ func main() {
 	protected.Get("/platforms", platformHandler.ListPlatforms)
 	// Check account limit before allowing new connections
 	protected.Get("/platforms/:platform/connect",
-		middleware.RequireLimit(db, features.MaxConnectedAccounts, func(userID int) (int, error) {
+		middleware.RequireLimit(db, cacheService, features.MaxConnectedAccounts, func(userID int) (int, error) {
 			var count int
 			err := db.QueryRow("SELECT COUNT(*) FROM platform_accounts WHERE user_id = $1 AND status IN ('active', 'connected')", userID).Scan(&count)
 			return count, err
@@ -169,6 +181,7 @@ func main() {
 
 	// Analytics
 	protected.Get("/analytics/overview", analyticsHandler.GetOverview)
+	protected.Get("/analytics/queue-status", analyticsHandler.GetQueueStatus)
 
 	// Platform Events (Upload Detection)
 	protected.Get("/events", webhookHandler.ListEvents)              // List user's events
@@ -180,7 +193,7 @@ func main() {
 	}
 
 	// Automation (Protected by Magic Sync entitlement)
-	automationGroup := protected.Group("/automation", middleware.RequireFeature(db, features.CanUseMagicSync))
+	automationGroup := protected.Group("/automation", middleware.RequireFeature(db, cacheService, features.CanUseMagicSync))
 	automationGroup.Get("", automationHandler.ListRules)
 	automationGroup.Post("", automationHandler.CreateRule)
 	automationGroup.Post("/blast", automationHandler.HandleBlast)
