@@ -7,6 +7,7 @@ import (
 	"net/http"
 	url "net/url"
 	"os"
+	"sync"
 	"time"
 
 	"example.com/creati/backend/internal/db/models"
@@ -46,7 +47,143 @@ func NewYouTubeService(db *sql.DB) *YouTubeService {
 	}
 }
 
-// GetAuthURL returns the OAuth URL for user authorization
+// DBTokenSource wraps oauth2.TokenSource to persist updates to the database
+type DBTokenSource struct {
+	src       oauth2.TokenSource
+	db        *sql.DB
+	accountID int
+	mu        sync.Mutex
+	lastToken *oauth2.Token
+}
+
+func (s *DBTokenSource) Token() (*oauth2.Token, error) {
+	t, err := s.src.Token()
+	if err != nil {
+		return nil, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Check if token has changed (access or refresh) and needs saving
+	// We save if it's the first time checking (lastToken == nil) AND it's different from what we thought,
+	// OR if it explicitly changed from the last known state.
+	// Actually, simpler: if t.AccessToken != s.lastToken.AccessToken, save it.
+	if s.lastToken == nil || t.AccessToken != s.lastToken.AccessToken || t.RefreshToken != s.lastToken.RefreshToken {
+		// Encrypt tokens
+		encAccess, err := utils.Encrypt(t.AccessToken)
+		if err != nil {
+			fmt.Printf("Failed to encrypt new access token: %v\n", err)
+			return t, nil // return token even if save fails, to keep working
+		}
+
+		// If refresh token is empty in new token, likely it didn't change (OAuth2 standard),
+		// but we should keep the old one in DB.
+		// However, query expects a value.
+		// If t.RefreshToken is empty, we should use s.lastToken.RefreshToken if available.
+		refreshToken := t.RefreshToken
+		if refreshToken == "" && s.lastToken != nil {
+			refreshToken = s.lastToken.RefreshToken
+		}
+
+		encRefresh, err := utils.Encrypt(refreshToken)
+		if err != nil {
+			fmt.Printf("Failed to encrypt new refresh token: %v\n", err)
+			return t, nil
+		}
+
+		// Update DB
+		// Note: We only update if we have an ID (which we do)
+		_, err = s.db.Exec(`
+			UPDATE platform_accounts 
+			SET access_token = $1, refresh_token = $2, status = 'connected', connected_at = NOW() 
+			WHERE id = $3
+		`, encAccess, encRefresh, s.accountID)
+
+		if err != nil {
+			fmt.Printf("Failed to persist refreshed token: %v\n", err)
+		} else {
+			fmt.Printf("🔄 Refreshed and saved new YouTube token for account %d\n", s.accountID)
+			s.lastToken = t
+			// Ensure we keep the valid refresh token in memory if the new one was blank
+			if s.lastToken.RefreshToken == "" {
+				s.lastToken.RefreshToken = refreshToken
+			}
+		}
+	}
+
+	return t, nil
+}
+
+func (y *YouTubeService) getClient(ctx context.Context, accountID int) (*http.Client, error) {
+	var encAccess, encRefresh string
+	err := y.db.QueryRow(
+		"SELECT access_token, refresh_token FROM platform_accounts WHERE id = $1", accountID,
+	).Scan(&encAccess, &encRefresh)
+	if err != nil {
+		return nil, fmt.Errorf("account not found: %w", err)
+	}
+
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt access token: %w", err)
+	}
+	refreshToken, err := utils.Decrypt(encRefresh)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt refresh token: %w", err)
+	}
+
+	// Initial token
+	token := &oauth2.Token{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		Expiry:       time.Now().Add(-1 * time.Minute), // Force check/refresh if needed (Expiry not stored, so assuming expired is safer, or let wrapper handle it?)
+		// Actually, if we don't store expiry, we can't be sure.
+		// If we set Expiry to past, TokenSource will immediately try to refresh.
+		// Setting it to zero time means "never expires" or "unknown", usually triggers refresh if checking.
+		// Let's rely on 401? No, oauth2 library checks expiry.
+		// If we don't know expiry, best to set it to Now() so it checks.
+	}
+	// Better: If we persist expiry in DB we'd know. Since we don't, we might cause a refresh on every new client creation
+	// which is every request. That's aggressive.
+	// But without expiry, we risk 401.
+	// Compromise: Set expiry to Now() - 1 sec to force a refresh IF it's actually invalid?
+	// No, if the token IS valid, we waste a refresh.
+	// API calls with invalid token usually return 401, but the library might auto-refresh then?
+	// oauth2.ReuseTokenSource logic: if t.Valid(), use it. Valid() checks expiry.
+	// If we don't set expiry, Valid() returns true (if expiry is zero)? No, Valid() returns !expiry.IsZero() && expiry.After(now).
+	// So if zero, it's considered valid? No, usually invalid.
+	// Actually, failing to set Expiry usually means it's assumed valid eternally or invalid immediately depending on impl.
+	// Let's set it to time.Time{} (zero). oauth2 checks: `if t.Expiry.IsZero() { return false }` -> considered invalid?
+	// Wait, we want to start with the stored token.
+	// If we refresh on every request, we hit rate limits.
+	// We really should store expiry.
+	// Since we don't, maybe we just assume it's valid for now?
+	// Or we just accept the cost for this fix since the user is blocked.
+	// Let's set it to valid for 1 minute?
+	// If we set it to time.Now(), it's expired.
+	// Let's try to fetch user info or something cheap? No.
+	// Given we are refactoring to fix a bug where it NEVER refreshed, let's allow it to refresh.
+	// BUT, if we save the NEW token, we want `lastToken` to be updated.
+	// If we constantly refresh, we constantly write to DB.
+	// Solution: Use the `expiry` from the REFRESHED token.
+	// But on fresh boot/request, we don't know it.
+	// Maybe we just let it refresh once per request context?
+	// Ideally we add `expires_at` to DB.
+	// For now, I'll set Expiry to Now so it refreshes. It preserves correctness at cost of performance.
+	token.Expiry = time.Now().Add(-1 * time.Second)
+
+	ts := y.oauthConfig.TokenSource(ctx, token)
+
+	dbTS := &DBTokenSource{
+		src:       ts,
+		db:        y.db,
+		accountID: accountID,
+		lastToken: token,
+	}
+
+	return oauth2.NewClient(ctx, dbTS), nil
+}
 func (y *YouTubeService) GetAuthURL(state string) string {
 	config := *y.oauthConfig
 	config.RedirectURL = fmt.Sprintf("%s/platforms/youtube/callback", os.Getenv("FRONTEND_URL"))
@@ -157,33 +294,13 @@ func (y *YouTubeService) Authenticate(code string, userID int) error {
 // Upload implements Platform interface
 // Uploads video to YouTube and returns YouTube video ID
 func (y *YouTubeService) Upload(video *models.Video, accountID int) (string, error) {
-	var encAccess, encRefresh string
-	err := y.db.QueryRow(
-		"SELECT access_token, refresh_token FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&encAccess, &encRefresh)
-	if err != nil {
-		return "", fmt.Errorf("account not found: %w", err)
-	}
-
-	// Decrypt tokens
-	accessToken, err := utils.Decrypt(encAccess)
-	if err != nil {
-		return "", fmt.Errorf("failed to decrypt access token: %w", err)
-	}
-	refreshToken, err := utils.Decrypt(encRefresh)
-	if err != nil {
-		return "", fmt.Errorf("failed to decrypt refresh token: %w", err)
-	}
-
-	// Create OAuth2 token
-	token := &oauth2.Token{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-	}
-
 	// Create YouTube client
 	ctx := context.Background()
-	client := y.oauthConfig.Client(ctx, token)
+	client, err := y.getClient(ctx, accountID)
+	if err != nil {
+		return "", err
+	}
+
 	service, err := youtube.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		return "", fmt.Errorf("failed to create youtube service: %w", err)
@@ -226,30 +343,12 @@ func (y *YouTubeService) GetStatus(platformVideoID string) (string, error) {
 
 // FetchAnalytics implements Platform interface
 func (y *YouTubeService) FetchAnalytics(platformVideoID string, accountID int) (*Analytics, error) {
-	var encAccess, encRefresh string
-	err := y.db.QueryRow(
-		"SELECT access_token, refresh_token FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&encAccess, &encRefresh)
-	if err != nil {
-		return nil, fmt.Errorf("account not found: %w", err)
-	}
-
-	accessToken, err := utils.Decrypt(encAccess)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt access token: %w", err)
-	}
-	refreshToken, err := utils.Decrypt(encRefresh)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt refresh token: %w", err)
-	}
-
-	token := &oauth2.Token{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-	}
-
 	ctx := context.Background()
-	client := y.oauthConfig.Client(ctx, token)
+	client, err := y.getClient(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+
 	service, err := youtube.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create youtube service: %w", err)
@@ -308,20 +407,12 @@ func (y *YouTubeService) SubscribeToChannel(channelID string) error {
 
 // FetchRecentVideos retrieves the most recent uploads from the channel
 func (y *YouTubeService) FetchRecentVideos(accountID int) ([]ExternalVideo, error) {
-	var encAccess string
-	err := y.db.QueryRow("SELECT access_token FROM platform_accounts WHERE id = $1", accountID).Scan(&encAccess)
-	if err != nil {
-		return nil, fmt.Errorf("account not found: %w", err)
-	}
-
-	accessToken, err := utils.Decrypt(encAccess)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt token: %w", err)
-	}
-
 	ctx := context.Background()
-	token := &oauth2.Token{AccessToken: accessToken}
-	client := y.oauthConfig.Client(ctx, token)
+	client, err := y.getClient(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+
 	service, err := youtube.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		return nil, err
