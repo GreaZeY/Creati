@@ -3,8 +3,8 @@ package middleware
 import (
 	"database/sql"
 
-	"example.com/creati/backend/internal/features"
-	"example.com/creati/backend/internal/utils"
+	"creati.in/creati/backend/internal/features"
+	"creati.in/creati/backend/internal/utils"
 	"github.com/gofiber/fiber/v2"
 )
 

@@ -5,9 +5,9 @@ import (
 	"os"
 	"time"
 
-	"example.com/creati/backend/internal/db/models"
-	"example.com/creati/backend/internal/features"
-	"example.com/creati/backend/internal/utils"
+	"creati.in/creati/backend/internal/db/models"
+	"creati.in/creati/backend/internal/features"
+	"creati.in/creati/backend/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"

@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"example.com/creati/backend/internal/logger"
+	"creati.in/creati/backend/internal/logger"
 	"golang.org/x/sync/errgroup"
 )
 

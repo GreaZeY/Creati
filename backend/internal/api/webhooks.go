@@ -6,8 +6,8 @@ import (
 	"io"
 	"log"
 
-	"example.com/creati/backend/internal/events"
-	"example.com/creati/backend/internal/middleware"
+	"creati.in/creati/backend/internal/events"
+	"creati.in/creati/backend/internal/middleware"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 )

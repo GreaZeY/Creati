@@ -5,9 +5,9 @@ import (
 	"log"
 	"strconv"
 
-	"example.com/creati/backend/internal/middleware"
-	"example.com/creati/backend/internal/services"
-	"example.com/creati/backend/internal/utils"
+	"creati.in/creati/backend/internal/middleware"
+	"creati.in/creati/backend/internal/services"
+	"creati.in/creati/backend/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
 )

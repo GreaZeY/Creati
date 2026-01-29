@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"example.com/creati/backend/internal/db/models"
+	"creati.in/creati/backend/internal/db/models"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/facebook"
 
-	"example.com/creati/backend/internal/utils"
+	"creati.in/creati/backend/internal/utils"
 )
 
 /**

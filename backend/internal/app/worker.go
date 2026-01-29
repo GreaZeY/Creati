@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"time"
 
-	"example.com/creati/backend/internal/logger"
-	"example.com/creati/backend/internal/services"
+	"creati.in/creati/backend/internal/logger"
+	"creati.in/creati/backend/internal/services"
 	"github.com/sirupsen/logrus"
 )
 

@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"example.com/creati/backend/internal/events"
-	"example.com/creati/backend/internal/logger"
+	"creati.in/creati/backend/internal/events"
+	"creati.in/creati/backend/internal/logger"
 	"github.com/sirupsen/logrus"
 )
 

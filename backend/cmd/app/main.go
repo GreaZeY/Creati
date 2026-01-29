@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"example.com/creati/backend/internal/app"
+	"creati.in/creati/backend/internal/app"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )

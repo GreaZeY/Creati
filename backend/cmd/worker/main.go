@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"example.com/creati/backend/internal/db/models"
-	"example.com/creati/backend/internal/logger"
-	"example.com/creati/backend/internal/services"
+	"creati.in/creati/backend/internal/db/models"
+	"creati.in/creati/backend/internal/logger"
+	"creati.in/creati/backend/internal/services"
 	"github.com/joho/godotenv"
 	"github.com/kkdai/youtube/v2"
 	_ "github.com/lib/pq"

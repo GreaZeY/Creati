@@ -3,7 +3,7 @@ package services
 import (
 	"time"
 
-	"example.com/creati/backend/internal/db/models"
+	"creati.in/creati/backend/internal/db/models"
 )
 
 /**

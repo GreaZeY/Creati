@@ -10,10 +10,10 @@ import (
 	"os"
 	"strings"
 
-	"example.com/creati/backend/internal/db/models"
+	"creati.in/creati/backend/internal/db/models"
 	"golang.org/x/oauth2"
 
-	"example.com/creati/backend/internal/utils"
+	"creati.in/creati/backend/internal/utils"
 )
 
 /**

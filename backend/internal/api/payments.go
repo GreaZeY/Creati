@@ -9,9 +9,9 @@ import (
 	"os"
 	"strings"
 
-	"example.com/creati/backend/internal/features"
-	"example.com/creati/backend/internal/middleware"
-	"example.com/creati/backend/internal/utils"
+	"creati.in/creati/backend/internal/features"
+	"creati.in/creati/backend/internal/middleware"
+	"creati.in/creati/backend/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/razorpay/razorpay-go"

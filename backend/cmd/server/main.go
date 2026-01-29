@@ -8,11 +8,11 @@ import (
 	"os"
 	"time"
 
-	"example.com/creati/backend/internal/api"
-	"example.com/creati/backend/internal/features"
-	"example.com/creati/backend/internal/middleware"
-	"example.com/creati/backend/internal/services"
-	"example.com/creati/backend/internal/workers"
+	"creati.in/creati/backend/internal/api"
+	"creati.in/creati/backend/internal/features"
+	"creati.in/creati/backend/internal/middleware"
+	"creati.in/creati/backend/internal/services"
+	"creati.in/creati/backend/internal/workers"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
