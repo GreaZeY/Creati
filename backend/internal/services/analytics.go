@@ -15,13 +15,22 @@ func NewAnalyticsService(db *sql.DB) *AnalyticsService {
 	return &AnalyticsService{db: db}
 }
 
+// PlatformStat represents metrics per platform
+type PlatformStat struct {
+	Platform string  `json:"platform"`
+	Views    int64   `json:"views"`
+	Revenue  float64 `json:"revenue"`
+}
+
 // UserStats represents aggregated user metrics
 type UserStats struct {
-	TotalVideos   int   `json:"totalVideos"`
-	TotalViews    int64 `json:"totalViews"`
-	TotalLikes    int64 `json:"totalLikes"`
-	TotalComments int64 `json:"totalComments"`
-	TotalShares   int64 `json:"totalShares"`
+	TotalVideos      int            `json:"totalVideos"`
+	TotalViews       int64          `json:"totalViews"`
+	TotalLikes       int64          `json:"totalLikes"`
+	TotalComments    int64          `json:"totalComments"`
+	TotalShares      int64          `json:"totalShares"`
+	PlatformBreakdown []PlatformStat `json:"platformBreakdown"`
+	ProjectedRevenue  float64        `json:"projectedRevenue"`
 }
 
 // VideoStats represents aggregated video metrics
@@ -37,9 +46,11 @@ type VideoStats struct {
 
 // GetUserStats fetches aggregated stats from view (Fast)
 func (s *AnalyticsService) GetUserStats(userID int) (*UserStats, error) {
-	stats := &UserStats{}
+	stats := &UserStats{
+		PlatformBreakdown: []PlatformStat{},
+	}
 
-	// Query the optimized view
+	// 1. Core aggregates
 	err := s.db.QueryRow(`
 		SELECT total_videos, total_views, total_likes, total_comments, total_shares
 		FROM vw_user_stats WHERE user_id = $1
@@ -47,12 +58,34 @@ func (s *AnalyticsService) GetUserStats(userID int) (*UserStats, error) {
 		&stats.TotalVideos, &stats.TotalViews, &stats.TotalLikes, &stats.TotalComments, &stats.TotalShares,
 	)
 
-	if err == sql.ErrNoRows {
-		return &UserStats{}, nil // Return empty stats for new users
-	}
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}
+
+	// 2. Fetch platform breakdown
+	rows, err := s.db.Query(`
+		SELECT platform, COALESCE(SUM(views), 0)
+		FROM (
+			SELECT DISTINCT ON (video_id, account_id) platform, views
+			FROM video_analytics
+			WHERE video_id IN (SELECT id FROM videos WHERE user_id = $1)
+			ORDER BY video_id, account_id, fetched_at DESC
+		) latest_per_account
+		GROUP BY platform
+	`, userID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var p PlatformStat
+			if err := rows.Scan(&p.Platform, &p.Views); err == nil {
+				// Mock revenue calculation: $2.00 per 1k views (generic RPM)
+				p.Revenue = float64(p.Views) * 0.002
+				stats.PlatformBreakdown = append(stats.PlatformBreakdown, p)
+				stats.ProjectedRevenue += p.Revenue
+			}
+		}
+	}
+
 	return stats, nil
 }
 

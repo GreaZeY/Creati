@@ -10,10 +10,11 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  Database,
 } from "lucide-react";
 import { automationAPI } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
+import { LensedCard } from "@/components/ui/LensedCard";
 import { Link } from "react-router-dom";
 import { toast } from "@/lib/events";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
@@ -43,42 +44,44 @@ function BlastProgress({ ruleId }: { ruleId: number }) {
   const isFinished = summary.completed + summary.failed === summary.total;
 
   return (
-    <div className="mt-4 space-y-3">
-      <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
+    <div className="mt-6 space-y-4">
+      <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-[0.2em]">
         <div className="flex items-center gap-2">
           {isFinished ? (
             <span className="text-primary flex items-center gap-1">
-              <CheckCircle2 size={12} /> ALL PUBLISHED
+              <CheckCircle2 size={12} /> SYNC_COMPLETE
             </span>
           ) : summary.processing > 0 ? (
-            <span className="text-yellow-500 flex items-center gap-1">
-              <Loader2 size={12} className="animate-spin" /> BLASTING...
+            <span className="text-cyan-400 flex items-center gap-1">
+              <Loader2 size={12} className="animate-spin" /> DISPATCHING...
             </span>
           ) : (
-            <span className="text-muted-foreground">QUEUED</span>
+            <span className="text-muted-foreground/40 text-[8px]">
+              UPLINK_STANDBY
+            </span>
           )}
         </div>
-        <span className="opacity-60">
-          {summary.completed} / {summary.total} SHOTS FIRED
+        <span className="opacity-40">
+          {summary.completed} / {summary.total} NODES_REACHED
         </span>
       </div>
 
-      <div className="h-2 w-full bg-secondary/30 rounded-full overflow-hidden border border-border/20">
+      <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden p-[1px] border border-white/5">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
           className={cn(
-            "h-full transition-all duration-500",
+            "h-full transition-all duration-700 rounded-full",
             isFinished
-              ? "bg-primary shadow-[0_0_10px_rgba(var(--primary),0.5)]"
-              : "bg-primary/60",
+              ? "bg-primary shadow-[0_0_15px_rgba(var(--primary),0.6)]"
+              : "bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.4)]",
           )}
         />
       </div>
 
       {summary.failed > 0 && (
-        <p className="text-[10px] font-bold text-destructive flex items-center gap-1">
-          <XCircle size={10} /> {summary.failed} MISSES
+        <p className="text-[9px] font-black text-red-500 flex items-center gap-1 uppercase tracking-widest">
+          <XCircle size={10} /> {summary.failed} DROPS_DETECTED
         </p>
       )}
     </div>
@@ -101,19 +104,13 @@ export function ArchiveBlast() {
 
   // Real-time SSE Connection
   useEffect(() => {
-    // SSE endpoint requires a protocol and host
     const url = `${import.meta.env.VITE_API_BASE || "http://localhost:8080/api"}/realtime/blasts`;
-    // Note: EventSource doesn't support custom headers (like Auth) by default.
-    // However, our backend check can be relaxed for this read-only stream or
-    // we can use a library or a temporary token if session cookies aren't enough.
-    // For now, assuming session cookies (web) are used.
     const eventSource = new EventSource(url, { withCredentials: true });
 
     eventSource.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         if (data.type === "blast_update") {
-          // Invalidate specific rule job summary to trigger UI refresh
           queryClient.invalidateQueries({
             queryKey: ["blast-summary", data.ruleId],
           });
@@ -121,10 +118,6 @@ export function ArchiveBlast() {
       } catch (err) {
         console.error("SSE parse error:", err);
       }
-    };
-
-    eventSource.onerror = (err) => {
-      console.warn("SSE connection error, will reconnect:", err);
     };
 
     return () => {
@@ -136,125 +129,133 @@ export function ArchiveBlast() {
     mutationFn: (id: number) => automationAPI.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["automation-rules"] });
-      toast.success("Blast history cleared.");
+      toast.success("Operational history cleared.");
     },
   });
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs font-black uppercase tracking-widest animate-pulse">
-          Raiding Archive...
+      <div className="flex flex-col items-center justify-center min-h-[500px] gap-6">
+        <div className="w-16 h-16 border-2 border-primary border-t-transparent rounded-full animate-spin shadow-[0_0_30px_rgba(var(--primary),0.2)]" />
+        <p className="text-[10px] font-black uppercase tracking-[0.5em] animate-pulse text-primary/60">
+          Syncing Neural Vault...
         </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-10 pb-20 max-w-6xl mx-auto px-4">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
+    <div className="space-y-12 pb-20 max-w-7xl mx-auto px-4 font-outfit">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-8 pb-4">
+        <div className="space-y-2">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-primary/10 rounded-lg text-primary">
+            <div className="p-2 bg-primary/10 rounded-xl text-primary border border-primary/20">
               <Rocket size={24} fill="currentColor" />
             </div>
-            <h1 className="text-4xl font-black tracking-tighter uppercase italic">
+            <h1 className="text-6xl font-black tracking-tighter uppercase italic">
               Quick Blast
             </h1>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">
-            Manual video distribution. Raid your vault and fire 'em off
-            everywhere instantly.
+          <p className="text-muted-foreground text-xl font-medium max-w-lg">
+            Rapid fire distribution. Sectorized asset broadcasting across all
+            active nodes.
           </p>
         </div>
-        <Link to="/blast/new">
-          <Button
-            size="lg"
-            className="h-14 px-10 rounded-2xl font-black text-lg gap-3 shadow-[0_10px_30px_rgba(var(--primary),0.2)] hover:scale-105 active:scale-95 transition-all"
-          >
-            NEW BLAST <Zap size={20} className="fill-current" />
-          </Button>
-        </Link>
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <Link to="/blast/new">
+            <Button
+              size="lg"
+              className="h-16 px-10 rounded-2xl bg-primary text-slate-950 font-black text-lg gap-3 hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(var(--primary),0.3)] group border-0"
+            >
+              NEW BLAST <Zap size={20} className="fill-current" />
+            </Button>
+          </Link>
+        </motion.div>
       </header>
 
       {rules.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center p-20 text-center border-4 border-dashed border-primary/10 bg-primary/5 rounded-[3rem]">
-          <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-            <Rocket className="text-primary animate-bounce" size={48} />
+        <LensedCard className="py-32 flex flex-col items-center justify-center text-center border-dashed border-2 border-white/5">
+          <div className="w-24 h-24 rounded-3xl bg-white/5 flex items-center justify-center mb-8 ring-1 ring-white/10 group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700">
+            <Database
+              className="text-primary opacity-40 blur-[1px]"
+              size={48}
+            />
           </div>
-          <h3 className="text-3xl font-black italic mb-2 tracking-tight">
-            VAULT IS FULL? 💀
+          <h3 className="text-4xl font-black uppercase italic tracking-tighter mb-4">
+            VAULT_STANDBY
           </h3>
-          <p className="text-muted-foreground font-medium max-w-md">
-            Got some archive bangers that need more eyeballs? Blast them across
-            all platforms in seconds.
+          <p className="text-muted-foreground font-medium max-w-md text-lg opacity-60">
+            No active broadcast history detected. Prime your vault for a
+            wide-sector blast.
           </p>
-          <Link to="/blast/new" className="mt-8">
-            <Button size="lg" className="rounded-xl px-12 h-12 font-bold gap-2">
-              START YOUR FIRST BLAST
+          <Link to="/blast/new" className="mt-12">
+            <Button
+              size="lg"
+              className="h-16 px-12 rounded-2xl bg-white text-black font-black text-lg hover:scale-105 active:scale-95 transition-all"
+            >
+              INITIALIZE FIRST BLAST
             </Button>
           </Link>
-        </Card>
+        </LensedCard>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <AnimatePresence mode="popLayout">
             {rules.map((rule: any) => (
               <motion.div
                 key={rule.id}
                 layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
               >
-                <Card className="group relative p-6 h-full bg-card/60 border-border/40 hover:border-linear transition-all duration-500 overflow-hidden flex flex-col">
-                  {/* Background Flair */}
-                  <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                    <Rocket size={100} className="-rotate-45" />
-                  </div>
-
-                  <div className="flex justify-between items-start mb-6">
+                <LensedCard className="group h-full flex flex-col p-8">
+                  <div className="flex justify-between items-start mb-8">
                     <div>
-                      <h3 className="font-black text-xl tracking-tight uppercase italic truncate max-w-[250px]">
+                      <h3 className="font-black text-2xl tracking-tighter uppercase italic truncate max-w-[280px]">
                         {rule.name}
                       </h3>
-                      <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest mt-1">
+                      <div className="flex items-center gap-2 text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] mt-2">
                         <Clock size={10} />{" "}
                         {new Date(rule.createdAt).toLocaleDateString()}
                       </div>
                     </div>
                     <button
                       onClick={() => setRuleToDelete(rule.id)}
-                      className="p-2 text-muted-foreground/40 hover:text-destructive transition-colors rounded-lg bg-secondary/20"
+                      className="p-3 text-muted-foreground/30 hover:text-red-400 transition-all rounded-xl bg-white/5 hover:bg-red-500/10"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={18} />
                     </button>
                   </div>
 
-                  <div className="flex-1 space-y-4">
+                  <div className="flex-1 space-y-8">
                     {/* Source & Targets */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2 bg-primary/10 px-3 py-1.5 rounded-full border border-primary/20">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 bg-primary/10 px-4 py-2 rounded-xl border border-primary/20 ring-1 ring-primary/10">
                         <PlatformLogo
                           platform={rule.sourceAccount.platform}
-                          size={14}
+                          size={16}
+                          className="text-primary"
                         />
-                        <span className="text-[10px] font-black uppercase text-primary">
-                          Source
+                        <span className="text-[10px] font-black uppercase tracking-widest text-primary">
+                          SRC
                         </span>
                       </div>
                       <ArrowRight
-                        size={14}
-                        className="text-muted-foreground/40"
+                        size={16}
+                        className="text-muted-foreground/20"
                       />
-                      <div className="flex -space-x-2">
+                      <div className="flex -space-x-3">
                         {rule.targets.map((t: any) => (
                           <div
                             key={t.accountId}
-                            className="w-8 h-8 rounded-full border-2 border-card bg-secondary flex items-center justify-center shadow-lg"
+                            className="w-10 h-10 rounded-full border-2 border-[#0a0a0c] bg-white/5 flex items-center justify-center shadow-2xl ring-1 ring-white/5 group-hover:ring-primary/20 transition-all"
                             title={t.platform}
                           >
-                            <PlatformLogo platform={t.platform} size={14} />
+                            <PlatformLogo platform={t.platform} size={16} />
                           </div>
                         ))}
                       </div>
@@ -262,7 +263,7 @@ export function ArchiveBlast() {
 
                     <BlastProgress ruleId={rule.id} />
                   </div>
-                </Card>
+                </LensedCard>
               </motion.div>
             ))}
           </AnimatePresence>
@@ -279,9 +280,9 @@ export function ArchiveBlast() {
           }
         }}
         isLoading={deleteMutation.isPending}
-        title="CLEAR BLAST HISTORY"
-        description="This will remove this blast from your dashboard. It won't affect any videos already sent."
-        confirmText="CLEAR IT"
+        title="PURGE SESSION?"
+        description="This will permanently delete this operational sync record from the vault. Irreversible action."
+        confirmText="PURGE RECORD"
         variant="danger"
       />
     </div>
