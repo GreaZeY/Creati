@@ -126,8 +126,8 @@ func main() {
 		authHandler := api.NewAuthHandler(db)
 		platformHandler := api.NewPlatformHandler(db, cacheService)
 		uploadHandler := api.NewUploadHandler(storageService, queueService, db)
-		videosHandler := api.NewVideosHandler(db)
-		analyticsHandler := api.NewAnalyticsHandler(db, queueService)
+		videosHandler := api.NewVideosHandler(db, cacheService)
+		analyticsHandler := api.NewAnalyticsHandler(db, queueService, cacheService)
 		automationService := services.NewAutomationService(db, queueService)
 		automationHandler := api.NewAutomationHandler(db, automationService)
 		paymentHandler := api.NewPaymentHandler(db)
@@ -231,7 +231,8 @@ func main() {
 	fmt.Println("API: http://localhost:" + port)
 	fmt.Println("Health: http://localhost:" + port + "/health")
 	fmt.Println("========================================")
-	log.Fatal(app.Listen(":" + port))
+		log.Fatal(app.Listen(":" + port))
+	}
 }
 
 // Custom error handler for better error responses

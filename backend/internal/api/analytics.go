@@ -14,9 +14,9 @@ type AnalyticsHandler struct {
 	queue   *services.QueueService
 }
 
-func NewAnalyticsHandler(db *sql.DB, queue *services.QueueService) *AnalyticsHandler {
+func NewAnalyticsHandler(db *sql.DB, queue *services.QueueService, cache *services.CacheService) *AnalyticsHandler {
 	return &AnalyticsHandler{
-		service: services.NewAnalyticsService(db),
+		service: services.NewAnalyticsService(db, cache),
 		queue:   queue,
 	}
 }

@@ -132,14 +132,32 @@ func ProcessJob(db *sql.DB, storage *services.StorageService, throttle *services
 		return err
 	}
 
-	// 5. Update job status to completed
-	_, err = db.Exec(`
+	// 5. Update job status to completed and update main video record with external reference
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`
 		UPDATE video_platform_jobs 
 		SET status = $1, platform_id = $2, updated_at = NOW() 
 		WHERE id = $3
 	`, models.JobStatusCompleted, platformVideoID, job.JobID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
 
-	return err
+	// Also update the main video record with external reference for easier tracking
+	_, err = tx.Exec(`
+		UPDATE videos SET external_id = $1, platform = $2 WHERE id = $3 AND (external_id IS NULL OR external_id = '')
+	`, platformVideoID, job.Platform, job.VideoID)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func HandleAutomationJob(db *sql.DB, storage *services.StorageService, throttle *services.ThrottleService, job *services.UploadJob) error {
@@ -227,7 +245,7 @@ func HandleAutomationJob(db *sql.DB, storage *services.StorageService, throttle 
 
 	// 3. Stage in Storage
 	s3Key := fmt.Sprintf("automation/%d/%d_%s.mp4", userID, job.AutomationJobID, job.SourceVideoID)
-	logger.Get("automation").WithField("key", s3Key).Info("Uploading to storage...")
+	logger.Get("automation").WithField("url", s3Key).Info("Uploading to storage...")
 
 	uploadCtx, uploadCancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer uploadCancel()
@@ -240,13 +258,24 @@ func HandleAutomationJob(db *sql.DB, storage *services.StorageService, throttle 
 	s3URL := storage.GetObjectURL(s3Key)
 	logger.Get("automation").WithField("url", s3URL).Info("Upload successful!")
 
-	// 4. Create transient Video model
+	// 4. Create and persist Video model so it's tracked in Creati
 	video := &models.Video{
 		UserID:      userID,
 		Title:       videoMetadata.Title,
 		Description: fmt.Sprintf("Automatically synced from YouTube: %s\n\nRule: %s", videoMetadata.Description, ruleName),
 		S3URL:       s3URL,
 	}
+
+	var newVideoID int
+	err = db.QueryRow(`
+		INSERT INTO videos (user_id, title, description, s3_url, status)
+		VALUES ($1, $2, $3, $4, 'synced')
+		RETURNING id
+	`, video.UserID, video.Title, video.Description, video.S3URL).Scan(&newVideoID)
+	if err != nil {
+		return fmt.Errorf("failed to persist automation video: %w", err)
+	}
+	video.ID = newVideoID
 
 	// 5. Proceed with normal Upload
 	logger.Get("automation").WithField("platform", job.Platform).Info("Pushing to target platform...")
@@ -265,7 +294,19 @@ func HandleAutomationJob(db *sql.DB, storage *services.StorageService, throttle 
 		"platform_video_id": platformVideoID,
 	}).Info("Automation redistributed")
 
-	// 6. Final Status Update
+	// 6. Record as a completed platform job so analytics will track it
+	_, err = db.Exec(`
+		INSERT INTO video_platform_jobs (video_id, account_id, platform, platform_id, status)
+		VALUES ($1, $2, $3, $4, 'completed')
+	`, video.ID, job.AccountID, job.Platform, platformVideoID)
+	if err != nil {
+		logger.Get("automation").WithError(err).Warn("Failed to create platform job record for automation video")
+	}
+
+	// 7. Update main video record with external ID
+	db.Exec(`UPDATE videos SET external_id = $1, platform = $2 WHERE id = $3`, platformVideoID, job.Platform, video.ID)
+
+	// 8. Final Status Update
 	_, err = db.Exec(`
 		UPDATE automation_jobs 
 		SET status = 'completed', updated_at = NOW() 

@@ -1,18 +1,21 @@
 package services
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"time"
 )
 
 // AnalyticsService handles efficient stats gathering and caching
 type AnalyticsService struct {
-	db *sql.DB
+	db    *sql.DB
+	cache *CacheService
 }
 
-func NewAnalyticsService(db *sql.DB) *AnalyticsService {
-	return &AnalyticsService{db: db}
+func NewAnalyticsService(db *sql.DB, cache *CacheService) *AnalyticsService {
+	return &AnalyticsService{db: db, cache: cache}
 }
 
 // PlatformStat represents metrics per platform
@@ -109,7 +112,10 @@ func (s *AnalyticsService) GetVideoStats(videoID int) (*VideoStats, error) {
 
 // SyncUserAnalytics triggers synchronization for all user's videos (Async friendly)
 func (s *AnalyticsService) SyncUserAnalytics(userID int) {
-	// Find all videos for user
+	// 1. Discover external videos first (ingest pre-existing platform content)
+	s.DiscoverVideos(userID)
+
+	// 2. Find all videos for user (now including newly discovered ones)
 	rows, err := s.db.Query("SELECT id FROM videos WHERE user_id = $1", userID)
 	if err != nil {
 		log.Printf("Failed to list videos for sync: %v", err)
@@ -180,5 +186,103 @@ func (s *AnalyticsService) SyncVideoAnalytics(videoID int) {
 		if err != nil {
 			log.Printf("Failed to save analytics snapshot: %v", err)
 		}
+	}
+}
+// DiscoverVideos pulls existing videos from connected platforms and registers them in Creati
+func (s *AnalyticsService) DiscoverVideos(userID int) {
+	// Throttle discovery to once every 6 hours per user
+	discoveryKey := fmt.Sprintf("discovery:user:%d", userID)
+	if s.cache != nil {
+		var last string
+		if err := s.cache.Get(context.Background(), discoveryKey, &last); err == nil {
+			log.Printf("Discovery throttle: Skipping for user %d (already ran recently)", userID)
+			return
+		}
+	}
+
+	// Find all connected accounts for user
+	rows, err := s.db.Query(`
+		SELECT id, platform, platform_user_id 
+		FROM platform_accounts 
+		WHERE user_id = $1 AND status = 'connected'
+	`, userID)
+	if err != nil {
+		log.Printf("Failed to list accounts for discovery: %v", err)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var accountID int
+		var platform, platformUserID string
+		if err := rows.Scan(&accountID, &platform, &platformUserID); err != nil {
+			continue
+		}
+
+		// Use factory to get service
+		svc, err := GetPlatformService(platform, s.db)
+		if err != nil {
+			continue
+		}
+
+		// Fetch recent videos from platform
+		externals, err := svc.FetchRecentVideos(accountID)
+		if err != nil {
+			log.Printf("Failed to fetch recent videos for %s account %d: %v", platform, accountID, err)
+			continue
+		}
+
+		for _, ev := range externals {
+			// 1. Check if this video is already tracked
+			var videoID int
+			err := s.db.QueryRow(`
+				SELECT video_id FROM video_platform_jobs 
+				WHERE platform = $1 AND platform_id = $2
+			`, platform, ev.ID).Scan(&videoID)
+
+			if err == nil {
+				// Already exists, skip
+				continue
+			}
+
+			// 2. Register as a shadow video in Creati
+			// We use a transaction to ensure both records are created
+			tx, err := s.db.Begin()
+			if err != nil {
+				continue
+			}
+
+			var newVideoID int
+			err = tx.QueryRow(`
+				INSERT INTO videos (user_id, title, description, platform, external_id, status)
+				VALUES ($1, $2, $3, $4, $5, 'synced')
+				RETURNING id
+			`, userID, ev.Title, ev.Description, platform, ev.ID).Scan(&newVideoID)
+
+			if err != nil {
+				tx.Rollback()
+				log.Printf("Failed to insert discovered video: %v", err)
+				continue
+			}
+
+			_, err = tx.Exec(`
+				INSERT INTO video_platform_jobs (video_id, account_id, platform, platform_id, status)
+				VALUES ($1, $2, $3, $4, 'completed')
+			`, newVideoID, accountID, platform, ev.ID)
+
+			if err != nil {
+				tx.Rollback()
+				log.Printf("Failed to insert discovery job: %v", err)
+				continue
+			}
+
+			tx.Commit()
+			log.Printf("Discovered and registered external video: %s (%s)", ev.Title, ev.ID)
+		}
+	}
+
+	// Mark as discovered in cache
+	if s.cache != nil {
+		s.cache.Set(context.Background(), discoveryKey, "ok", 6*time.Hour)
 	}
 }

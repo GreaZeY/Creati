@@ -1,13 +1,13 @@
 package services
 
 import (
-	"context"
+	"bufio"
 	"fmt"
 	"sync"
+	"time"
 
 	"creati.in/creati/backend/internal/logger"
 	"github.com/gofiber/fiber/v2"
-	"github.com/sirupsen/logrus"
 )
 
 type RealtimeService struct {
@@ -35,15 +35,16 @@ func (s *RealtimeService) HandleConnection(c *fiber.Ctx, userID int) error {
 	s.clients[userID] = append(s.clients[userID], messageChan)
 	s.clientsMux.Unlock()
 
-	logger.Get("realtime").WithField("user_id", userID).Info("New SSE connection")
+	// Capture the Done channel outside the goroutine as 'c' is pooled
+	done := c.Context().Done()
 
-	c.Context().SetBodyStreamWriter(func(w *fiber.Writer) {
-		keepAliveTicker := fiber.NewTicker(20 * fiber.Second)
+	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		keepAliveTicker := time.NewTicker(20 * time.Second)
 		defer keepAliveTicker.Stop()
 
 		for {
 			select {
-			case <-c.Context().Done():
+			case <-done:
 				s.removeClient(userID, messageChan)
 				return
 			case msg := <-messageChan:

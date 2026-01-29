@@ -16,10 +16,10 @@ type VideosHandler struct {
 	analyticsService *services.AnalyticsService
 }
 
-func NewVideosHandler(db *sql.DB) *VideosHandler {
+func NewVideosHandler(db *sql.DB, cache *services.CacheService) *VideosHandler {
 	return &VideosHandler{
 		db:               db,
-		analyticsService: services.NewAnalyticsService(db),
+		analyticsService: services.NewAnalyticsService(db, cache),
 	}
 }
 

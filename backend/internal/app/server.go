@@ -40,12 +40,17 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	// Static storage (for local driver)
 	app.Static("/storage", "./storage")
 
+	var cacheService *services.CacheService
+	if queueService != nil && queueService.Client != nil {
+		cacheService = services.NewCacheService(queueService.Client)
+	}
+
 	// Initialize handlers
 	authHandler := api.NewAuthHandler(db)
 	platformHandler := api.NewPlatformHandler(db)
 	uploadHandler := api.NewUploadHandler(storageService, queueService, db)
-	videosHandler := api.NewVideosHandler(db)
-	analyticsHandler := api.NewAnalyticsHandler(db)
+	videosHandler := api.NewVideosHandler(db, cacheService)
+	analyticsHandler := api.NewAnalyticsHandler(db, queueService, cacheService)
 	automationService := services.NewAutomationService(db, queueService)
 	automationHandler := api.NewAutomationHandler(db, automationService)
 	paymentHandler := api.NewPaymentHandler(db)
