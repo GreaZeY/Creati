@@ -58,6 +58,9 @@ func main() {
 	// 2. Initialize CacheService (needed for Handlers)
 	cacheService := services.NewCacheService(queueService.Client)
 
+	// 3. Initialize RealtimeService (SSE)
+	realtimeService := services.NewRealtimeService()
+
 	// 3. Initialize Storage
 	storageService, err := services.NewStorageService()
 	if err != nil {
@@ -77,7 +80,7 @@ func main() {
 
 	if startMode == "worker" || startMode == "all" {
 		// Event processor for upload detection
-		eventProcessor := workers.NewEventProcessor(db, dbURL, 30*time.Second, 50)
+		eventProcessor := workers.NewEventProcessor(db, dbURL, realtimeService, 30*time.Second, 50)
 		go eventProcessor.Start(ctx)
 		log.Println("✓ Event Processor started")
 	}
@@ -153,6 +156,12 @@ func main() {
 
 	// Auth Check
 	protected.Get("/auth/me", authHandler.CheckAuth)
+
+	// Realtime (SSE) - single connection for all blasts
+	protected.Get("/realtime/blasts", func(c *fiber.Ctx) error {
+		userID := middleware.GetUserID(c)
+		return realtimeService.HandleConnection(c, userID)
+	})
 
 	// Uploads
 	protected.Post("/upload/init", uploadHandler.InitUpload)

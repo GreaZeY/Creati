@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -34,14 +34,6 @@ function BlastProgress({ ruleId }: { ruleId: number }) {
     queryFn: async () => {
       const resp = await automationAPI.getBlastSummary(ruleId);
       return resp.data.data as BlastSummary;
-    },
-    refetchInterval: (query) => {
-      const data = query.state.data as BlastSummary | undefined;
-      if (!data) return 3000;
-      // Stop polling if all jobs are final
-      if (data.completed + data.failed === data.total && data.total > 0)
-        return false;
-      return 3000;
     },
   });
 
@@ -107,6 +99,39 @@ export function ArchiveBlast() {
     },
   });
 
+  // Real-time SSE Connection
+  useEffect(() => {
+    // SSE endpoint requires a protocol and host
+    const url = `${import.meta.env.VITE_API_BASE || "http://localhost:8080/api"}/realtime/blasts`;
+    // Note: EventSource doesn't support custom headers (like Auth) by default.
+    // However, our backend check can be relaxed for this read-only stream or
+    // we can use a library or a temporary token if session cookies aren't enough.
+    // For now, assuming session cookies (web) are used.
+    const eventSource = new EventSource(url, { withCredentials: true });
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === "blast_update") {
+          // Invalidate specific rule job summary to trigger UI refresh
+          queryClient.invalidateQueries({
+            queryKey: ["blast-summary", data.ruleId],
+          });
+        }
+      } catch (err) {
+        console.error("SSE parse error:", err);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.warn("SSE connection error, will reconnect:", err);
+    };
+
+    return () => {
+      eventSource.close();
+    };
+  }, [queryClient]);
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => automationAPI.delete(id),
     onSuccess: () => {
@@ -135,7 +160,7 @@ export function ArchiveBlast() {
               <Rocket size={24} fill="currentColor" />
             </div>
             <h1 className="text-4xl font-black tracking-tighter uppercase italic">
-              The Blast
+              Quick Blast
             </h1>
           </div>
           <p className="text-muted-foreground text-sm font-medium">

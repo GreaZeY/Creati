@@ -8,6 +8,7 @@ import (
 
 	"creati.in/creati/backend/internal/events"
 	"creati.in/creati/backend/internal/logger"
+	"creati.in/creati/backend/internal/services"
 	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 )
@@ -26,20 +27,22 @@ import (
  */
 
 type EventProcessor struct {
-	db         *sql.DB
-	dsn        string
-	eventStore *events.Store
-	interval   time.Duration
-	batchSize  int
+	db              *sql.DB
+	dsn             string
+	eventStore      *events.Store
+	realtimeService *services.RealtimeService
+	interval        time.Duration
+	batchSize       int
 }
 
-func NewEventProcessor(db *sql.DB, dsn string, interval time.Duration, batchSize int) *EventProcessor {
+func NewEventProcessor(db *sql.DB, dsn string, realtime *services.RealtimeService, interval time.Duration, batchSize int) *EventProcessor {
 	return &EventProcessor{
-		db:         db,
-		dsn:        dsn,
-		eventStore: events.NewStore(db),
-		interval:   interval,
-		batchSize:  batchSize,
+		db:              db,
+		dsn:             dsn,
+		eventStore:      events.NewStore(db),
+		realtimeService: realtime,
+		interval:        interval,
+		batchSize:       batchSize,
 	}
 }
 
@@ -59,10 +62,8 @@ func (p *EventProcessor) Start(ctx context.Context) {
 	}
 
 	listener := pq.NewListener(p.dsn, 10*time.Second, time.Minute, reportProblem)
-	err := listener.Listen("platform_event_inserted")
-	if err != nil {
-		log.Errorf("Failed to listen to channel: %v", err)
-	}
+	_ = listener.Listen("platform_event_inserted")
+	_ = listener.Listen("automation_job_updated") // New channel for SSE
 	defer listener.UnlistenAll()
 
 	// 2. Ticker for fallback polling (heartbeat)
@@ -88,12 +89,44 @@ func (p *EventProcessor) Start(ctx context.Context) {
 			if n == nil {
 				continue
 			}
-			log.WithField("channel", n.Channel).Debug("Received notification, processing...")
-			if err := p.processBatch(ctx); err != nil {
-				log.WithField("error", err).Error("Triggered batch processing failed")
+			log.WithFields(logrus.Fields{
+				"channel": n.Channel,
+				"extra":   n.Extra,
+			}).Debug("Received notification")
+
+			if n.Channel == "platform_event_inserted" {
+				if err := p.processBatch(ctx); err != nil {
+					log.WithField("error", err).Error("Triggered batch processing failed")
+				}
+			} else if n.Channel == "automation_job_updated" {
+				p.handleJobNotification(ctx, n.Extra)
 			}
 		}
 	}
+}
+
+// handleJobNotification reacts to status changes by broadcasting to SSE
+func (p *EventProcessor) handleJobNotification(ctx context.Context, jobIDStr string) {
+	var userID, ruleID int
+	err := p.db.QueryRowContext(ctx, `
+		SELECT ar.user_id, aj.rule_id 
+		FROM automation_jobs aj
+		JOIN automation_rules ar ON aj.rule_id = ar.id
+		WHERE aj.id = $1
+	`, jobIDStr).Scan(&userID, &ruleID)
+
+	if err != nil {
+		logger.Get("event_processor").WithField("error", err).Error("Failed to fetch user/rule for SSE broadcast")
+		return
+	}
+
+	// Payload for SSE
+	update := map[string]interface{}{
+		"type":   "blast_update",
+		"ruleId": ruleID,
+	}
+	msg, _ := json.Marshal(update)
+	p.realtimeService.Broadcast(userID, string(msg))
 }
 
 // processBatch fetches and processes a batch of pending events
