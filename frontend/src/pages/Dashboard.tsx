@@ -40,7 +40,7 @@ export const Dashboard = () => {
     queryKey: ["analytics-overview"],
     queryFn: async () => {
       const res = await analyticsAPI.getOverview();
-      return res.data;
+      return res.data.data;
     },
   });
 

@@ -1,4 +1,4 @@
-import { useRef, useState, ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 interface LensedCardProps {
@@ -39,7 +39,9 @@ export function LensedCard({ children, className, onClick }: LensedCardProps) {
         }}
       />
 
-      <div className="relative z-10 font-outfit">{children}</div>
+      <div className="relative z-10 font-outfit h-full flex flex-col">
+        {children}
+      </div>
     </div>
   );
 }

@@ -19,16 +19,18 @@ import {
   AreaChart,
   Area,
 } from "recharts";
+import { PlatformLogo } from "@/components/platforms/PlatformLogo";
+import { motion } from "framer-motion";
 
-// Mock data for the Pulse Chart (will be replaced by API)
-const pulseData = [
-  { name: "Mon", reach: 4500, engagement: 2400 },
-  { name: "Tue", reach: 5200, engagement: 1398 },
-  { name: "Wed", reach: 6800, engagement: 9800 },
-  { name: "Thu", reach: 7100, engagement: 3908 },
-  { name: "Fri", reach: 9100, engagement: 4800 },
-  { name: "Sat", reach: 12000, engagement: 3800 },
-  { name: "Sun", reach: 11000, engagement: 4300 },
+// Fallback mock data if no history yet
+const mockPulseData = [
+  { name: "Mon", reach: 0, engagement: 0 },
+  { name: "Tue", reach: 0, engagement: 0 },
+  { name: "Wed", reach: 0, engagement: 0 },
+  { name: "Thu", reach: 0, engagement: 0 },
+  { name: "Fri", reach: 0, engagement: 0 },
+  { name: "Sat", reach: 0, engagement: 0 },
+  { name: "Sun", reach: 0, engagement: 0 },
 ];
 
 export const Analytics = () => {
@@ -36,7 +38,7 @@ export const Analytics = () => {
     queryKey: ["analytics-overview"],
     queryFn: async () => {
       const res = await analyticsAPI.getOverview();
-      return res.data;
+      return res.data.data;
     },
   });
 
@@ -60,7 +62,10 @@ export const Analytics = () => {
       : "0.0";
   const engagementDensity =
     totalViews > 0 ? ((totalEngagement / totalViews) * 100).toFixed(1) : "0.0";
-  const projectedRevenue = (totalViews * 0.002).toFixed(2); // Mock RPV of $0.002
+  const projectedRevenue =
+    analytics?.projectedRevenue !== undefined
+      ? analytics.projectedRevenue.toFixed(2)
+      : (totalViews * 0.002).toFixed(2); // Fallback to mock RPV
 
   return (
     <div className="space-y-10 pb-20 max-w-7xl mx-auto px-4">
@@ -176,9 +181,16 @@ export const Analytics = () => {
               </span>
             </div>
           </div>
-          <div className="flex-1 w-full min-h-0">
+          <div className="flex-1 w-full min-h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={pulseData}>
+              <AreaChart
+                data={
+                  analytics?.pulseData?.length
+                    ? analytics.pulseData
+                    : mockPulseData
+                }
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              >
                 <defs>
                   <linearGradient id="colorReach" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3} />
@@ -197,7 +209,7 @@ export const Analytics = () => {
                 </defs>
                 <CartesianGrid
                   strokeDasharray="3 3"
-                  stroke="rgba(255,255,255,0.05)"
+                  stroke="rgba(255,255,255,0.1)"
                   vertical={false}
                 />
                 <XAxis
@@ -244,26 +256,67 @@ export const Analytics = () => {
           </div>
         </LensedCard>
 
-        <LensedCard className="flex flex-col justify-center items-center text-center p-10 border-dashed border-2 border-primary/10">
-          <div className="p-6 rounded-3xl bg-primary/5 mb-6 ring-1 ring-primary/10">
-            <TrendingUp className="w-12 h-12 text-primary/40 animate-pulse" />
+        <LensedCard className="flex flex-col p-10 border-primary/10">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="p-3 rounded-2xl bg-primary/10 ring-1 ring-primary/20">
+              <TrendingUp className="w-6 h-6 text-primary shadow-[0_0_15px_rgba(var(--primary),0.5)]" />
+            </div>
+            <h3 className="text-2xl font-black tracking-tighter italic uppercase">
+              Resonance Mapping
+            </h3>
           </div>
-          <h3 className="text-2xl font-black tracking-tighter italic uppercase mb-4">
-            Deep Resonance Mapping
-          </h3>
-          <p className="text-muted-foreground text-sm font-medium leading-relaxed opacity-60">
-            Our neural engine is analyzing platform-specific resonance.
-            Individual platform drill-downs arriving in next sync.
-          </p>
-          <div className="mt-8 grid grid-cols-2 gap-2 w-full">
-            {["LOYALTY", "DROPOFF", "GEO_SPARK", "CPM_TREND"].map((tag) => (
-              <div
-                key={tag}
-                className="text-[9px] font-black py-2 bg-white/5 rounded-lg border border-white/5 opacity-30 tracking-widest"
-              >
-                {tag}
+
+          <div className="flex-1 space-y-6">
+            {analytics?.platformBreakdown?.length ? (
+              analytics.platformBreakdown.map((platform: any) => (
+                <div key={platform.platform} className="space-y-2">
+                  <div className="flex justify-between items-end">
+                    <div className="flex items-center gap-2">
+                      <PlatformLogo
+                        platform={platform.platform}
+                        size={12}
+                        className="text-primary"
+                      />
+                      <span className="text-[10px] font-black uppercase tracking-widest opacity-50">
+                        {platform.platform}
+                      </span>
+                    </div>
+                    <span className="text-sm font-black tracking-tighter font-outfit">
+                      {formatNumber(platform.views)}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden ring-1 ring-white/5">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{
+                        width: `${
+                          totalViews > 0
+                            ? (platform.views / totalViews) * 100
+                            : 0
+                        }%`,
+                      }}
+                      className="h-full bg-primary/40 shadow-[0_0_10px_rgba(var(--primary),0.3)]"
+                    />
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 opacity-40 border-dashed border-2 border-white/5 rounded-3xl">
+                <p className="text-[10px] font-black uppercase tracking-[0.3em]">
+                  Sector Data Pending
+                </p>
               </div>
-            ))}
+            )}
+          </div>
+
+          <div className="mt-10 p-5 bg-white/5 rounded-2xl border border-white/5 relative overflow-hidden group">
+            <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+            <p className="relative z-10 text-[9px] font-black text-muted-foreground uppercase leading-relaxed tracking-[0.2em] text-center">
+              Neural engine prioritizing high-affinity sectors. <br />
+              <span className="text-primary/60">
+                Optimal distribution nodes identified.
+              </span>
+            </p>
           </div>
         </LensedCard>
       </div>

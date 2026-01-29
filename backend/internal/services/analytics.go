@@ -34,6 +34,13 @@ type UserStats struct {
 	TotalShares      int64          `json:"totalShares"`
 	PlatformBreakdown []PlatformStat `json:"platformBreakdown"`
 	ProjectedRevenue  float64        `json:"projectedRevenue"`
+	PulseData         []PulsePoint   `json:"pulseData"`
+}
+
+type PulsePoint struct {
+	Date       string `json:"name"` // e.g. "Mon" or "01-30"
+	Reach      int64  `json:"reach"`
+	Engagement int64  `json:"engagement"`
 }
 
 // VideoStats represents aggregated video metrics
@@ -51,7 +58,10 @@ type VideoStats struct {
 func (s *AnalyticsService) GetUserStats(userID int) (*UserStats, error) {
 	stats := &UserStats{
 		PlatformBreakdown: []PlatformStat{},
+		PulseData:         []PulsePoint{},
 	}
+
+	log.Printf("DEBUG: Fetching stats for user %d", userID)
 
 	// 1. Core aggregates
 	err := s.db.QueryRow(`
@@ -85,11 +95,74 @@ func (s *AnalyticsService) GetUserStats(userID int) (*UserStats, error) {
 				p.Revenue = float64(p.Views) * 0.002
 				stats.PlatformBreakdown = append(stats.PlatformBreakdown, p)
 				stats.ProjectedRevenue += p.Revenue
-			}
+				}
 		}
 	}
 
+	// 3. Pulse Data (last 7 days) - Ensure we always have 7 days for the chart
+	pulse, err := s.GetGrowthPulse(userID)
+	if err == nil {
+		stats.PulseData = pulse
+	}
+
 	return stats, nil
+}
+
+// GetGrowthPulse fetches time-series data for the last 7 days
+func (s *AnalyticsService) GetGrowthPulse(userID int) ([]PulsePoint, error) {
+	// Aggregate views and engagement per day, ensuring 0s for missing days
+	rows, err := s.db.Query(`
+		WITH RECURSIVE days AS (
+			SELECT DATE_TRUNC('day', NOW()) as day
+			UNION ALL
+			SELECT day - INTERVAL '1 day'
+			FROM days
+			WHERE day > DATE_TRUNC('day', NOW()) - INTERVAL '6 days'
+		),
+		daily_snaps AS (
+			SELECT 
+				DATE_TRUNC('day', fetched_at) as day,
+				video_id,
+				account_id,
+				MAX(views) as max_views,
+				MAX(likes + comments + shares) as max_engagement
+			FROM video_analytics
+			WHERE video_id IN (SELECT id FROM videos WHERE user_id = $1)
+			  AND fetched_at > NOW() - INTERVAL '7 days'
+			GROUP BY 1, 2, 3
+		),
+		summed_daily AS (
+			SELECT 
+				d.day,
+				COALESCE(SUM(s.max_views), 0) as reach,
+				COALESCE(SUM(s.max_engagement), 0) as engagement
+			FROM days d
+			LEFT JOIN daily_snaps s ON d.day = s.day
+			GROUP BY 1
+			ORDER BY 1 ASC
+		)
+		SELECT 
+			TO_CHAR(day, 'Dy') as name,
+			reach,
+			engagement
+		FROM summed_daily
+	`, userID)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	pulse := make([]PulsePoint, 0)
+	for rows.Next() {
+		var p PulsePoint
+		if err := rows.Scan(&p.Date, &p.Reach, &p.Engagement); err == nil {
+			pulse = append(pulse, p)
+		}
+	}
+
+	log.Printf("DEBUG: Found %d pulse points for user %d", len(pulse), userID)
+	return pulse, nil
 }
 
 // GetVideoStats fetches specific video stats from view (Fast)
