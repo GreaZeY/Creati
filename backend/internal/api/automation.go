@@ -66,6 +66,14 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 		Platform        string `json:"platform"`
 	}
 
+	type BlastSummary struct {
+		Pending    int `json:"pending"`
+		Processing int `json:"processing"`
+		Completed  int `json:"completed"`
+		Failed     int `json:"failed"`
+		Total      int `json:"total"`
+	}
+
 	type RuleResponse struct {
 		ID            int              `json:"id"`
 		Name          string           `json:"name"`
@@ -76,6 +84,7 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 		IsActive      bool             `json:"isActive"`
 		LastRunAt     *string          `json:"lastRunAt"`
 		CreatedAt     string           `json:"createdAt"`
+		Summary       *BlastSummary    `json:"summary,omitempty"`
 	}
 
 	rules := make([]RuleResponse, 0)
@@ -124,6 +133,39 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 			val := lastRunAt.String
 			r.LastRunAt = &val
 		}
+
+		// Fetch summary for manual blasts
+		if r.TriggerType == "manual" {
+			summaryRows, err := h.db.Query(`
+				SELECT status, COUNT(*) 
+				FROM automation_jobs 
+				WHERE rule_id = $1 
+				GROUP BY status
+			`, r.ID)
+			if err == nil {
+				s := &BlastSummary{}
+				for summaryRows.Next() {
+					var status string
+					var count int
+					if err := summaryRows.Scan(&status, &count); err == nil {
+						switch status {
+						case "pending":
+							s.Pending = count
+						case "processing":
+							s.Processing = count
+						case "completed":
+							s.Completed = count
+						case "failed":
+							s.Failed = count
+						}
+						s.Total += count
+					}
+				}
+				summaryRows.Close()
+				r.Summary = s
+			}
+		}
+
 		rules = append(rules, r)
 	}
 

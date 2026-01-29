@@ -29,15 +29,7 @@ interface BlastSummary {
   total: number;
 }
 
-function BlastProgress({ ruleId }: { ruleId: number }) {
-  const { data: summary } = useQuery({
-    queryKey: ["blast-summary", ruleId],
-    queryFn: async () => {
-      const resp = await automationAPI.getBlastSummary(ruleId);
-      return resp.data.data as BlastSummary;
-    },
-  });
-
+function BlastProgress({ summary }: { summary?: BlastSummary }) {
   if (!summary || summary.total === 0) return null;
 
   const progress = (summary.completed / summary.total) * 100;
@@ -112,7 +104,7 @@ export function ArchiveBlast() {
         const data = JSON.parse(event.data);
         if (data.type === "blast_update") {
           queryClient.invalidateQueries({
-            queryKey: ["blast-summary", data.ruleId],
+            queryKey: ["automation-rules"],
           });
         }
       } catch (err) {
@@ -261,7 +253,7 @@ export function ArchiveBlast() {
                       </div>
                     </div>
 
-                    <BlastProgress ruleId={rule.id} />
+                    <BlastProgress summary={rule.summary} />
                   </div>
                 </LensedCard>
               </motion.div>
