@@ -2,71 +2,53 @@ package services
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
-	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"creati.in/creati/backend/internal/services/storage"
 )
 
 type StorageService struct {
-	Client        *s3.Client
-	PresignClient *s3.PresignClient
-	Bucket        string
+	Provider storage.StorageProvider
 }
 
 func NewStorageService() (*StorageService, error) {
-	cfg, err := config.LoadDefaultConfig(context.TODO())
+	driver := os.Getenv("STORAGE_DRIVER")
+	if driver == "" {
+		driver = "local"
+	}
+
+	var provider storage.StorageProvider
+	var err error
+
+	switch driver {
+	case "local":
+		provider, err = storage.NewLocalProvider()
+	case "s3":
+		provider, err = storage.NewS3Provider()
+	default:
+		provider, err = storage.NewLocalProvider()
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	client := s3.NewFromConfig(cfg)
-	presignClient := s3.NewPresignClient(client)
-
-	// In a real app, load from env
-	bucket := os.Getenv("AWS_S3_BUCKET")
-	if bucket == "" {
-		bucket = "creati-uploads-dev"
-	}
-
 	return &StorageService{
-		Client:        client,
-		PresignClient: presignClient,
-		Bucket:        bucket,
+		Provider: provider,
 	}, nil
 }
 
-func (s *StorageService) GeneratePresignedURL(key string, contentType string) (string, error) {
-	request, err := s.PresignClient.PresignPutObject(context.TODO(), &s3.PutObjectInput{
-		Bucket:      aws.String(s.Bucket),
-		Key:         aws.String(key),
-		ContentType: aws.String(contentType),
-	}, func(opts *s3.PresignOptions) {
-		opts.Expires = 15 * time.Minute
-	})
-
-	if err != nil {
-		return "", err
-	}
-
-	return request.URL, nil
-}
-
 func (s *StorageService) Upload(ctx context.Context, key string, reader io.Reader, contentType string) error {
-	_, err := s.Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:      aws.String(s.Bucket),
-		Key:         aws.String(key),
-		Body:        reader,
-		ContentType: aws.String(contentType),
-	})
-	return err
+	return s.Provider.Upload(ctx, key, reader, contentType)
 }
 
 func (s *StorageService) GetObjectURL(key string) string {
-	// Simplified URL construction. In production, consider region-specific endpoints.
-	return fmt.Sprintf("https://%s.s3.amazonaws.com/%s", s.Bucket, key)
+	return s.Provider.GetObjectURL(key)
+}
+
+// Deprecated: Use Upload directly
+func (s *StorageService) GeneratePresignedURL(key string, contentType string) (string, error) {
+	// For now, return empty as Local doesn't support it, and S3 logic moved
+	return "", nil
 }

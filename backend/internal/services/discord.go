@@ -151,12 +151,15 @@ func (d *DiscordService) Upload(video *models.Video, accountID int) (string, err
 		return "", fmt.Errorf("account not found or no webhook: %w", err)
 	}
 
-	// Download video from S3
-	resp, err := http.Get(video.S3URL)
+	// Download video to temp file for reliable upload
+	tmpFile, err := utils.DownloadToTempFile(video.S3URL)
 	if err != nil {
-		return "", fmt.Errorf("failed to download video from S3: %w", err)
+		return "", fmt.Errorf("failed to download video to temp file: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+	}()
 
 	// Prepare multipart message
 	body := &bytes.Buffer{}
@@ -174,7 +177,7 @@ func (d *DiscordService) Upload(video *models.Video, accountID int) (string, err
 	if err != nil {
 		return "", fmt.Errorf("failed to create form file: %w", err)
 	}
-	_, err = io.Copy(part, resp.Body)
+	_, err = io.Copy(part, tmpFile)
 	if err != nil {
 		return "", fmt.Errorf("failed to copy video content: %w", err)
 	}

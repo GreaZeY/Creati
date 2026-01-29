@@ -191,17 +191,19 @@ func (l *LinkedInService) Upload(video *models.Video, accountID int) (string, er
 
 	videoURN := registerResult.Value.Video
 
-	// Step 2: Download video from S3 and upload to LinkedIn
-	// In production, this should stream the video
-	videoResp, err := http.Get(video.S3URL)
+	// Step 2: Download video to temp file and upload to LinkedIn
+	tmpFile, err := utils.DownloadToTempFile(video.S3URL)
 	if err != nil {
-		return "", fmt.Errorf("failed to download video: %w", err)
+		return "", fmt.Errorf("failed to download video to temp file: %w", err)
 	}
-	defer videoResp.Body.Close()
+	defer func() {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+	}()
 
 	if len(registerResult.Value.UploadInstructions) > 0 {
 		uploadURL := registerResult.Value.UploadInstructions[0].UploadURL
-		uploadReq, err := http.NewRequest("PUT", uploadURL, videoResp.Body)
+		uploadReq, err := http.NewRequest("PUT", uploadURL, tmpFile)
 		if err != nil {
 			return "", err
 		}

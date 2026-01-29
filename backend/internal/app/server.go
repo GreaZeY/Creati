@@ -37,6 +37,9 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	app.Use(fiberlog.New())
 	app.Use(cors.New())
 
+	// Static storage (for local driver)
+	app.Static("/storage", "./storage")
+
 	// Initialize handlers
 	authHandler := api.NewAuthHandler(db)
 	platformHandler := api.NewPlatformHandler(db)

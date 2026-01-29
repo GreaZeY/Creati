@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -219,17 +218,21 @@ func (t *TwitterService) Upload(video *models.Video, accountID int) (string, err
 
 // uploadMedia handles chunked video upload to Twitter
 func (t *TwitterService) uploadMedia(accessToken, videoURL string) (string, error) {
-	// Download video
-	videoResp, err := http.Get(videoURL)
+	// Download video to temp file for reliable chunked upload
+	tmpFile, err := utils.DownloadToTempFile(videoURL)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to download video to temp file: %w", err)
 	}
-	defer videoResp.Body.Close()
+	defer func() {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+	}()
 
-	videoData, err := io.ReadAll(videoResp.Body)
+	fileInfo, err := tmpFile.Stat()
 	if err != nil {
 		return "", err
 	}
+	totalBytes := fileInfo.Size()
 
 	client := &http.Client{}
 	mediaUploadURL := "https://upload.twitter.com/1.1/media/upload.json"
@@ -238,7 +241,7 @@ func (t *TwitterService) uploadMedia(accessToken, videoURL string) (string, erro
 	initData := url.Values{}
 	initData.Set("command", "INIT")
 	initData.Set("media_type", "video/mp4")
-	initData.Set("total_bytes", fmt.Sprintf("%d", len(videoData)))
+	initData.Set("total_bytes", fmt.Sprintf("%d", totalBytes))
 	initData.Set("media_category", "tweet_video")
 
 	initReq, err := http.NewRequest("POST", mediaUploadURL, bytes.NewBufferString(initData.Encode()))
@@ -265,17 +268,21 @@ func (t *TwitterService) uploadMedia(accessToken, videoURL string) (string, erro
 
 	// APPEND (chunked upload)
 	chunkSize := 5 * 1024 * 1024 // 5MB chunks
-	for i := 0; i < len(videoData); i += chunkSize {
-		end := i + chunkSize
-		if end > len(videoData) {
-			end = len(videoData)
+	for i := int64(0); i < totalBytes; i += int64(chunkSize) {
+		size := int64(chunkSize)
+		if i+size > totalBytes {
+			size = totalBytes - i
 		}
 
-		chunk := videoData[i:end]
+		chunk := make([]byte, size)
+		if _, err := tmpFile.ReadAt(chunk, i); err != nil {
+			return "", fmt.Errorf("failed to read chunk: %w", err)
+		}
+
 		appendData := url.Values{}
 		appendData.Set("command", "APPEND")
 		appendData.Set("media_id", mediaID)
-		appendData.Set("segment_index", fmt.Sprintf("%d", i/chunkSize))
+		appendData.Set("segment_index", fmt.Sprintf("%d", i/int64(chunkSize)))
 		appendData.Set("media_data", base64.StdEncoding.EncodeToString(chunk))
 
 		appendReq, err := http.NewRequest("POST", mediaUploadURL, bytes.NewBufferString(appendData.Encode()))

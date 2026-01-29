@@ -135,7 +135,7 @@ export function ArchiveBlast() {
               <Rocket size={24} fill="currentColor" />
             </div>
             <h1 className="text-4xl font-black tracking-tighter uppercase italic">
-              The Blast 🚀
+              The Blast
             </h1>
           </div>
           <p className="text-muted-foreground text-sm font-medium">

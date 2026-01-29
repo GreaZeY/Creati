@@ -181,67 +181,38 @@ func (f *FacebookService) Upload(video *models.Video, accountID int) (string, er
 		return "", fmt.Errorf("failed to decrypt page token: %w", err)
 	}
 
-	// Upload video using resumable upload API
-	// Step 1: Initialize upload session
-	initURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/videos", pageID)
+	// Upload video using single request with hosted URL
+	// Since we provide an S3/Local public URL, we don't need resumable upload phases
+	uploadURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/videos", pageID)
 	data := url.Values{}
-	data.Set("upload_phase", "start")
 	data.Set("file_url", video.S3URL)
+	data.Set("title", video.Title)
+	data.Set("description", video.Description)
 	data.Set("access_token", pageToken)
 
-	resp, err := http.PostForm(initURL, data)
+	resp, err := http.PostForm(uploadURL, data)
 	if err != nil {
-		return "", fmt.Errorf("failed to initialize upload: %w", err)
+		return "", fmt.Errorf("facebook upload request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	var initResult struct {
-		VideoID string `json:"video_id"`
-		Error   struct {
+	var result struct {
+		ID    string `json:"id"`
+		Error struct {
 			Message string `json:"message"`
 		} `json:"error"`
 	}
 
-	if err := json.Unmarshal(body, &initResult); err != nil {
-		return "", fmt.Errorf("failed to parse init response: %w", err)
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	if initResult.Error.Message != "" {
-		return "", fmt.Errorf("facebook API error: %s", initResult.Error.Message)
+	if result.Error.Message != "" {
+		return "", fmt.Errorf("facebook API error: %s", result.Error.Message)
 	}
 
-	// Step 2: Finish upload with metadata
-	finishURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/videos", pageID)
-	finishData := url.Values{}
-	finishData.Set("upload_phase", "finish")
-	finishData.Set("video_id", initResult.VideoID)
-	finishData.Set("title", video.Title)
-	finishData.Set("description", video.Description)
-	finishData.Set("access_token", pageToken)
-
-	resp, err = http.PostForm(finishURL, finishData)
-	if err != nil {
-		return "", fmt.Errorf("failed to finish upload: %w", err)
-	}
-	defer resp.Body.Close()
-
-	var finishResult struct {
-		Success bool `json:"success"`
-		Error   struct {
-			Message string `json:"message"`
-		} `json:"error"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&finishResult); err != nil {
-		return "", fmt.Errorf("failed to parse finish response: %w", err)
-	}
-
-	if finishResult.Error.Message != "" {
-		return "", fmt.Errorf("facebook finish error: %s", finishResult.Error.Message)
-	}
-
-	return initResult.VideoID, nil
+	return result.ID, nil
 }
 
 // GetStatus implements Platform interface

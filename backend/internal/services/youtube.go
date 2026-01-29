@@ -317,16 +317,19 @@ func (y *YouTubeService) Upload(video *models.Video, accountID int) (string, err
 		},
 	}
 
-	// Download video from S3 (simplified - in production use streaming)
-	resp, err := http.Get(video.S3URL)
+	// Download video to a temp file for reliable upload
+	tmpFile, err := utils.DownloadToTempFile(video.S3URL)
 	if err != nil {
-		return "", fmt.Errorf("failed to download video: %w", err)
+		return "", fmt.Errorf("failed to download video to temp file: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+	}()
 
 	// Upload to YouTube
 	call := service.Videos.Insert([]string{"snippet", "status"}, upload)
-	result, err := call.Media(resp.Body).Do()
+	result, err := call.Media(tmpFile).Do()
 	if err != nil {
 		return "", fmt.Errorf("youtube upload failed: %w", err)
 	}
