@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"example.com/creati/backend/internal/db/models"
+	"example.com/creati/backend/internal/logger"
 	"example.com/creati/backend/internal/services"
 	"github.com/joho/godotenv"
 	"github.com/kkdai/youtube/v2"
@@ -52,7 +53,7 @@ func main() {
 	}
 
 	fmt.Println("\n========================================")
-	fmt.Println("👷 Worker starting...")
+	logger.Log("info", "Worker starting...", nil, "worker")
 	fmt.Println("========================================")
 
 	// Context for graceful shutdown
@@ -85,33 +86,33 @@ func main() {
 				continue
 			}
 
-			log.Printf("🚀 Processing job: VideoID=%d, Platform=%s", job.VideoID, job.Platform)
+			logger.Log("info", fmt.Sprintf("Processing job: VideoID=%d, Platform=%s", job.VideoID, job.Platform), nil, "worker")
 
 			// Process job
 			err = processJob(db, storageService, job)
 			if err != nil {
-				log.Printf("❌ Job failed: %v", err)
+				logger.Log("error", fmt.Sprintf("Job failed: %v", err), err, "worker")
 
 				if job.RetryCount < MaxRetries {
 					job.RetryCount++
 					// Exponential backoff: 30s, 2m, 8m...
 					delay := time.Duration(math.Pow(4, float64(job.RetryCount))) * time.Second * 30
-					log.Printf("🔄 Retrying in %v (Attempt %d/%d)", delay, job.RetryCount, MaxRetries)
+					logger.Log("info", fmt.Sprintf("Retrying in %v (Attempt %d/%d)", delay, job.RetryCount, MaxRetries), nil, "worker")
 
 					go func(j services.UploadJob, d time.Duration) {
 						time.Sleep(d)
 						if err := queueService.EnqueueUpload(context.Background(), j); err != nil {
-							log.Printf("❌ Failed to re-enqueue job: %v", err)
+							logger.Log("error", fmt.Sprintf("Failed to re-enqueue job: %v", err), err, "worker")
 						}
 					}(*job, delay)
 				} else {
-					log.Printf("💀 Max retries reached for job %d", job.JobID)
+					logger.Log("error", fmt.Sprintf("Max retries reached for job %d", job.JobID), nil, "worker")
 					if job.AutomationJobID > 0 {
 						db.Exec("UPDATE automation_jobs SET status = 'failed', error = $1 WHERE id = $2", err.Error(), job.AutomationJobID)
 					}
 				}
 			} else {
-				log.Printf("✅ Job completed: VideoID=%d, Platform=%s", job.VideoID, job.Platform)
+				logger.Log("info", fmt.Sprintf("Job completed: VideoID=%d, Platform=%s", job.VideoID, job.Platform), nil, "worker")
 			}
 		}
 	}
@@ -170,7 +171,7 @@ func processJob(db *sql.DB, storage *services.StorageService, job *services.Uplo
 }
 
 func handleAutomationJob(db *sql.DB, storage *services.StorageService, job *services.UploadJob) error {
-	log.Printf("🤖 Processing Automation Job %d (Source: %s)", job.AutomationJobID, job.SourceVideoID)
+	logger.Log("info", fmt.Sprintf("Processing Automation Job %d (Source: %s)", job.AutomationJobID, job.SourceVideoID), nil, "automation")
 
 	// Update status
 	_, err := db.Exec("UPDATE automation_jobs SET status = 'processing', updated_at = NOW() WHERE id = $1", job.AutomationJobID)
@@ -230,7 +231,7 @@ func handleAutomationJob(db *sql.DB, storage *services.StorageService, job *serv
 		return err
 	}
 
-	log.Printf("   ✅ Automation redistributed to %s (ID: %s)", job.Platform, platformVideoID)
+	logger.Log("info", fmt.Sprintf("Automation redistributed to %s (ID: %s)", job.Platform, platformVideoID), nil, "automation")
 
 	// 6. Final Status Update
 	_, err = db.Exec(`

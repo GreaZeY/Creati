@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"log"
+	"fmt"
 	"time"
 
 	"example.com/creati/backend/internal/events"
+	"example.com/creati/backend/internal/logger"
 )
 
 /**
@@ -41,7 +42,7 @@ func NewEventProcessor(db *sql.DB, interval time.Duration, batchSize int) *Event
 
 // Start begins processing events in a loop
 func (p *EventProcessor) Start(ctx context.Context) {
-	log.Printf("Event processor started (interval=%s, batch=%d)", p.interval, p.batchSize)
+	logger.Log("info", fmt.Sprintf("Event processor started (interval=%s, batch=%d)", p.interval, p.batchSize), nil, "event_processor")
 
 	ticker := time.NewTicker(p.interval)
 	defer ticker.Stop()
@@ -49,11 +50,11 @@ func (p *EventProcessor) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Event processor shutting down")
+			logger.Log("info", "Event processor shutting down", nil, "event_processor")
 			return
 		case <-ticker.C:
 			if err := p.processBatch(ctx); err != nil {
-				log.Printf("Event processor error: %v", err)
+				logger.Log("error", "Event processor error", err, "event_processor")
 			}
 		}
 	}
@@ -70,17 +71,17 @@ func (p *EventProcessor) processBatch(ctx context.Context) error {
 		return nil // No work
 	}
 
-	log.Printf("Processing %d pending events", len(pendingEvents))
+	logger.Log("info", fmt.Sprintf("Processing %d pending events", len(pendingEvents)), nil, "event_processor")
 
 	for _, event := range pendingEvents {
 		if err := p.processEvent(ctx, event); err != nil {
 			// Log error and mark as failed
-			log.Printf("Failed to process event %s: %v", event.ID, err)
+			logger.Log("error", fmt.Sprintf("Failed to process event %s", event.ID), err, "event_processor")
 			p.eventStore.MarkEventFailed(ctx, event.ID, err.Error())
 		} else {
 			// Mark as processed
 			p.eventStore.MarkEventProcessed(ctx, event.ID)
-			log.Printf("Event %s processed successfully", event.ID)
+			logger.Log("info", fmt.Sprintf("Event %s processed successfully", event.ID), nil, "event_processor")
 		}
 	}
 
@@ -89,8 +90,7 @@ func (p *EventProcessor) processBatch(ctx context.Context) error {
 
 // processEvent handles a single event
 func (p *EventProcessor) processEvent(ctx context.Context, event *events.NormalizedEvent) error {
-	log.Printf("Processing event: platform=%s, type=%s, external_id=%s",
-		event.Platform, event.EventType, event.ExternalID)
+	logger.Log("info", fmt.Sprintf("Processing event: platform=%s, type=%s, external_id=%s", event.Platform, event.EventType, event.ExternalID), nil, "event_processor")
 
 	// Step 1: Create or update video record
 	videoID, err := p.createOrUpdateVideo(ctx, event)
@@ -100,7 +100,7 @@ func (p *EventProcessor) processEvent(ctx context.Context, event *events.Normali
 
 	// Step 2: Evaluate automation rules for this account/platform
 	if err := p.evaluateAutomationRules(ctx, event, videoID); err != nil {
-		log.Printf("Failed to evaluate automation rules: %v", err)
+		logger.Log("error", "Failed to evaluate automation rules", err, "event_processor")
 		// Don't fail the entire event processing if rule evaluation fails
 	}
 
@@ -154,7 +154,7 @@ func (p *EventProcessor) createOrUpdateVideo(ctx context.Context, event *events.
 		return 0, err
 	}
 
-	log.Printf("Created video record: id=%d, external_id=%s", videoID, event.ExternalID)
+	logger.Log("info", fmt.Sprintf("Created video record: id=%d, external_id=%s", videoID, event.ExternalID), nil, "event_processor")
 	return videoID, nil
 }
 
@@ -179,27 +179,27 @@ func (p *EventProcessor) evaluateAutomationRules(ctx context.Context, event *eve
 		var targetsJSON, filtersJSON []byte
 
 		if err := rows.Scan(&ruleID, &ruleName, &targetsJSON, &filtersJSON); err != nil {
-			log.Printf("Error scanning rule: %v", err)
+			logger.Log("error", "Error scanning rule", err, "event_processor")
 			continue
 		}
 
 		// Parse filters
 		var filters map[string]interface{}
 		if err := json.Unmarshal(filtersJSON, &filters); err != nil {
-			log.Printf("Error parsing filters for rule %d: %v", ruleID, err)
+			logger.Log("error", fmt.Sprintf("Error parsing filters for rule %d", ruleID), err, "event_processor")
 			continue
 		}
 
 		// Apply filters (basic implementation - can be extended)
 		if !p.matchesFilters(event, filters) {
-			log.Printf("Event does not match rule %d filters", ruleID)
+			logger.Log("info", fmt.Sprintf("Event does not match rule %d filters", ruleID), nil, "event_processor")
 			continue
 		}
 
 		// Parse targets
 		var targets []map[string]interface{}
 		if err := json.Unmarshal(targetsJSON, &targets); err != nil {
-			log.Printf("Error parsing targets for rule %d: %v", ruleID, err)
+			logger.Log("error", fmt.Sprintf("Error parsing targets for rule %d", ruleID), err, "event_processor")
 			continue
 		}
 
@@ -217,11 +217,11 @@ func (p *EventProcessor) evaluateAutomationRules(ctx context.Context, event *eve
 			`, ruleID, videoID, event.ExternalID, int(targetAccountID), time.Now())
 
 			if err != nil {
-				log.Printf("Error creating automation job: %v", err)
+				logger.Log("error", "Error creating automation job", err, "event_processor")
 				continue
 			}
 
-			log.Printf("Created automation job: rule=%s, target_account=%d", ruleName, int(targetAccountID))
+			logger.Log("info", fmt.Sprintf("Created automation job: rule=%s, target_account=%d", ruleName, int(targetAccountID)), nil, "event_processor")
 		}
 
 		// Update rule's last_run_at
@@ -229,7 +229,7 @@ func (p *EventProcessor) evaluateAutomationRules(ctx context.Context, event *eve
 			UPDATE automation_rules SET last_run_at = $1 WHERE id = $2
 		`, time.Now(), ruleID)
 		if err != nil {
-			log.Printf("Error updating rule last_run_at: %v", err)
+			logger.Log("error", "Error updating rule last_run_at", err, "event_processor")
 		}
 	}
 

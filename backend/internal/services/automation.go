@@ -182,11 +182,13 @@ func (s *AutomationService) BlastVideos(userID int, sourceAccountID int, videoID
 	var ruleID int
 	name := fmt.Sprintf("Quick Blast - %s", time.Now().Format("Jan 02, 15:04"))
 
+	targetsJSON, _ := json.Marshal(targets)
+
 	err := s.db.QueryRow(`
 		INSERT INTO automation_rules (user_id, name, source_account_id, trigger_type, filters, targets, is_active)
-		VALUES ($1, $2, $3, 'manual', '{}', '[]', false)
+		VALUES ($1, $2, $3, 'manual', '{}', $4, false)
 		RETURNING id
-	`, userID, name, sourceAccountID).Scan(&ruleID)
+	`, userID, name, sourceAccountID, targetsJSON).Scan(&ruleID)
 
 	if err != nil {
 		return 0, fmt.Errorf("failed to create blast rule: %w", err)
