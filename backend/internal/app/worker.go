@@ -179,12 +179,13 @@ func HandleAutomationJob(db *sql.DB, storage *services.StorageService, throttle 
 	var ruleName string
 	var ruleID int
 	var sourcePlatform string
+	var sourceAccountID int
 	err = db.QueryRow(`
-		SELECT r.id, r.user_id, r.name, pa.platform 
+		SELECT r.id, r.user_id, r.name, pa.platform, pa.id
 		FROM automation_rules r
 		JOIN platform_accounts pa ON r.source_account_id = pa.id
 		WHERE r.id = (SELECT rule_id FROM automation_jobs WHERE id = $1)
-	`, job.AutomationJobID).Scan(&ruleID, &userID, &ruleName, &sourcePlatform)
+	`, job.AutomationJobID).Scan(&ruleID, &userID, &ruleName, &sourcePlatform, &sourceAccountID)
 	if err != nil {
 		return fmt.Errorf("failed to fetch rule details: %w", err)
 	}
@@ -212,7 +213,7 @@ func HandleAutomationJob(db *sql.DB, storage *services.StorageService, throttle 
 		context.Background(),
 		sourcePlatform,
 		job.SourceVideoID,
-		0, // No account ID for source
+		sourceAccountID,
 		videoMetadata.Title,
 		videoMetadata.Description,
 		int(videoMetadata.Duration.Seconds()),

@@ -41,6 +41,9 @@ func (cn *ContentNormalizer) NormalizeContent(
 	durationSeconds int,
 	s3Key string,
 ) (*NormalizedContent, error) {
+	// Handle optional account ID (0 means NULL)
+	dbAccountID := sql.NullInt64{Int64: int64(accountID), Valid: accountID != 0}
+
 	// Generate fingerprint
 	fp := cn.fingerprint.Generate(platform, platformContentID, title, durationSeconds)
 
@@ -68,7 +71,7 @@ func (cn *ContentNormalizer) NormalizeContent(
 			SET platform_content_id = EXCLUDED.platform_content_id,
 			    account_id = EXCLUDED.account_id,
 			    s3_key = EXCLUDED.s3_key
-		`, existingID, platform, platformContentID, accountID, s3Key)
+		`, existingID, platform, platformContentID, dbAccountID, s3Key)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to update platform reference: %w", err)
@@ -100,7 +103,7 @@ func (cn *ContentNormalizer) NormalizeContent(
 		INSERT INTO platform_contents 
 		(content_id, platform, platform_content_id, account_id, s3_key, published_at)
 		VALUES ($1, $2, $3, $4, $5, NOW())
-	`, contentID, platform, platformContentID, accountID, s3Key)
+	`, contentID, platform, platformContentID, dbAccountID, s3Key)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create platform reference: %w", err)
