@@ -58,3 +58,15 @@ func (l *LocalProvider) Upload(ctx context.Context, key string, reader io.Reader
 func (l *LocalProvider) GetObjectURL(key string) string {
 	return fmt.Sprintf("%s/%s", l.BaseURL, key)
 }
+
+func (l *LocalProvider) Exists(ctx context.Context, key string) (bool, error) {
+	path := filepath.Join(l.BaseDir, key)
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}

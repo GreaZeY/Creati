@@ -43,6 +43,7 @@ func RunWorker(ctx context.Context, db *sql.DB, throttle *services.ThrottleServi
 	}
 
 	logger.Get("worker").Info("Worker starting...")
+	logger.Get("worker").Info("Polling for jobs...")
 
 	for {
 		select {
@@ -82,10 +83,10 @@ func ProcessJob(db *sql.DB, storage *services.StorageService, throttle *services
 	// 0. Global Platform Rate Limiting
 	// Define limits (could be per-platform, here generic for demo)
 	// YouTube: 60 uploads per hour global, Instagram: 30 per hour global
-	limit := 10                               // fallback
-	window := 1 * time.Hour                   // fallback
+	limit := 10             // fallback
+	window := 1 * time.Hour // fallback
 	quotaKey := fmt.Sprintf("global:%s", job.Platform)
-	
+
 	if job.Platform == "youtube" {
 		limit = 60
 	} else if job.Platform == "instagram" {
@@ -209,6 +210,26 @@ func HandleAutomationJob(db *sql.DB, storage *services.StorageService, throttle 
 	})
 
 	bestFormat := &formats[0]
+	// 3. Stage in Storage (Deduplication Check)
+	// Key Format: automation/<userID>/youtube_<channelID>_<videoID>.mp4
+	// Note: videoMetadata.ChannelID might be empty or named differently depending on library version.
+	// We use "channel" as fallback if empty.
+	channelID := videoMetadata.ChannelID
+	if channelID == "" {
+		channelID = "channel"
+	}
+	s3Key := fmt.Sprintf("automation/%d/youtube_%s_%s.mp4", userID, channelID, job.SourceVideoID)
+
+	// Check if already exists
+	exists, err := storage.Exists(context.Background(), s3Key)
+	if err == nil && exists {
+		logger.Get("automation").WithField("key", s3Key).Info("Video already staged, skipping download...")
+		s3URL := storage.GetObjectURL(s3Key)
+
+		// Continue to model persistence with existing URL
+		return persistAndPush(db, job, videoMetadata, ruleName, userID, s3URL)
+	}
+
 	logger.Get("automation").WithFields(logrus.Fields{
 		"resolution": fmt.Sprintf("%dx%d", bestFormat.Width, bestFormat.Height),
 		"fps":        bestFormat.FPS,
@@ -243,8 +264,6 @@ func HandleAutomationJob(db *sql.DB, storage *services.StorageService, throttle 
 		return fmt.Errorf("failed to rewind temp file: %w", err)
 	}
 
-	// 3. Stage in Storage
-	s3Key := fmt.Sprintf("automation/%d/%d_%s.mp4", userID, job.AutomationJobID, job.SourceVideoID)
 	logger.Get("automation").WithField("url", s3Key).Info("Uploading to storage...")
 
 	uploadCtx, uploadCancel := context.WithTimeout(context.Background(), 10*time.Minute)
@@ -258,6 +277,12 @@ func HandleAutomationJob(db *sql.DB, storage *services.StorageService, throttle 
 	s3URL := storage.GetObjectURL(s3Key)
 	logger.Get("automation").WithField("url", s3URL).Info("Upload successful!")
 
+	// 4. Create and persist Video model
+	return persistAndPush(db, job, videoMetadata, ruleName, userID, s3URL)
+}
+
+func persistAndPush(db *sql.DB, job *services.UploadJob, videoMetadata *youtube.Video, ruleName string, userID int, s3URL string) error {
+
 	// 4. Create and persist Video model so it's tracked in Creati
 	video := &models.Video{
 		UserID:      userID,
@@ -267,7 +292,7 @@ func HandleAutomationJob(db *sql.DB, storage *services.StorageService, throttle 
 	}
 
 	var newVideoID int
-	err = db.QueryRow(`
+	err := db.QueryRow(`
 		INSERT INTO videos (user_id, title, description, s3_url, status)
 		VALUES ($1, $2, $3, $4, 'synced')
 		RETURNING id

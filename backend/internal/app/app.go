@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"creati.in/creati/backend/internal/logger"
+	"creati.in/creati/backend/internal/services"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -45,8 +46,19 @@ func Run(cfg Config) error {
 	}
 
 	if cfg.RunMode == "all" || cfg.RunMode == "worker" {
+		logger.Get("app").Info("Initializing Worker...")
 		g.Go(func() error {
-			return RunWorker(ctx, db)
+			// Initialize Queue & Throttle for Worker
+			logger.Get("app").Info("Starting Worker Service...")
+
+			queueService, err := services.NewQueueService()
+			if err != nil {
+				logger.Get("app").WithError(err).Error("Failed to initialize QueueService for worker")
+				return err
+			}
+			throttle := services.NewThrottleService(queueService.Client)
+
+			return RunWorker(ctx, db, throttle)
 		})
 	}
 

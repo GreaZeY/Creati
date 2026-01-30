@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"database/sql"
+	"os"
 	"time"
 
 	"creati.in/creati/backend/internal/api"
@@ -45,9 +46,12 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 		cacheService = services.NewCacheService(queueService.Client)
 	}
 
+	// Initialize RealtimeService (SSE)
+	realtimeService := services.NewRealtimeService()
+
 	// Initialize handlers
 	authHandler := api.NewAuthHandler(db)
-	platformHandler := api.NewPlatformHandler(db)
+	platformHandler := api.NewPlatformHandler(db, cacheService)
 	uploadHandler := api.NewUploadHandler(storageService, queueService, db)
 	videosHandler := api.NewVideosHandler(db, cacheService)
 	analyticsHandler := api.NewAnalyticsHandler(db, queueService, cacheService)
@@ -57,7 +61,8 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	webhookHandler := api.NewWebhookHandler(db)
 
 	// Events
-	eventProcessor := workers.NewEventProcessor(db, 30*time.Second, 50)
+	dbURL := os.Getenv("DATABASE_URL")
+	eventProcessor := workers.NewEventProcessor(db, dbURL, realtimeService, 30*time.Second, 50)
 	go eventProcessor.Start(ctx)
 
 	// Routes
@@ -74,6 +79,10 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 
 	protected := apiRoutes.Use(middleware.AuthMiddleware)
 	protected.Get("/auth/me", authHandler.CheckAuth)
+	protected.Get("/realtime/blasts", func(c *fiber.Ctx) error {
+		userID := middleware.GetUserID(c)
+		return realtimeService.HandleConnection(c, userID)
+	})
 	protected.Post("/upload/init", uploadHandler.InitUpload)
 	protected.Post("/upload/confirm", uploadHandler.ConfirmUpload)
 	protected.Get("/platforms/count", platformHandler.GetPlatformCounts)
@@ -90,7 +99,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	protected.Get("/events/:id", webhookHandler.GetEvent)
 	protected.Post("/events/:id/replay", webhookHandler.ReplayEvent)
 
-	automationGroup := protected.Group("/automation", middleware.RequireFeature(db, features.CanUseMagicSync))
+	automationGroup := protected.Group("/automation", middleware.RequireFeature(db, cacheService, features.CanUseMagicSync))
 	automationGroup.Get("", automationHandler.ListRules)
 	automationGroup.Post("", automationHandler.CreateRule)
 	automationGroup.Post("/blast", automationHandler.HandleBlast)

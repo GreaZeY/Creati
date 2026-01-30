@@ -52,3 +52,7 @@ func (s *StorageService) GeneratePresignedURL(key string, contentType string) (s
 	// For now, return empty as Local doesn't support it, and S3 logic moved
 	return "", nil
 }
+
+func (s *StorageService) Exists(ctx context.Context, key string) (bool, error) {
+	return s.Provider.Exists(ctx, key)
+}
