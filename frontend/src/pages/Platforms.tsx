@@ -130,7 +130,7 @@ export const Platforms = () => {
           <motion.h1
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="text-6xl font-black tracking-tighter uppercase italic font-outfit"
+            className="text-6xl font-black tracking-tighter uppercase font-outfit"
           >
             Active Nodes
           </motion.h1>
@@ -148,7 +148,7 @@ export const Platforms = () => {
             <div className="flex flex-col items-end gap-2">
               <Button
                 disabled
-                className="h-16 px-10 rounded-2xl bg-white/5 text-muted-foreground font-black text-lg opacity-50 cursor-not-allowed border-0"
+                className="h-16 px-10 rounded-2xl bg-muted text-muted-foreground font-black text-lg opacity-50 cursor-not-allowed border-0"
               >
                 NODE LIMIT REACHED
               </Button>
@@ -163,7 +163,7 @@ export const Platforms = () => {
             <Button
               asChild
               size="lg"
-              className="h-16 px-10 rounded-2xl bg-primary text-slate-950 font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(var(--primary),0.3)] group border-0"
+              className="h-16 px-10 rounded-2xl bg-primary text-primary-foreground font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(var(--primary),0.3)] group border-0"
             >
               <Link to="/platforms/connect" className="flex items-center gap-3">
                 <Plus className="w-6 h-6 transition-transform group-hover:rotate-90 duration-500" />
@@ -208,11 +208,11 @@ export const Platforms = () => {
                       !platform.connected && "opacity-60",
                     )}
                   >
-                    {/* Dropdown Menu */}
-                    <div className="absolute top-4 right-4 z-20">
+                    {/* Dropdown Menu - Absolute Top Right */}
+                    <div className="absolute top-6 right-6 z-20">
                       <DropdownMenu
                         trigger={
-                          <button className="p-2 rounded-xl text-muted-foreground/40 hover:text-foreground hover:bg-white/5 transition-all">
+                          <button className="p-2 rounded-xl text-muted-foreground/60 hover:text-foreground hover:bg-secondary transition-all">
                             <MoreVertical size={18} />
                           </button>
                         }
@@ -253,7 +253,7 @@ export const Platforms = () => {
 
                     <div
                       className={cn(
-                        "w-20 h-20 rounded-2xl flex items-center justify-center shrink-0 shadow-2xl ring-1 ring-white/5 bg-white/5",
+                        "w-20 h-20 rounded-2xl flex items-center justify-center shrink-0 shadow-lg ring-1 ring-border/10 bg-secondary/50",
                         accentClass.split(" ")[1],
                       )}
                     >
@@ -264,9 +264,9 @@ export const Platforms = () => {
                       />
                     </div>
 
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 pr-12">
                       <div className="flex items-center gap-3">
-                        <h3 className="text-2xl font-black tracking-tighter uppercase italic truncate">
+                        <h3 className="text-2xl font-black tracking-tighter uppercase truncate">
                           {platform.profileName || platform.name}
                         </h3>
                         {platform.connected ? (
@@ -294,7 +294,7 @@ export const Platforms = () => {
                           connectMutation.isPending &&
                           connectMutation.variables === platform.id
                         }
-                        className="h-10 px-6 rounded-xl bg-primary text-slate-950 font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                        className="h-10 px-6 rounded-xl bg-primary text-primary-foreground font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
                       >
                         Reconnect
                       </Button>

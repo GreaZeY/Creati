@@ -2,6 +2,7 @@ import { Card } from '@/components/ui/Card';
 import { Settings as SettingsIcon, User, Bell, Lock, Palette, ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export const Settings = () => {
     const sections = [
@@ -43,7 +44,13 @@ export const Settings = () => {
                                     <p className="text-sm text-muted-foreground font-medium">{section.desc}</p>
                                 </div>
                             </div>
-                            <ChevronRight className="w-6 h-6 text-muted-foreground/30 group-hover:text-foreground transition-all group-hover:translate-x-1 relative z-10" />
+                            {section.label === 'Appearance' ? (
+                                <div className="relative z-10" onClick={(e) => e.stopPropagation()}>
+                                    <ThemeToggle />
+                                </div>
+                            ) : (
+                                <ChevronRight className="w-6 h-6 text-muted-foreground/30 group-hover:text-foreground transition-all group-hover:translate-x-1 relative z-10" />
+                            )}
                         </Card>
                     </motion.div>
                 ))}

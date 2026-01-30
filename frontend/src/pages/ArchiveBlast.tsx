@@ -219,7 +219,7 @@ export function ArchiveBlast() {
                       onClick={() => setRuleToDelete(rule.id)}
                       className="p-3 text-muted-foreground/30 hover:text-red-400 transition-all rounded-xl bg-white/5 hover:bg-red-500/10"
                     >
-                      <Trash2 size={18} />
+                      <Trash2 color="red" size={18} />
                     </button>
                   </div>
 

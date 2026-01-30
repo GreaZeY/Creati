@@ -4,8 +4,40 @@
 
 @layer base {
   :root {
-    /* Adaptive Neutral Theme - Locked (No Light/Dark toggle needed) */
+    /* Light Mode Defaults */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
 
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 157 69% 45%;
+    /* Slightly darker teal for light mode contrast */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 157 69% 45%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
     /* Base Background: #050505 (Ultra Deep) */
     --background: 240 10% 2%;
 
@@ -45,9 +77,6 @@
     --border: 216 20% 20%;
     --input: 216 20% 20%;
     --ring: 157 69% 65%;
-
-    /* Radius: 12px default for buttons */
-    --radius: 0.75rem;
   }
 }
 
@@ -73,37 +102,52 @@
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.5'/%3E%3C/svg%3E");
   }
 
+  :root {
+    /* ... existing color vars ... */
+
+    /* Theme Configuration - Shadows & Effects */
+    --shadow-light: none;
+    --shadow-hover: none;
+
+    --glare-opacity: 0.4;
+    --border-opacity: 0.2;
+    /* Reduced from 0.5 for lighter borders */
+  }
+
+  .dark {
+    /* ... existing color vars ... */
+
+    /* Theme Configuration - Shadows & Effects (Dark Mode) */
+    --shadow-light: none;
+    --shadow-hover: none;
+
+    --glare-opacity: 0.05;
+    --border-opacity: 0.1;
+    /* Reduced from 0.2 for lighter borders */
+  }
+}
+
+@layer components {
   .glass-card {
-    @apply bg-card/40 backdrop-blur-[20px] saturate-[180%] border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.8)];
-    background-image: radial-gradient(
-      circle at top left,
-      rgba(255, 255, 255, 0.03) 0%,
-      transparent 50%
-    );
+    @apply bg-card/60 backdrop-blur-xl border transition-all duration-300;
+    box-shadow: var(--shadow-light);
+
+    background-image: radial-gradient(circle at top left,
+        rgba(255, 255, 255, var(--glare-opacity)) 0%,
+        transparent 50%);
   }
 
   .lens-effect {
     @apply relative overflow-hidden transition-all duration-500;
   }
 
-  .lens-effect::after {
-    content: "";
-    @apply absolute inset-0 opacity-0 transition-opacity duration-500 pointer-events-none;
-    background: radial-gradient(
-      circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
-      rgba(255, 255, 255, 0.08) 0%,
-      transparent 40%
-    );
-  }
-
-  .lens-effect:hover::after {
-    @apply opacity-100;
-  }
-
   .lens-effect:hover {
-    @apply scale-[1.01] shadow-[0_20px_50px_rgba(0,0,0,0.5)];
+    transform: scale(1.01);
+    box-shadow: var(--shadow-hover);
   }
 }
+
+@layer utilities {}
 
 /* Custom Scrollbar & Layout Stability */
 html {

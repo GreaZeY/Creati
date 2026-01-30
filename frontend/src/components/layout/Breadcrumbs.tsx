@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronRight, Home } from 'lucide-react';
+import { ThemeToggle } from '../ThemeToggle';
 
 export const Breadcrumbs = () => {
     const location = useLocation();
@@ -21,7 +22,8 @@ export const Breadcrumbs = () => {
     };
 
     return (
-        <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
+        <nav className="flex items-center gap-2 justify-between text-sm text-muted-foreground mb-6">
+            <div>
             <Link
                 to="/dashboard"
                 className="hover:text-primary transition-colors flex items-center gap-1"
@@ -48,6 +50,8 @@ export const Breadcrumbs = () => {
                     </div>
                 );
             })}
+            </div>
+            <ThemeToggle/>
         </nav>
     );
 };
