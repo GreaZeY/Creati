@@ -25,6 +25,7 @@ var logsClearCmd = &cobra.Command{
 func init() {
 	logsClearCmd.Flags().BoolVarP(&forceClear, "force", "f", false, "Force clear by truncating files if they are in use")
 	logsCmd.AddCommand(logsClearCmd)
+	rootCmd.AddCommand(logsCmd)
 }
 
 func runLogsClear(cmd *cobra.Command, args []string) {

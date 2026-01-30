@@ -15,6 +15,10 @@ var updateCmd = &cobra.Command{
 	Run:   runSelfUpdate,
 }
 
+func init() {
+	rootCmd.AddCommand(updateCmd)
+}
+
 func runSelfUpdate(cmd *cobra.Command, args []string) {
 	fmt.Println("🔄 Rebuilding creati CLI...")
 

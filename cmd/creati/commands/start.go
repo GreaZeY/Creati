@@ -24,6 +24,7 @@ var startCmd = &cobra.Command{
 
 func init() {
 	startCmd.Flags().BoolVarP(&workerOnly, "worker-only", "w", false, "Start only the backend worker")
+	rootCmd.AddCommand(startCmd)
 }
 
 func runStart(cmd *cobra.Command, args []string) {

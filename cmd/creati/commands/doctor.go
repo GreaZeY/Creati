@@ -18,6 +18,10 @@ var doctorCmd = &cobra.Command{
 	Run:   runDoctor,
 }
 
+func init() {
+	rootCmd.AddCommand(doctorCmd)
+}
+
 func runDoctor(cmd *cobra.Command, args []string) {
 	cfg := GetConfig()
 

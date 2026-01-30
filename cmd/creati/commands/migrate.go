@@ -15,6 +15,10 @@ var migrateCmd = &cobra.Command{
 	Run:   runMigrate,
 }
 
+func init() {
+	rootCmd.AddCommand(migrateCmd)
+}
+
 func runMigrate(cmd *cobra.Command, args []string) {
 	fmt.Println("🚀 Running database migrations...")
 

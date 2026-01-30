@@ -15,6 +15,11 @@ var buildCmd = &cobra.Command{
 	Run:   runBuild,
 }
 
+func init() {
+	rootCmd.AddCommand(buildCmd)
+}
+
+
 func runBuild(cmd *cobra.Command, args []string) {
 	cfg := GetConfig()
 

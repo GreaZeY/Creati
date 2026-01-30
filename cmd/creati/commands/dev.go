@@ -15,6 +15,10 @@ var devCmd = &cobra.Command{
 	Run:   runDev,
 }
 
+func init() {
+	rootCmd.AddCommand(devCmd)
+}
+
 func runDev(cmd *cobra.Command, args []string) {
 	cfg := GetConfig()
 

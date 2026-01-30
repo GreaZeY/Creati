@@ -50,16 +50,7 @@ func Execute() error {
 	return rootCmd.Execute()
 }
 
-func init() {
-	rootCmd.AddCommand(startCmd)
-	rootCmd.AddCommand(buildCmd)
-	rootCmd.AddCommand(logsCmd)
-	rootCmd.AddCommand(devCmd)
-	rootCmd.AddCommand(doctorCmd)
-	rootCmd.AddCommand(queueCmd)
-	rootCmd.AddCommand(migrateCmd)
-	rootCmd.AddCommand(updateCmd)
-}
+// Commands self-register via their own init() functions
 
 // ensureProjectRoot validates we're in the project root
 func ensureProjectRoot() {

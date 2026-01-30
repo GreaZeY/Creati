@@ -51,6 +51,7 @@ func init() {
 	queueCmd.AddCommand(queueClearCmd)
 	queueCmd.AddCommand(queueUpCmd)
 	queueCmd.AddCommand(queueDownCmd)
+	rootCmd.AddCommand(queueCmd)
 }
 
 func getRedisClient() (*redis.Client, string) {
