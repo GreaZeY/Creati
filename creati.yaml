@@ -1,0 +1,22 @@
+# Creati Configuration
+
+# Mode: "dev" or "prod"
+mode: dev
+
+# Project paths
+frontend_path: frontend
+backend_path: backend
+
+# Development configuration
+dev:
+  frontend_command: npm run dev
+  backend_command: air
+  frontend_port: 5173
+  backend_port: 8080
+
+# Production configuration
+prod:
+  frontend_command: npm run build
+  backend_command: go run ./cmd/app
+  frontend_dist: frontend/dist
+  backend_bin: bin/creati-server
