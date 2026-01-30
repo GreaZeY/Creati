@@ -14,9 +14,33 @@ The CLI is already built! The binary is located at `tools/creati.exe`.
 .\tools\creati.exe start
 ```
 
-This will start both frontend and backend based on the mode in `creati.yaml`:
-- **Dev mode** (`mode: dev`): Runs `npm run dev` and `air`
-- **Prod mode** (`mode: prod`): Runs production builds
+This will start both frontend and backend based on the mode in `creati.yaml`.
+
+#### Options:
+- `--worker-only` / `-w`: Start only the backend worker process.
+
+### Queue Management (Redis)
+
+```bash
+# Show items in upload_queue
+.\tools\creati.exe queue info
+
+# Clear the upload_queue
+.\tools\creati.exe queue clear
+```
+
+### Database Migrations
+
+```bash
+.\tools\creati.exe migrate
+```
+
+### Self-Update
+
+```bash
+# Rebuild the CLI from source
+.\tools\creati.exe self-update
+```
 
 ### Check Environment Health
 

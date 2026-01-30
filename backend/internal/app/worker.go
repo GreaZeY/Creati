@@ -180,8 +180,9 @@ func HandleAutomationJob(db *sql.DB, storage *services.StorageService, throttle 
 	var ruleID int
 	var sourcePlatform string
 	err = db.QueryRow(`
-		SELECT r.id, r.user_id, r.name, r.source_platform 
+		SELECT r.id, r.user_id, r.name, pa.platform 
 		FROM automation_rules r
+		JOIN platform_accounts pa ON r.source_account_id = pa.id
 		WHERE r.id = (SELECT rule_id FROM automation_jobs WHERE id = $1)
 	`, job.AutomationJobID).Scan(&ruleID, &userID, &ruleName, &sourcePlatform)
 	if err != nil {

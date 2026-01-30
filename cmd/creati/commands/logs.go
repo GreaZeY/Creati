@@ -14,6 +14,8 @@ var logsCmd = &cobra.Command{
 	Long:  `Manage application log files`,
 }
 
+var forceClear bool
+
 var logsClearCmd = &cobra.Command{
 	Use:   "clear",
 	Short: "Clear all log files",
@@ -21,6 +23,7 @@ var logsClearCmd = &cobra.Command{
 }
 
 func init() {
+	logsClearCmd.Flags().BoolVarP(&forceClear, "force", "f", false, "Force clear by truncating files if they are in use")
 	logsCmd.AddCommand(logsClearCmd)
 }
 
@@ -34,14 +37,27 @@ func runLogsClear(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	removed := 0
+	cleared := 0
 	for _, file := range files {
-		if err := os.Remove(file); err != nil {
-			fmt.Printf("⚠️  Failed to remove %s: %v\n", file, err)
+		err := os.Remove(file)
+		if err == nil {
+			cleared++
+			continue
+		}
+
+		if forceClear {
+			// Try truncation if remove fails and force is enabled
+			err := os.Truncate(file, 0)
+			if err == nil {
+				fmt.Printf("🧹 Truncated locked file: %s\n", file)
+				cleared++
+			} else {
+				fmt.Printf("❌ Failed to clear %s (even with force): %v\n", file, err)
+			}
 		} else {
-			removed++
+			fmt.Printf("⚠️  Failed to remove %s: %v (Use --force to truncate instead)\n", file, err)
 		}
 	}
 
-	fmt.Printf("✅ Cleared %d log file(s)\n", removed)
+	fmt.Printf("✅ Cleared %d log file(s)\n", cleared)
 }

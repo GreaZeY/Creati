@@ -13,11 +13,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var workerOnly bool
+
 var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start frontend and backend",
 	Long:  `Starts both frontend and backend services with prefixed colored logs`,
 	Run:   runStart,
+}
+
+func init() {
+	startCmd.Flags().BoolVarP(&workerOnly, "worker-only", "w", false, "Start only the backend worker")
 }
 
 func runStart(cmd *cobra.Command, args []string) {
@@ -26,52 +32,63 @@ func runStart(cmd *cobra.Command, args []string) {
 	var backendCmd, frontendCmd *exec.Cmd
 
 	if cfg.IsDev() {
-		// Development mode
 		fmt.Println("🚀 Starting in DEV mode...")
-
-		// Start backend with air
-		backendCmd = exec.Command("cmd", "/C", "cd backend && "+cfg.DevConfig.BackendCommand)
-
-		// Start frontend with npm run dev
-		frontendCmd = exec.Command("cmd", "/C", "cd "+cfg.FrontendPath+" && "+cfg.DevConfig.FrontendCommand)
+		if workerOnly {
+			fmt.Println("👷 Starting WORKER ONLY...")
+			backendCmd = exec.Command("cmd", "/C", "cd backend && set RUN_MODE=worker && "+cfg.DevConfig.BackendCommand)
+		} else {
+			backendCmd = exec.Command("cmd", "/C", "cd backend && "+cfg.DevConfig.BackendCommand)
+			frontendCmd = exec.Command("cmd", "/C", "cd "+cfg.FrontendPath+" && "+cfg.DevConfig.FrontendCommand)
+		}
 	} else {
-		// Production mode
 		fmt.Println("🚀 Starting in PRODUCTION mode...")
-
-		// Start backend binary
-		backendCmd = exec.Command("cmd", "/C", "cd backend && "+cfg.ProdConfig.BackendCommand)
-
-		// Start frontend (assuming built and served via backend)
-		frontendCmd = exec.Command("cmd", "/C", "cd "+cfg.FrontendPath+" && "+cfg.ProdConfig.FrontendCommand)
+		if workerOnly {
+			fmt.Println("👷 Starting WORKER ONLY...")
+			backendCmd = exec.Command("cmd", "/C", "cd backend && set RUN_MODE=worker && "+cfg.ProdConfig.BackendCommand)
+		} else {
+			backendCmd = exec.Command("cmd", "/C", "cd backend && "+cfg.ProdConfig.BackendCommand)
+			frontendCmd = exec.Command("cmd", "/C", "cd "+cfg.FrontendPath+" && "+cfg.ProdConfig.FrontendCommand)
+		}
 	}
 
-	// Set up colored log prefixes
-	backendColor := color.New(color.FgCyan).SprintFunc()
-	frontendColor := color.New(color.FgGreen).SprintFunc()
+	// Pipes
+	var backendStdout, backendStderr io.ReadCloser
+	var frontendStdout, frontendStderr io.ReadCloser
 
-	// Pipe outputs with prefixes
-	backendStdout, _ := backendCmd.StdoutPipe()
-	backendStderr, _ := backendCmd.StderrPipe()
-	frontendStdout, _ := frontendCmd.StdoutPipe()
-	frontendStderr, _ := frontendCmd.StderrPipe()
+	backendStdout, _ = backendCmd.StdoutPipe()
+	backendStderr, _ = backendCmd.StderrPipe()
 
-	// Start both processes
+	if frontendCmd != nil {
+		frontendStdout, _ = frontendCmd.StdoutPipe()
+		frontendStderr, _ = frontendCmd.StderrPipe()
+	}
+
+	// Start processes
 	if err := backendCmd.Start(); err != nil {
 		fmt.Println("❌ Failed to start backend:", err)
 		return
 	}
 
-	if err := frontendCmd.Start(); err != nil {
-		fmt.Println("❌ Failed to start frontend:", err)
-		backendCmd.Process.Kill()
-		return
+	if frontendCmd != nil {
+		if err := frontendCmd.Start(); err != nil {
+			fmt.Println("❌ Failed to start frontend:", err)
+			backendCmd.Process.Kill()
+			return
+		}
 	}
 
-	// Stream logs with prefixes
+	// Colors
+	backendColor := color.New(color.FgCyan).SprintFunc()
+	frontendColor := color.New(color.FgGreen).SprintFunc()
+
+	// Stream logs
 	go streamLogs(backendStdout, backendColor("[backend]"))
 	go streamLogs(backendStderr, backendColor("[backend]"))
-	go streamLogs(frontendStdout, frontendColor("[frontend]"))
-	go streamLogs(frontendStderr, frontendColor("[frontend]"))
+
+	if frontendCmd != nil {
+		go streamLogs(frontendStdout, frontendColor("[frontend]"))
+		go streamLogs(frontendStderr, frontendColor("[frontend]"))
+	}
 
 	// Handle graceful shutdown
 	sigChan := make(chan os.Signal, 1)
@@ -81,17 +98,19 @@ func runStart(cmd *cobra.Command, args []string) {
 		<-sigChan
 		fmt.Println("\n🛑 Shutting down...")
 
-		if backendCmd.Process != nil {
+		if backendCmd != nil && backendCmd.Process != nil {
 			backendCmd.Process.Signal(syscall.SIGTERM)
 		}
-		if frontendCmd.Process != nil {
+		if frontendCmd != nil && frontendCmd.Process != nil {
 			frontendCmd.Process.Signal(syscall.SIGTERM)
 		}
 	}()
 
-	// Wait for both to complete
+	// Wait for processes
 	backendCmd.Wait()
-	frontendCmd.Wait()
+	if frontendCmd != nil {
+		frontendCmd.Wait()
+	}
 }
 
 // streamLogs reads from a pipe and prints with prefix

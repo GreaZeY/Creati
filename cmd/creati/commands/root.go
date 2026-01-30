@@ -37,8 +37,8 @@ var config *Config
 // rootCmd represents the base command
 var rootCmd = &cobra.Command{
 	Use:   "creati",
-	Short: "Creati development tool",
-	Long:  `Repo-local CLI for managing Creati development workflow`,
+	Short: "Creati CLI",
+	Long:  `CLI for managing Creati workflow`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		ensureProjectRoot()
 		loadConfig()
@@ -56,6 +56,9 @@ func init() {
 	rootCmd.AddCommand(logsCmd)
 	rootCmd.AddCommand(devCmd)
 	rootCmd.AddCommand(doctorCmd)
+	rootCmd.AddCommand(queueCmd)
+	rootCmd.AddCommand(migrateCmd)
+	rootCmd.AddCommand(updateCmd)
 }
 
 // ensureProjectRoot validates we're in the project root
