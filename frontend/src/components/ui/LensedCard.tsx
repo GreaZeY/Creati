@@ -35,7 +35,7 @@ export function LensedCard({ children, className, onClick }: LensedCardProps) {
       <div
         className="absolute inset-0 pointer-events-none opacity-0 transition-opacity duration-500 group-hover:opacity-100"
         style={{
-          background: `radial-gradient(circle at ${mousePos.x}% ${mousePos.y}%, hsl(var(--primary) / 0.2) 0%, transparent 45%)`,
+          background: `radial-gradient(circle at ${mousePos.x}% ${mousePos.y}%, hsl(var(--primary) / 0.06) 0%, transparent 45%)`,
         }}
       />
 

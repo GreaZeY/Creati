@@ -14,7 +14,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 157 69% 45%;
+    --primary: 344.67 100% 64.71%;
     /* Slightly darker teal for light mode contrast */
     --primary-foreground: 210 40% 98%;
 
@@ -24,7 +24,7 @@
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
+    --accent: 344.67 100% 64.71%;
     --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
@@ -53,7 +53,7 @@
     --popover-foreground: 216 20% 92%;
 
     /* Accent: #6AE3B4 (Mint-Teal) */
-    --primary: 157 69% 65%;
+    /* --primary: 157 69% 65%; */
     /* Primary text on accent: Dark Bg Color (#0E1116) */
     --primary-foreground: 218 22% 7%;
 

@@ -9,7 +9,6 @@ export const Settings = () => {
         { label: 'Profile', icon: User, desc: 'Manage your public name and avatar.' },
         { label: 'Notifications', icon: Bell, desc: 'Configure when and how you receive updates.' },
         { label: 'Security', icon: Lock, desc: 'Update your password and 2FA settings.' },
-        { label: 'Appearance', icon: Palette, desc: 'Customize the theme and layout density.' },
     ];
 
     return (
