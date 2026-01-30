@@ -18,7 +18,7 @@ var updateCmd = &cobra.Command{
 func runSelfUpdate(cmd *cobra.Command, args []string) {
 	fmt.Println("🔄 Rebuilding creati CLI...")
 
-	buildCmd := exec.Command("go", "build", "-o", "tools/creati.exe", "./cmd/creati")
+	buildCmd := exec.Command("go", "build", "-o", "creati.exe", "./cmd/creati")
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 

@@ -28,9 +28,29 @@ var queueClearCmd = &cobra.Command{
 	Run:   runQueueClear,
 }
 
+var queueUpCmd = &cobra.Command{
+	Use:   "up",
+	Short: "Start Redis queue service (Docker)",
+	Run: func(cmd *cobra.Command, args []string) {
+		// We could start just redis, but StartServices(true) is safer to ensure stack health
+		StartServices(true)
+	},
+}
+
+var queueDownCmd = &cobra.Command{
+	Use:   "down",
+	Short: "Stop Redis queue service (Docker)",
+	Run: func(cmd *cobra.Command, args []string) {
+		// StopServices brings down the whole stack which includes redis
+		StopServices()
+	},
+}
+
 func init() {
 	queueCmd.AddCommand(queueInfoCmd)
 	queueCmd.AddCommand(queueClearCmd)
+	queueCmd.AddCommand(queueUpCmd)
+	queueCmd.AddCommand(queueDownCmd)
 }
 
 func getRedisClient() (*redis.Client, string) {

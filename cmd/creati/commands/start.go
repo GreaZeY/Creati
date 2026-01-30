@@ -33,6 +33,10 @@ func runStart(cmd *cobra.Command, args []string) {
 
 	if cfg.IsDev() {
 		fmt.Println("🚀 Starting in DEV mode...")
+
+		// Start Docker sidecars (Redis, PG) using shared logic
+		StartServices(true)
+
 		if workerOnly {
 			fmt.Println("👷 Starting WORKER ONLY...")
 			backendCmd = exec.Command("cmd", "/C", "cd backend && set RUN_MODE=worker && "+cfg.DevConfig.BackendCommand)
@@ -103,6 +107,10 @@ func runStart(cmd *cobra.Command, args []string) {
 		}
 		if frontendCmd != nil && frontendCmd.Process != nil {
 			frontendCmd.Process.Signal(syscall.SIGTERM)
+		}
+
+		if cfg.IsDev() {
+			StopServices()
 		}
 	}()
 
