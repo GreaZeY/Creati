@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"creati.in/creati/backend/internal/api"
+	workerApp "creati.in/creati/backend/internal/app"
 	"creati.in/creati/backend/internal/features"
 	"creati.in/creati/backend/internal/middleware"
 	"creati.in/creati/backend/internal/services"
@@ -83,6 +84,15 @@ func main() {
 		eventProcessor := workers.NewEventProcessor(db, dbURL, realtimeService, 30*time.Second, 50)
 		go eventProcessor.Start(ctx)
 		log.Println("✓ Event Processor started")
+
+		// Job Worker for uploads
+		throttleService := services.NewThrottleService(queueService.Client)
+		go func() {
+			log.Println("✓ Job Worker started")
+			if err := workerApp.RunWorker(ctx, db, throttleService); err != nil {
+				log.Printf("❌ Job Worker failed: %v", err)
+			}
+		}()
 	}
 
 	if startMode == "api" || startMode == "all" {
@@ -136,101 +146,101 @@ func main() {
 		// API routes
 		apiRoutes := app.Group("/api")
 
-	// Public routes
-	apiRoutes.Post("/auth/register", authHandler.Register)
-	apiRoutes.Post("/auth/login", authHandler.Login)
-	apiRoutes.Post("/auth/logout", authHandler.Logout) // Logout can be public or protected, technically public to clear cookie is fine
+		// Public routes
+		apiRoutes.Post("/auth/register", authHandler.Register)
+		apiRoutes.Post("/auth/login", authHandler.Login)
+		apiRoutes.Post("/auth/logout", authHandler.Logout) // Logout can be public or protected, technically public to clear cookie is fine
 
-	// OAuth callback (public)
-	// OAuth callback (public - invoked by frontend)
-	apiRoutes.Post("/platforms/:platform/callback", platformHandler.HandleCallback)
+		// OAuth callback (public)
+		// OAuth callback (public - invoked by frontend)
+		apiRoutes.Post("/platforms/:platform/callback", platformHandler.HandleCallback)
 
-	// Webhooks (public - unauthenticated)
-	webhooks := app.Group("/webhooks")
-	webhooks.Get("/youtube", webhookHandler.YouTubeWebhookVerification)  // WebSub subscription verification
-	webhooks.Post("/youtube", webhookHandler.YouTubeWebhookNotification) // WebSub content notifications
-	webhooks.Post("/razorpay", paymentHandler.HandleWebhook)
+		// Webhooks (public - unauthenticated)
+		webhooks := app.Group("/webhooks")
+		webhooks.Get("/youtube", webhookHandler.YouTubeWebhookVerification)  // WebSub subscription verification
+		webhooks.Post("/youtube", webhookHandler.YouTubeWebhookNotification) // WebSub content notifications
+		webhooks.Post("/razorpay", paymentHandler.HandleWebhook)
 
-	// Protected routes (require authentication)
-	protected := apiRoutes.Use(middleware.AuthMiddleware)
+		// Protected routes (require authentication)
+		protected := apiRoutes.Use(middleware.AuthMiddleware)
 
-	// Auth Check
-	protected.Get("/auth/me", authHandler.CheckAuth)
+		// Auth Check
+		protected.Get("/auth/me", authHandler.CheckAuth)
 
-	// Realtime (SSE) - single connection for all blasts
-	protected.Get("/realtime/blasts", func(c *fiber.Ctx) error {
-		userID := middleware.GetUserID(c)
-		return realtimeService.HandleConnection(c, userID)
-	})
+		// Realtime (SSE) - single connection for all blasts
+		protected.Get("/realtime/blasts", func(c *fiber.Ctx) error {
+			userID := middleware.GetUserID(c)
+			return realtimeService.HandleConnection(c, userID)
+		})
 
-	// Uploads
-	protected.Post("/upload/init", uploadHandler.InitUpload)
-	protected.Post("/upload/confirm", uploadHandler.ConfirmUpload)
+		// Uploads
+		protected.Post("/upload/init", uploadHandler.InitUpload)
+		protected.Post("/upload/confirm", uploadHandler.ConfirmUpload)
 
-	// Platforms
-	protected.Get("/platforms/count", platformHandler.GetPlatformCounts)
-	protected.Get("/platforms", platformHandler.ListPlatforms)
-	// Check account limit before allowing new connections
-	protected.Get("/platforms/:platform/connect",
-		middleware.RequireLimit(db, cacheService, features.MaxConnectedAccounts, func(userID int) (int, error) {
-			var count int
-			err := db.QueryRow("SELECT COUNT(*) FROM platform_accounts WHERE user_id = $1 AND status IN ('active', 'connected')", userID).Scan(&count)
-			return count, err
-		}),
-		platformHandler.InitiateConnection,
-	)
-	protected.Put("/platforms/:platform/disconnect", platformHandler.DeactivatePlatform)
-	protected.Delete("/platforms/:platform", platformHandler.RemovePlatform)
-	protected.Get("/platforms/:platform/videos", platformHandler.GetRecentVideos)
+		// Platforms
+		protected.Get("/platforms/count", platformHandler.GetPlatformCounts)
+		protected.Get("/platforms", platformHandler.ListPlatforms)
+		// Check account limit before allowing new connections
+		protected.Get("/platforms/:platform/connect",
+			middleware.RequireLimit(db, cacheService, features.MaxConnectedAccounts, func(userID int) (int, error) {
+				var count int
+				err := db.QueryRow("SELECT COUNT(*) FROM platform_accounts WHERE user_id = $1 AND status IN ('active', 'connected')", userID).Scan(&count)
+				return count, err
+			}),
+			platformHandler.InitiateConnection,
+		)
+		protected.Put("/platforms/:platform/disconnect", platformHandler.DeactivatePlatform)
+		protected.Delete("/platforms/:platform", platformHandler.RemovePlatform)
+		protected.Get("/platforms/:platform/videos", platformHandler.GetRecentVideos)
 
-	// Videos & Dashboard
-	protected.Get("/videos", videosHandler.ListVideos)
-	protected.Get("/videos/:id/status", videosHandler.GetVideoStatus)
-	protected.Get("/videos/:id/analytics", videosHandler.GetVideoAnalytics)
+		// Videos & Dashboard
+		protected.Get("/videos", videosHandler.ListVideos)
+		protected.Get("/videos/:id/status", videosHandler.GetVideoStatus)
+		protected.Get("/videos/:id/analytics", videosHandler.GetVideoAnalytics)
 
-	// Analytics
-	protected.Get("/analytics/overview", analyticsHandler.GetOverview)
-	protected.Get("/analytics/queue-status", analyticsHandler.GetQueueStatus)
+		// Analytics
+		protected.Get("/analytics/overview", analyticsHandler.GetOverview)
+		protected.Get("/analytics/queue-status", analyticsHandler.GetQueueStatus)
 
-	// Platform Events (Upload Detection)
-	protected.Get("/events", webhookHandler.ListEvents)              // List user's events
-	protected.Get("/events/:id", webhookHandler.GetEvent)            // Get single event
-	protected.Post("/events/:id/replay", webhookHandler.ReplayEvent) // Replay failed event
-	// Dev/testing only - should be gated by env var in production
-	if os.Getenv("ENABLE_EVENT_SIMULATOR") == "true" {
-		protected.Post("/events/simulate", webhookHandler.SimulateEvent)
-	}
+		// Platform Events (Upload Detection)
+		protected.Get("/events", webhookHandler.ListEvents)              // List user's events
+		protected.Get("/events/:id", webhookHandler.GetEvent)            // Get single event
+		protected.Post("/events/:id/replay", webhookHandler.ReplayEvent) // Replay failed event
+		// Dev/testing only - should be gated by env var in production
+		if os.Getenv("ENABLE_EVENT_SIMULATOR") == "true" {
+			protected.Post("/events/simulate", webhookHandler.SimulateEvent)
+		}
 
-	// Automation (Protected by Magic Sync entitlement)
-	automationGroup := protected.Group("/automation", middleware.RequireFeature(db, cacheService, features.CanUseMagicSync))
-	automationGroup.Get("", automationHandler.ListRules)
-	automationGroup.Post("", automationHandler.CreateRule)
-	automationGroup.Post("/blast", automationHandler.HandleBlast)
-	automationGroup.Get("/rules/:id/summary", automationHandler.GetRuleJobSummary)
-	automationGroup.Put("/:id", automationHandler.ToggleRule)
-	automationGroup.Delete("/:id", automationHandler.DeleteRule)
+		// Automation (Protected by Magic Sync entitlement)
+		automationGroup := protected.Group("/automation", middleware.RequireFeature(db, cacheService, features.CanUseMagicSync))
+		automationGroup.Get("", automationHandler.ListRules)
+		automationGroup.Post("", automationHandler.CreateRule)
+		automationGroup.Post("/blast", automationHandler.HandleBlast)
+		automationGroup.Get("/rules/:id/summary", automationHandler.GetRuleJobSummary)
+		automationGroup.Put("/:id", automationHandler.ToggleRule)
+		automationGroup.Delete("/:id", automationHandler.DeleteRule)
 
-	// Payments
-	// Payments
-	protected.Post("/payments/create-subscription", paymentHandler.CreateSubscription)
-	protected.Post("/payments/verify-subscription", paymentHandler.VerifySubscription)
-	protected.Put("/payments/subscription", paymentHandler.UpdateSubscription)
-	protected.Delete("/payments/subscription", paymentHandler.CancelSubscription)
-	protected.Get("/payments/subscription", paymentHandler.GetSubscription)
+		// Payments
+		// Payments
+		protected.Post("/payments/create-subscription", paymentHandler.CreateSubscription)
+		protected.Post("/payments/verify-subscription", paymentHandler.VerifySubscription)
+		protected.Put("/payments/subscription", paymentHandler.UpdateSubscription)
+		protected.Delete("/payments/subscription", paymentHandler.CancelSubscription)
+		protected.Get("/payments/subscription", paymentHandler.GetSubscription)
 
-	// Start server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+		// Start server
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8080"
+		}
 
-	fmt.Println("\n========================================")
-	fmt.Println("🚀 Server starting on port", port)
-	fmt.Println("========================================")
-	fmt.Println("Frontend: " + frontendURL)
-	fmt.Println("API: http://localhost:" + port)
-	fmt.Println("Health: http://localhost:" + port + "/health")
-	fmt.Println("========================================")
+		fmt.Println("\n========================================")
+		fmt.Println("🚀 Server starting on port", port)
+		fmt.Println("========================================")
+		fmt.Println("Frontend: " + frontendURL)
+		fmt.Println("API: http://localhost:" + port)
+		fmt.Println("Health: http://localhost:" + port + "/health")
+		fmt.Println("========================================")
 		log.Fatal(app.Listen(":" + port))
 	}
 }
