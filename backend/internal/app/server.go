@@ -36,7 +36,14 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 
 	// Middleware
 	app.Use(fiberlog.New())
-	app.Use(cors.New())
+
+	// CORS - Allow credentials (required for SSE with auth)
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     os.Getenv("FRONTEND_URL"),
+		AllowCredentials: true,
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS",
+	}))
 
 	// Static storage (for local driver)
 	app.Static("/storage", "./storage")

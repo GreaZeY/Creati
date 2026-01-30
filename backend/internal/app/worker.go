@@ -177,12 +177,18 @@ func HandleAutomationJob(db *sql.DB, storage *services.StorageService, throttle 
 	logger.Get("automation").Info("Fetching rule details...")
 	var userID int
 	var ruleName string
+	var ruleID int
+	var sourcePlatform string
 	err = db.QueryRow(`
-		SELECT user_id, name FROM automation_rules WHERE id = (SELECT rule_id FROM automation_jobs WHERE id = $1)
-	`, job.AutomationJobID).Scan(&userID, &ruleName)
+		SELECT r.id, r.user_id, r.name, r.source_platform 
+		FROM automation_rules r
+		WHERE r.id = (SELECT rule_id FROM automation_jobs WHERE id = $1)
+	`, job.AutomationJobID).Scan(&ruleID, &userID, &ruleName, &sourcePlatform)
 	if err != nil {
 		return fmt.Errorf("failed to fetch rule details: %w", err)
 	}
+
+	// 2. Download from YouTube to get metadata first
 
 	// 2. Download from YouTube to a temporary file
 	logger.Get("automation").WithField("video_id", job.SourceVideoID).Info("Fetching YouTube metadata...")
@@ -197,7 +203,77 @@ func HandleAutomationJob(db *sql.DB, storage *services.StorageService, throttle 
 		return fmt.Errorf("failed to fetch youtube metadata: %w", err)
 	}
 
-	logger.Get("automation").WithField("title", videoMetadata.Title).Info("Got metadata, starting stream download...")
+	logger.Get("automation").WithField("title", videoMetadata.Title).Info("Got metadata, normalizing content...")
+
+	// 2a. Normalize Content (get or create canonical content ID)
+	normalizer := services.NewContentNormalizer(db)
+	normalized, err := normalizer.NormalizeContent(
+		context.Background(),
+		sourcePlatform,
+		job.SourceVideoID,
+		0, // No account ID for source
+		videoMetadata.Title,
+		videoMetadata.Description,
+		int(videoMetadata.Duration.Seconds()),
+		"", // No S3 key yet for source
+	)
+	if err != nil {
+		return fmt.Errorf("failed to normalize content: %w", err)
+	}
+
+	contentID := normalized.ContentID
+	logger.Get("automation").WithFields(logrus.Fields{
+		"content_id": contentID,
+		"is_new":     normalized.IsNew,
+	}).Info("Content normalized")
+
+	// 2b. Cycle Detection - Check if content already posted to target platform
+	cycleCtx, cycleCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cycleCancel()
+
+	wouldCycle, err := normalizer.CheckCycle(cycleCtx, contentID, job.Platform)
+	if err != nil {
+		return fmt.Errorf("failed to check for cycle: %w", err)
+	}
+
+	if wouldCycle {
+		logger.Get("automation").WithFields(logrus.Fields{
+			"content_id":      contentID,
+			"target_platform": job.Platform,
+		}).Warn("Cycle detected - content already exists on target platform, skipping")
+
+		// Record skipped execution
+		_, _ = db.Exec(`
+			INSERT INTO automation_executions 
+			(content_id, rule_id, source_platform, target_platform, target_account_id, status, trace_id)
+			VALUES ($1, $2, $3, $4, $5, 'skipped_cycle', gen_random_uuid())
+			ON CONFLICT (content_id, target_platform) DO UPDATE SET status = 'skipped_cycle'
+		`, contentID, ruleID, sourcePlatform, job.Platform, job.AccountID)
+
+		// Update automation_jobs
+		db.Exec("UPDATE automation_jobs SET status = 'skipped', error = 'Cycle detected', updated_at = NOW() WHERE id = $1", job.AutomationJobID)
+
+		return nil // Not an error, just skipped
+	}
+
+	// 2c. Create Automation Execution Record (with timeout)
+	execCtx, execCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer execCancel()
+
+	var executionID string
+	err = db.QueryRowContext(execCtx, `
+		INSERT INTO automation_executions 
+		(content_id, rule_id, source_platform, target_platform, target_account_id, status, trace_id)
+		VALUES ($1, $2, $3, $4, $5, 'queued', gen_random_uuid())
+		RETURNING id
+	`, contentID, ruleID, sourcePlatform, job.Platform, job.AccountID).Scan(&executionID)
+	if err != nil {
+		return fmt.Errorf("failed to create execution record: %w", err)
+	}
+
+	logger.Get("automation").WithField("execution_id", executionID).Info("Created execution record, proceeding with download...")
+
+	// 3. Continue with download and upload
 
 	formats := videoMetadata.Formats.WithAudioChannels()
 	if len(formats) == 0 {
@@ -220,14 +296,17 @@ func HandleAutomationJob(db *sql.DB, storage *services.StorageService, throttle 
 	}
 	s3Key := fmt.Sprintf("automation/%d/youtube_%s_%s.mp4", userID, channelID, job.SourceVideoID)
 
-	// Check if already exists
-	exists, err := storage.Exists(context.Background(), s3Key)
+	// Check if already exists (with timeout)
+	existsCtx, existsCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer existsCancel()
+
+	exists, err := storage.Exists(existsCtx, s3Key)
 	if err == nil && exists {
 		logger.Get("automation").WithField("key", s3Key).Info("Video already staged, skipping download...")
 		s3URL := storage.GetObjectURL(s3Key)
 
 		// Continue to model persistence with existing URL
-		return persistAndPush(db, job, videoMetadata, ruleName, userID, s3URL)
+		return persistAndPush(db, job, videoMetadata, ruleName, userID, s3URL, contentID, executionID)
 	}
 
 	logger.Get("automation").WithFields(logrus.Fields{
@@ -278,10 +357,10 @@ func HandleAutomationJob(db *sql.DB, storage *services.StorageService, throttle 
 	logger.Get("automation").WithField("url", s3URL).Info("Upload successful!")
 
 	// 4. Create and persist Video model
-	return persistAndPush(db, job, videoMetadata, ruleName, userID, s3URL)
+	return persistAndPush(db, job, videoMetadata, ruleName, userID, s3URL, contentID, executionID)
 }
 
-func persistAndPush(db *sql.DB, job *services.UploadJob, videoMetadata *youtube.Video, ruleName string, userID int, s3URL string) error {
+func persistAndPush(db *sql.DB, job *services.UploadJob, videoMetadata *youtube.Video, ruleName string, userID int, s3URL string, contentID string, executionID string) error {
 
 	// 4. Create and persist Video model so it's tracked in Creati
 	video := &models.Video{
@@ -306,11 +385,15 @@ func persistAndPush(db *sql.DB, job *services.UploadJob, videoMetadata *youtube.
 	logger.Get("automation").WithField("platform", job.Platform).Info("Pushing to target platform...")
 	platformSvc, err := services.GetPlatformService(job.Platform, db)
 	if err != nil {
+		// Mark execution as failed
+		db.Exec(`UPDATE automation_executions SET status = 'failed', error = $1, completed_at = NOW() WHERE id = $2`, err.Error(), executionID)
 		return err
 	}
 
 	platformVideoID, err := platformSvc.Upload(video, job.AccountID)
 	if err != nil {
+		// Mark execution as failed
+		db.Exec(`UPDATE automation_executions SET status = 'failed', error = $1, completed_at = NOW() WHERE id = $2`, err.Error(), executionID)
 		return err
 	}
 
@@ -319,7 +402,19 @@ func persistAndPush(db *sql.DB, job *services.UploadJob, videoMetadata *youtube.
 		"platform_video_id": platformVideoID,
 	}).Info("Automation redistributed")
 
-	// 6. Record as a completed platform job so analytics will track it
+	// 6. Add platform_contents reference (prevents future cycles)
+	_, err = db.Exec(`
+		INSERT INTO platform_contents 
+		(content_id, platform, platform_content_id, account_id, s3_key, published_at)
+		VALUES ($1, $2, $3, $4, $5, NOW())
+		ON CONFLICT (content_id, platform) DO NOTHING
+	`, contentID, job.Platform, platformVideoID, job.AccountID, s3URL)
+	if err != nil {
+		logger.Get("automation").WithError(err).Warn("Failed to add platform_contents reference")
+	}
+
+	// 7. Record as a completed platform job so analytics will track it
+	// 7. Record as a completed platform job so analytics will track it
 	_, err = db.Exec(`
 		INSERT INTO video_platform_jobs (video_id, account_id, platform, platform_id, status)
 		VALUES ($1, $2, $3, $4, 'completed')
@@ -328,10 +423,20 @@ func persistAndPush(db *sql.DB, job *services.UploadJob, videoMetadata *youtube.
 		logger.Get("automation").WithError(err).Warn("Failed to create platform job record for automation video")
 	}
 
-	// 7. Update main video record with external ID
+	// 8. Update main video record with external ID
 	db.Exec(`UPDATE videos SET external_id = $1, platform = $2 WHERE id = $3`, platformVideoID, job.Platform, video.ID)
 
-	// 8. Final Status Update
+	// 9. Mark execution as completed
+	_, err = db.Exec(`
+		UPDATE automation_executions 
+		SET status = 'executed', completed_at = NOW()
+		WHERE id = $1
+	`, executionID)
+	if err != nil {
+		logger.Get("automation").WithError(err).Warn("Failed to mark execution as completed")
+	}
+
+	// 10. Final Status Update for automation_jobs
 	_, err = db.Exec(`
 		UPDATE automation_jobs 
 		SET status = 'completed', updated_at = NOW() 
