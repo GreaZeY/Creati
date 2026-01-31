@@ -21,6 +21,15 @@ func NewAutomationHandler(db *sql.DB, service *services.AutomationService) *Auto
 	return &AutomationHandler{db: db, service: service}
 }
 
+type BlastSummary struct {
+	Pending    int               `json:"pending"`
+	Processing int               `json:"processing"`
+	Completed  int               `json:"completed"`
+	Failed     int               `json:"failed"`
+	Total      int               `json:"total"`
+	Failures   map[string]string `json:"failures,omitempty"`
+}
+
 type RuleTarget struct {
 	AccountID       int    `json:"accountId"`
 	CaptionTemplate string `json:"captionTemplate"`
@@ -64,14 +73,6 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 		ProfileName     string `json:"profileName"`
 		Handle          string `json:"handle"`
 		Platform        string `json:"platform"`
-	}
-
-	type BlastSummary struct {
-		Pending    int `json:"pending"`
-		Processing int `json:"processing"`
-		Completed  int `json:"completed"`
-		Failed     int `json:"failed"`
-		Total      int `json:"total"`
 	}
 
 	type RuleResponse struct {
@@ -136,18 +137,19 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 
 		// Fetch summary for manual blasts
 		if r.TriggerType == "manual" {
+			s := &BlastSummary{Failures: make(map[string]string)}
 			summaryRows, err := h.db.Query(`
-				SELECT status, COUNT(*) 
-				FROM automation_executions 
-				WHERE rule_id = $1 
-				GROUP BY status
-			`, r.ID)
+					SELECT status, target_platform, error, COUNT(*) 
+					FROM automation_executions 
+					WHERE rule_id = $1 
+					GROUP BY status, target_platform, error
+				`, r.ID)
 			if err == nil {
-				s := &BlastSummary{}
 				for summaryRows.Next() {
-					var status string
+					var status, platform string
+					var errMsg sql.NullString
 					var count int
-					if err := summaryRows.Scan(&status, &count); err == nil {
+					if err := summaryRows.Scan(&status, &platform, &errMsg, &count); err == nil {
 						switch status {
 						case "queued", "pending":
 							s.Pending += count
@@ -157,6 +159,9 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 							s.Completed += count
 						case "failed":
 							s.Failed += count
+							if errMsg.Valid && errMsg.String != "" {
+								s.Failures[platform] = errMsg.String
+							}
 						}
 						s.Total += count
 					}
@@ -324,40 +329,40 @@ func (h *AutomationHandler) GetRuleJobSummary(c *fiber.Ctx) error {
 	}
 
 	rows, err := h.db.Query(`
-		SELECT status, COUNT(*) 
+		SELECT status, target_platform, error, COUNT(*) 
 		FROM automation_executions 
 		WHERE rule_id = $1 
-		GROUP BY status
+		GROUP BY status, target_platform, error
 	`, ruleID)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
 	}
 	defer rows.Close()
 
-	summary := fiber.Map{
-		"pending":    0,
-		"processing": 0,
-		"completed":  0,
-		"failed":     0,
-		"total":      0,
-	}
-
-	total := 0
+	s := &BlastSummary{Failures: make(map[string]string)}
 	for rows.Next() {
-		var status string
+		var status, platform string
+		var errMsg sql.NullString
 		var count int
-		if err := rows.Scan(&status, &count); err == nil {
-			if status == "queued" {
-				status = "pending"
+		if err := rows.Scan(&status, &platform, &errMsg, &count); err == nil {
+			switch status {
+			case "queued", "pending":
+				s.Pending += count
+			case "processing":
+				s.Processing += count
+			case "completed":
+				s.Completed += count
+			case "failed":
+				s.Failed += count
+				if errMsg.Valid && errMsg.String != "" {
+					s.Failures[platform] = errMsg.String
+				}
 			}
-			val, _ := summary[status].(int)
-			summary[status] = val + count
-			total += count
+			s.Total += count
 		}
 	}
-	summary["total"] = total
 
-	return utils.SuccessResponse(c, summary, "")
+	return utils.SuccessResponse(c, s, "Summary retrieved")
 }
 
 // HandleYouTubeWebhook handles PubSubHubbub verification and notifications

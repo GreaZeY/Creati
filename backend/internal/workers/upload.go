@@ -153,12 +153,26 @@ func (w *UploadWorker) downloadToStorage(ctx context.Context, platform, vidID, s
 	}
 
 	formats := video.Formats.WithAudioChannels()
-	sort.Slice(formats, func(i, j int) bool { return formats[i].Height > formats[j].Height })
-	if len(formats) == 0 {
-		return fmt.Errorf("no formats found")
+	// Filter for mp4 to maximize compatibility, fallback to any if no mp4
+	mp4Formats := formats.Type("video/mp4")
+	if len(mp4Formats) > 0 {
+		formats = mp4Formats
 	}
 
-	stream, _, err := client.GetStreamContext(ctx, video, &formats[0])
+	sort.Slice(formats, func(i, j int) bool { return formats[i].Height > formats[j].Height })
+	if len(formats) == 0 {
+		return fmt.Errorf("no suitable audio-video formats found for %s", vidID)
+	}
+
+	bestFormat := &formats[0]
+	logger.Get("worker").WithFields(logrus.Fields{
+		"vid":    vidID,
+		"height": bestFormat.Height,
+		"fps":    bestFormat.FPS,
+		"type":   bestFormat.MimeType,
+	}).Info("Selected highest quality stream")
+
+	stream, _, err := client.GetStreamContext(ctx, video, bestFormat)
 	if err != nil {
 		return err
 	}

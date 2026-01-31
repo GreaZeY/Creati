@@ -153,14 +153,6 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 		return
 	}
 
-	// 2. Normalize Content (V2)
-	normalizer := NewContentNormalizer(s.db)
-	normalized, err := normalizer.NormalizeContent(ctx, sourcePlatform, sourceVideoID, sourceAccountID, title, "", 0, "")
-	if err != nil {
-		log.Printf("Failed to normalize content for automation: %v", err)
-		return
-	}
-
 	// 3. Get target platform
 	var targetPlatform string
 	err = s.db.QueryRow("SELECT platform FROM platform_accounts WHERE id = $1", targetAccountID).Scan(&targetPlatform)
@@ -169,21 +161,38 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 		return
 	}
 
-	// 4. Create Automation Execution (V2)
+	// 4. Create Automation Execution (V2) - Early Insertion for accurate "Total" tracking
 	var executionID string
 	err = s.db.QueryRow(`
 		INSERT INTO automation_executions 
-		(content_id, rule_id, source_platform, target_platform, target_account_id, status, trace_id)
-		VALUES ($1, $2, $3, $4, $5, 'queued', gen_random_uuid())
+		(rule_id, source_platform, target_platform, target_account_id, status, trace_id)
+		VALUES ($1, $2, $3, $4, 'queued', gen_random_uuid())
 		RETURNING id
-	`, normalized.ContentID, ruleID, sourcePlatform, targetPlatform, targetAccountID).Scan(&executionID)
+	`, ruleID, sourcePlatform, targetPlatform, targetAccountID).Scan(&executionID)
 
 	if err != nil {
-		log.Printf("Failed to create automation execution: %v", err)
+		log.Printf("Failed to create automation execution skeleton: %v", err)
 		return
 	}
 
-	// 5. Enqueue V2 Payload
+	// 5. Normalize Content (V2)
+	normalizer := NewContentNormalizer(s.db)
+	normalized, err := normalizer.NormalizeContent(ctx, sourcePlatform, sourceVideoID, sourceAccountID, title, "", 0, "")
+	if err != nil {
+		log.Printf("Failed to normalize content for automation %s: %v", executionID, err)
+		s.db.Exec("UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", err.Error(), executionID)
+		return
+	}
+
+	// 6. Update Execution with Content ID & Enqueue for Upload
+	_, err = s.db.ExecContext(ctx, "UPDATE automation_executions SET content_id = $1 WHERE id = $2", normalized.ContentID, executionID)
+	if err != nil {
+		log.Printf("Failed to link content to execution %s: %v", executionID, err)
+		s.db.Exec("UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", "db link error", executionID)
+		return
+	}
+
+	// 7. Enqueue V2 Payload
 	payload, _ := json.Marshal(map[string]interface{}{
 		"content_id":      normalized.ContentID,
 		"target_platform": targetPlatform,
@@ -193,11 +202,11 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 
 	err = s.queue.Client.LPush(ctx, QueueUpload, payload).Err()
 	if err != nil {
-		log.Printf("Failed to enqueue V2 automation job: %v", err)
+		log.Printf("Failed to enqueue V2 automation job %s: %v", executionID, err)
 		s.db.Exec("UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", "failed to enqueue", executionID)
 	}
 
-	log.Printf("V2 Automation %s enqueued for content %s -> %s", executionID, normalized.ContentID, targetPlatform)
+	log.Printf("V2 Automation %s primed and enqueued for content %s -> %s", executionID, normalized.ContentID, targetPlatform)
 }
 
 // BlastVideos initiates a one-off distribution of multiple past videos
@@ -220,9 +229,24 @@ func (s *AutomationService) BlastVideos(userID int, sourceAccountID int, videoID
 
 	// 2. Enqueue jobs for each video and each target
 	for _, videoID := range videoIDs {
-		// Fetch title from source if possible (optional, worker handles it)
+		// Try to fetch the most descriptive title from our records
+		var title string
+		err := s.db.QueryRow(`
+			SELECT title FROM (
+				SELECT c.title FROM contents c
+				JOIN platform_contents pc ON pc.content_id = c.id
+				WHERE pc.platform_content_id = $1
+				UNION
+				SELECT title FROM videos WHERE external_id = $1
+			) t WHERE title IS NOT NULL AND title != '' AND title != 'Archive Blast Video'
+			LIMIT 1
+		`, videoID).Scan(&title)
+		if err != nil {
+			title = "Archive Blast Video"
+		}
+
 		for _, target := range targets {
-			s.createAutomationJob(ruleID, videoID, target.AccountID, "Archive Blast Video")
+			s.createAutomationJob(ruleID, videoID, target.AccountID, title)
 		}
 	}
 

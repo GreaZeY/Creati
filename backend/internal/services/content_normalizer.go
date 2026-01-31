@@ -44,55 +44,78 @@ func (cn *ContentNormalizer) NormalizeContent(
 	// Handle optional account ID (0 means NULL)
 	dbAccountID := sql.NullInt64{Int64: int64(accountID), Valid: accountID != 0}
 
-	// Generate fingerprint
+	// 1. Check if this platform content is already linked to a canonical record
+	var existingContentID string
+	err := cn.db.QueryRowContext(ctx, `
+		SELECT content_id FROM platform_contents 
+		WHERE platform = $1 AND platform_content_id = $2
+	`, platform, platformContentID).Scan(&existingContentID)
+
+	if err == nil {
+		// Platform link found - use the existing canonical ID.
+		logger.Get("normalizer").WithField("content_id", existingContentID).Debug("Existing platform link found")
+
+		// SYNC-ON-DEMAND: Update metadata while we have it fresh
+		_, err = cn.db.ExecContext(ctx, `
+			UPDATE contents 
+			SET title = COALESCE(NULLIF(title, ''), $1),
+			    description = COALESCE(NULLIF(description, ''), $2),
+				updated_at = NOW()
+			WHERE id = $3 AND (title = '' OR description = '' OR title IS NULL OR description IS NULL)
+		`, title, description, existingContentID)
+
+		return &NormalizedContent{
+			ContentID: existingContentID,
+			IsNew:     false,
+		}, nil
+	}
+
+	// 2. Not found by platform - generate fingerprint and check for global match
 	fp := cn.fingerprint.Generate(platform, platformContentID, title, durationSeconds)
 
 	logger.Get("normalizer").WithFields(logrus.Fields{
 		"platform":    platform,
 		"content_id":  platformContentID,
 		"fingerprint": fp[:16] + "...",
-	}).Debug("Normalizing content")
+	}).Debug("Normalizing new platform content")
 
-	// Try to find existing content by fingerprint
-	var existingID string
-	err := cn.db.QueryRowContext(ctx, `
+	err = cn.db.QueryRowContext(ctx, `
 		SELECT id FROM contents WHERE fingerprint = $1
-	`, fp).Scan(&existingID)
+	`, fp).Scan(&existingContentID)
 
 	if err == nil {
-		// Content exists - add platform reference if not already present
-		logger.Get("normalizer").WithField("content_id", existingID).Info("Found existing content")
+		// Fingerprint matched - link this platform content to the existing canonical record
+		logger.Get("normalizer").WithField("content_id", existingContentID).Info("Found global content match by fingerprint")
 
 		_, err = cn.db.ExecContext(ctx, `
 			INSERT INTO platform_contents 
 			(content_id, platform, platform_content_id, account_id, s3_key, published_at)
 			VALUES ($1, $2, $3, $4, $5, NOW())
-			ON CONFLICT (content_id, platform) DO UPDATE
-			SET platform_content_id = EXCLUDED.platform_content_id,
+			ON CONFLICT (platform, platform_content_id) DO UPDATE
+			SET content_id = EXCLUDED.content_id,
 			    account_id = EXCLUDED.account_id,
 			    s3_key = EXCLUDED.s3_key
-		`, existingID, platform, platformContentID, dbAccountID, s3Key)
+		`, existingContentID, platform, platformContentID, dbAccountID, s3Key)
 
 		if err != nil {
-			return nil, fmt.Errorf("failed to update platform reference: %w", err)
+			return nil, fmt.Errorf("failed to link existing content: %w", err)
 		}
 
 		return &NormalizedContent{
-			ContentID: existingID,
+			ContentID: existingContentID,
 			IsNew:     false,
 		}, nil
 	}
 
-	// Content doesn't exist - create new
-	logger.Get("normalizer").Info("Creating new content record")
+	// 3. Complete ghost - create new canonical content record
+	logger.Get("normalizer").Info("Creating new canonical content record")
 
-	var contentID string
 	err = cn.db.QueryRowContext(ctx, `
 		INSERT INTO contents 
 		(fingerprint, origin_platform, origin_platform_content_id, title, description, duration_seconds)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id
-	`, fp, platform, platformContentID, title, description, durationSeconds).Scan(&contentID)
+	`, fp, platform, platformContentID, title, description, durationSeconds).Scan(&existingContentID)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create content: %w", err)
@@ -103,16 +126,16 @@ func (cn *ContentNormalizer) NormalizeContent(
 		INSERT INTO platform_contents 
 		(content_id, platform, platform_content_id, account_id, s3_key, published_at)
 		VALUES ($1, $2, $3, $4, $5, NOW())
-	`, contentID, platform, platformContentID, dbAccountID, s3Key)
+	`, existingContentID, platform, platformContentID, dbAccountID, s3Key)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create platform reference: %w", err)
 	}
 
-	logger.Get("normalizer").WithField("content_id", contentID).Info("Created new content")
+	logger.Get("normalizer").WithField("content_id", existingContentID).Info("Created new content")
 
 	return &NormalizedContent{
-		ContentID: contentID,
+		ContentID: existingContentID,
 		IsNew:     true,
 	}, nil
 }

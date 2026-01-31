@@ -11,6 +11,7 @@ import {
   XCircle,
   Loader2,
   Database,
+  AlertTriangle,
 } from "lucide-react";
 import { automationAPI } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
@@ -27,6 +28,7 @@ interface BlastSummary {
   completed: number;
   failed: number;
   total: number;
+  failures?: Record<string, string>;
 }
 
 function BlastProgress({
@@ -36,7 +38,21 @@ function BlastProgress({
   summary?: BlastSummary;
   onRetry?: () => void;
 }) {
-  if (!summary || summary.total === 0) return null;
+  if (!summary || summary.total === 0) {
+    return (
+      <div className="space-y-4 opacity-40">
+        <div className="flex justify-between items-end">
+          <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+            Standby
+          </span>
+          <span className="text-xs font-black italic tracking-tighter">0%</span>
+        </div>
+        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+          <div className="h-full w-0 bg-primary shadow-[0_0_10px_rgba(var(--primary),0.5)]" />
+        </div>
+      </div>
+    );
+  }
 
   const progress = (summary.completed / summary.total) * 100;
   const isFinished = summary.completed + summary.failed === summary.total;
@@ -265,15 +281,50 @@ export function ArchiveBlast() {
                         className="text-muted-foreground/20"
                       />
                       <div className="flex -space-x-3">
-                        {rule.targets.map((t: any) => (
-                          <div
-                            key={t.accountId}
-                            className="w-10 h-10 rounded-full border-2 border-[#0a0a0c] bg-white/5 flex items-center justify-center shadow-2xl ring-1 ring-white/5 group-hover:ring-primary/20 transition-all"
-                            title={t.platform}
-                          >
-                            <PlatformLogo platform={t.platform} size={16} />
-                          </div>
-                        ))}
+                        {rule.targets.map((t: any) => {
+                          const error = rule.summary?.failures?.[t.platform];
+                          return (
+                            <div
+                              key={t.accountId}
+                              className="relative group/node"
+                            >
+                              <div
+                                className={cn(
+                                  "w-10 h-10 rounded-full border-2 border-[#0a0a0c] bg-white/5 flex items-center justify-center shadow-2xl ring-1 ring-white/5 group-hover:ring-primary/20 transition-all",
+                                  error && "ring-red-500/50 border-red-500/20",
+                                )}
+                              >
+                                <PlatformLogo platform={t.platform} size={16} />
+                                {error && (
+                                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center ring-2 ring-[#0a0a0c]">
+                                    <span className="text-[6px] font-black">
+                                      !
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              {error && (
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-48 opacity-0 group-hover/node:opacity-100 pointer-events-none transition-all duration-300 translate-y-2 group-hover/node:translate-y-0 z-50">
+                                  <div className="bg-black/80 backdrop-blur-xl border border-red-500/30 p-3 rounded-xl shadow-2xl">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <AlertTriangle
+                                        size={10}
+                                        className="text-red-400"
+                                      />
+                                      <span className="text-[8px] font-black text-red-400 uppercase tracking-widest">
+                                        Drop Failure
+                                      </span>
+                                    </div>
+                                    <p className="text-[10px] text-white/70 font-medium leading-relaxed">
+                                      {error}
+                                    </p>
+                                  </div>
+                                  <div className="w-2 h-2 bg-black/80 rotate-45 border-r border-b border-red-500/30 mx-auto -mt-1" />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
 

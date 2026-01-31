@@ -63,7 +63,7 @@ func (p *EventProcessor) Start(ctx context.Context) {
 
 	listener := pq.NewListener(p.dsn, 10*time.Second, time.Minute, reportProblem)
 	_ = listener.Listen("platform_event_inserted")
-	_ = listener.Listen("automation_job_updated") // New channel for SSE
+	_ = listener.Listen("automation_execution_updated") // Correct V2 channel
 	defer listener.UnlistenAll()
 
 	// 2. Ticker for fallback polling (heartbeat)
@@ -98,22 +98,22 @@ func (p *EventProcessor) Start(ctx context.Context) {
 				if err := p.processBatch(ctx); err != nil {
 					log.WithField("error", err).Error("Triggered batch processing failed")
 				}
-			} else if n.Channel == "automation_job_updated" {
-				p.handleJobNotification(ctx, n.Extra)
+			} else if n.Channel == "automation_execution_updated" {
+				p.handleExecutionNotification(ctx, n.Extra)
 			}
 		}
 	}
 }
 
-// handleJobNotification reacts to status changes by broadcasting to SSE
-func (p *EventProcessor) handleJobNotification(ctx context.Context, jobIDStr string) {
+// handleExecutionNotification reacts to status changes by broadcasting to SSE
+func (p *EventProcessor) handleExecutionNotification(ctx context.Context, execIDStr string) {
 	var userID, ruleID int
 	err := p.db.QueryRowContext(ctx, `
-		SELECT ar.user_id, aj.rule_id 
-		FROM automation_jobs aj
-		JOIN automation_rules ar ON aj.rule_id = ar.id
-		WHERE aj.id = $1
-	`, jobIDStr).Scan(&userID, &ruleID)
+		SELECT ar.user_id, e.rule_id 
+		FROM automation_executions e
+		JOIN automation_rules ar ON e.rule_id = ar.id
+		WHERE e.id = $1
+	`, execIDStr).Scan(&userID, &ruleID)
 
 	if err != nil {
 		logger.Get("event_processor").WithField("error", err).Error("Failed to fetch user/rule for SSE broadcast")

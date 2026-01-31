@@ -38,10 +38,10 @@ func (w *PostProcessWorker) Process(ctx context.Context, payload []byte) error {
 
 	logger.Get("worker").WithField("execution_id", job.ExecutionID).Info("Finalizing execution...")
 
-	// 1. Mark Execution as Executed
+	// 1. Mark Execution as Completed
 	_, err := w.DB.ExecContext(ctx, `
 		UPDATE automation_executions 
-		SET status = 'executed', completed_at = NOW() 
+		SET status = 'completed', completed_at = NOW() 
 		WHERE id = $1
 	`, job.ExecutionID)
 	if err != nil {
