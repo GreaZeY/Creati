@@ -33,22 +33,22 @@ func runStart(cmd *cobra.Command, args []string) {
 	var backendCmd, frontendCmd *exec.Cmd
 
 	if cfg.IsDev() {
-		fmt.Println("🚀 Starting in DEV mode...")
+		UISuccess("Starting in DEV mode...")
 
 		// Start Docker sidecars (Redis, PG) using shared logic
 		StartServices(true)
 
 		if workerOnly {
-			fmt.Println("👷 Starting WORKER ONLY...")
+			UIInfo("Starting WORKER ONLY...")
 			backendCmd = exec.Command("cmd", "/C", "cd backend && set RUN_MODE=worker && "+cfg.DevConfig.BackendCommand)
 		} else {
 			backendCmd = exec.Command("cmd", "/C", "cd backend && "+cfg.DevConfig.BackendCommand)
 			frontendCmd = exec.Command("cmd", "/C", "cd "+cfg.FrontendPath+" && "+cfg.DevConfig.FrontendCommand)
 		}
 	} else {
-		fmt.Println("🚀 Starting in PRODUCTION mode...")
+		UIInfo("Starting PRODUCTION mode...")
 		if workerOnly {
-			fmt.Println("👷 Starting WORKER ONLY...")
+			UIInfo("Starting WORKER ONLY...")
 			backendCmd = exec.Command("cmd", "/C", "cd backend && set RUN_MODE=worker && "+cfg.ProdConfig.BackendCommand)
 		} else {
 			backendCmd = exec.Command("cmd", "/C", "cd backend && "+cfg.ProdConfig.BackendCommand)
@@ -70,13 +70,13 @@ func runStart(cmd *cobra.Command, args []string) {
 
 	// Start processes
 	if err := backendCmd.Start(); err != nil {
-		fmt.Println("❌ Failed to start backend:", err)
+		UIError("Failed to start backend: %v", err)
 		return
 	}
 
 	if frontendCmd != nil {
 		if err := frontendCmd.Start(); err != nil {
-			fmt.Println("❌ Failed to start frontend:", err)
+			UIError("Failed to start frontend: %v", err)
 			backendCmd.Process.Kill()
 			return
 		}
@@ -126,6 +126,7 @@ func runStart(cmd *cobra.Command, args []string) {
 func streamLogs(reader io.Reader, prefix string) {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
-		fmt.Printf("%s %s\n", prefix, scanner.Text())
+		line := scanner.Text()
+		fmt.Printf("%s %s\n", prefix, LogLevelColor(line))
 	}
 }

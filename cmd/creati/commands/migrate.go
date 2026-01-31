@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 
@@ -20,7 +19,7 @@ func init() {
 }
 
 func runMigrate(cmd *cobra.Command, args []string) {
-	fmt.Println("🚀 Running database migrations...")
+	UIInfo("Running database migrations...")
 
 	migrateCmd := exec.Command("go", "run", "./cmd/migrate/main.go")
 	migrateCmd.Dir = "backend"
@@ -28,9 +27,9 @@ func runMigrate(cmd *cobra.Command, args []string) {
 	migrateCmd.Stderr = os.Stderr
 
 	if err := migrateCmd.Run(); err != nil {
-		fmt.Printf("❌ Migration failed: %v\n", err)
+		UIError("Migration failed: %v", err)
 		return
 	}
 
-	fmt.Println("✅ Migrations completed successfully!")
+	UISuccess("Migrations completed successfully!")
 }

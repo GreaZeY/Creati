@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 
@@ -20,16 +19,16 @@ func init() {
 }
 
 func runSelfUpdate(cmd *cobra.Command, args []string) {
-	fmt.Println("🔄 Rebuilding creati CLI...")
+	UIInfo("Rebuilding creati CLI...")
 
 	buildCmd := exec.Command("go", "build", "-o", "creati.exe", "./cmd/creati")
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr
 
 	if err := buildCmd.Run(); err != nil {
-		fmt.Printf("❌ Failed to rebuild CLI: %v\n", err)
+		UIError("Failed to rebuild CLI: %v", err)
 		return
 	}
 
-	fmt.Println("✅ creati CLI successfully updated!")
+	UISuccess("creati CLI successfully updated!")
 }

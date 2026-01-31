@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 
@@ -19,32 +18,31 @@ func init() {
 	rootCmd.AddCommand(buildCmd)
 }
 
-
 func runBuild(cmd *cobra.Command, args []string) {
 	cfg := GetConfig()
 
-	fmt.Println("🔨 Building frontend...")
+	UIInfo("Building frontend...")
 	frontendBuild := exec.Command("cmd", "/C", "cd "+cfg.FrontendPath+" && npm run build")
 	frontendBuild.Stdout = os.Stdout
 	frontendBuild.Stderr = os.Stderr
 
 	if err := frontendBuild.Run(); err != nil {
-		fmt.Println("❌ Frontend build failed:", err)
+		UIError("Frontend build failed: %v", err)
 		return
 	}
 
-	fmt.Println("✅ Frontend built to", cfg.ProdConfig.FrontendDist)
+	UISuccess("Frontend built to %s", cfg.ProdConfig.FrontendDist)
 
-	fmt.Println("\n🔨 Building backend...")
+	UIInfo("Building backend...")
 	backendBuild := exec.Command("go", "build", "-o", cfg.ProdConfig.BackendBin, "./backend/cmd/app")
 	backendBuild.Stdout = os.Stdout
 	backendBuild.Stderr = os.Stderr
 
 	if err := backendBuild.Run(); err != nil {
-		fmt.Println("❌ Backend build failed:", err)
+		UIError("Backend build failed: %v", err)
 		return
 	}
 
-	fmt.Println("✅ Backend built to", cfg.ProdConfig.BackendBin)
-	fmt.Println("\n🎉 Build complete!")
+	UISuccess("Backend built to %s", cfg.ProdConfig.BackendBin)
+	UISuccess("Build complete!")
 }
