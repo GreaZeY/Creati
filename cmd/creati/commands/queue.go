@@ -56,9 +56,9 @@ func init() {
 
 func getRedisClient() (*redis.Client, string) {
 	_ = godotenv.Load("backend/.env")
-	redisURL := os.Getenv("REDIS_URL")
+	redisURL := os.Getenv("REDIS_QUEUE_URL")
 	if redisURL == "" {
-		redisURL = "localhost:6379"
+		redisURL = "localhost:6380"
 	}
 
 	opt, err := redis.ParseURL(redisURL)
@@ -73,26 +73,58 @@ func runQueueInfo(cmd *cobra.Command, args []string) {
 	client, url := getRedisClient()
 	ctx := context.Background()
 
-	length, err := client.LLen(ctx, "upload_queue").Result()
-	if err != nil {
-		fmt.Printf("❌ Failed to connect to Redis at %s: %v\n", url, err)
-		return
+	queues := []string{
+		"ingestion_queue",
+		"orchestration_queue",
+		"upload_queue",
+		"post_process_queue",
+		"notification_queue",
+		"upload_dlq",
+		"notify_dlq",
 	}
 
-	fmt.Printf("🔗 Redis connected: %s\n", url)
-	color.Cyan("📊 Items in upload_queue: %d\n", length)
+	fmt.Printf("🔗 Redis connected (Queue): %s\n", url)
+	fmt.Println("📊 Queue Status:")
+
+	for _, q := range queues {
+		length, err := client.LLen(ctx, q).Result()
+		if err != nil {
+			fmt.Printf("  ❌ %-20s: Connection error\n", q)
+			continue
+		}
+
+		output := fmt.Sprintf("  🔹 %-20s: %d items", q, length)
+		if length > 0 {
+			color.Cyan(output)
+		} else {
+			fmt.Println(output)
+		}
+	}
 }
 
 func runQueueClear(cmd *cobra.Command, args []string) {
 	client, url := getRedisClient()
 	ctx := context.Background()
 
-	err := client.Del(ctx, "upload_queue").Err()
-	if err != nil {
-		fmt.Printf("❌ Failed to clear queue at %s: %v\n", url, err)
-		return
+	queues := []string{
+		"ingestion_queue",
+		"orchestration_queue",
+		"upload_queue",
+		"post_process_queue",
+		"notification_queue",
+		"upload_dlq",
+		"notify_dlq",
 	}
 
-	fmt.Printf("🔗 Redis connected: %s\n", url)
-	color.Green("✅ upload_queue successfully cleared\n")
+	fmt.Printf("🔗 Redis connected (Queue): %s\n", url)
+
+	for _, q := range queues {
+		err := client.Del(ctx, q).Err()
+		if err != nil {
+			fmt.Printf("  ❌ Failed to clear %s\n", q)
+		} else {
+			fmt.Printf("  ✅ %s cleared\n", q)
+		}
+	}
+	color.Green("\n✨ All queues successfully cleared\n")
 }

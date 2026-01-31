@@ -42,7 +42,7 @@ func (h *AnalyticsHandler) GetOverview(c *fiber.Ctx) error {
 
 // GetQueueStatus returns the current depth of the upload queue (for autoscaling)
 func (h *AnalyticsHandler) GetQueueStatus(c *fiber.Ctx) error {
-	depth, err := h.queue.GetQueueDepth(c.Context())
+	depth, err := h.queue.GetQueueDepth(c.Context(), services.QueueUpload)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to fetch queue depth")
 	}

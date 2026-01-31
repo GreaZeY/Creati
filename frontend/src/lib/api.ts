@@ -167,6 +167,12 @@ export const automationAPI = {
 
     getBlastSummary: (id: number) =>
         api.get<ApiResponse>(`/automation/rules/${id}/summary`),
+
+    retryExecution: (id: string) =>
+        api.post<ApiResponse>(`/automation/executions/${id}/retry`),
+
+    retryRule: (id: number) =>
+        api.post<ApiResponse>(`/automation/rules/${id}/retry`),
 };
 
 export const paymentsAPI = {

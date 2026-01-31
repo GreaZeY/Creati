@@ -23,15 +23,25 @@ type UploadJob struct {
 	SourceVideoID   string `json:"source_video_id,omitempty"` // External ID if from automation
 }
 
+const (
+	QueueIngestion     = "ingestion_queue"
+	QueueOrchestration = "orchestration_queue"
+	QueueUpload        = "upload_queue"
+	QueuePostProcess   = "post_process_queue"
+	QueueNotification  = "notification_queue"
+	QueueUploadDLQ     = "upload_dlq"
+	QueueNotifyDLQ     = "notify_dlq"
+)
+
 func NewQueueService() (*QueueService, error) {
-	redisURL := os.Getenv("REDIS_URL")
+	redisURL := os.Getenv("REDIS_QUEUE_URL")
 	if redisURL == "" {
-		redisURL = "localhost:6379"
+		// Fallback for dev if not specified
+		redisURL = "localhost:6380"
 	}
 
 	opt, err := redis.ParseURL(redisURL)
 	if err != nil {
-		// Fallback for simple host:port if not a URL
 		opt = &redis.Options{
 			Addr: redisURL,
 		}
@@ -80,7 +90,19 @@ func (q *QueueService) DequeueUpload(ctx context.Context) (*UploadJob, error) {
 	return &job, nil
 }
 
+// Dequeue waits for a job from a specific queue (blocking)
+func (q *QueueService) Dequeue(ctx context.Context, queueName string) ([]byte, error) {
+	results, err := q.Client.BRPop(ctx, 0, queueName).Result()
+	if err != nil {
+		return nil, err
+	}
+	if len(results) < 2 {
+		return nil, fmt.Errorf("invalid response from redis")
+	}
+	return []byte(results[1]), nil
+}
+
 // GetQueueDepth returns the number of pending jobs in the queue
-func (q *QueueService) GetQueueDepth(ctx context.Context) (int64, error) {
-	return q.Client.LLen(ctx, "upload_queue").Result()
+func (q *QueueService) GetQueueDepth(ctx context.Context, queueName string) (int64, error) {
+	return q.Client.LLen(ctx, queueName).Result()
 }

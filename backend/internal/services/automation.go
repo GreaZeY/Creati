@@ -137,43 +137,67 @@ func (s *AutomationService) matchFilters(title string, filters map[string]interf
 }
 
 func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string, targetAccountID int, title string) {
-	// 1. Record in database
-	var jobID int
+	ctx := context.Background()
+
+	// 1. Fetch source platform/account details for normalization
+	var sourcePlatform string
+	var sourceAccountID int
 	err := s.db.QueryRow(`
-		INSERT INTO automation_jobs (rule_id, source_platform_id, target_account_id, status)
-		VALUES ($1, $2, $3, 'pending')
+		SELECT pa.platform, pa.id 
+		FROM automation_rules ar
+		JOIN platform_accounts pa ON ar.source_account_id = pa.id
+		WHERE ar.id = $1
+	`, ruleID).Scan(&sourcePlatform, &sourceAccountID)
+	if err != nil {
+		log.Printf("Failed to fetch source details for automation: %v", err)
+		return
+	}
+
+	// 2. Normalize Content (V2)
+	normalizer := NewContentNormalizer(s.db)
+	normalized, err := normalizer.NormalizeContent(ctx, sourcePlatform, sourceVideoID, sourceAccountID, title, "", 0, "")
+	if err != nil {
+		log.Printf("Failed to normalize content for automation: %v", err)
+		return
+	}
+
+	// 3. Get target platform
+	var targetPlatform string
+	err = s.db.QueryRow("SELECT platform FROM platform_accounts WHERE id = $1", targetAccountID).Scan(&targetPlatform)
+	if err != nil {
+		log.Printf("Failed to fetch target platform: %v", err)
+		return
+	}
+
+	// 4. Create Automation Execution (V2)
+	var executionID string
+	err = s.db.QueryRow(`
+		INSERT INTO automation_executions 
+		(content_id, rule_id, source_platform, target_platform, target_account_id, status, trace_id)
+		VALUES ($1, $2, $3, $4, $5, 'queued', gen_random_uuid())
 		RETURNING id
-	`, ruleID, sourceVideoID, targetAccountID).Scan(&jobID)
+	`, normalized.ContentID, ruleID, sourcePlatform, targetPlatform, targetAccountID).Scan(&executionID)
 
 	if err != nil {
-		log.Printf("Failed to create automation job record: %v", err)
+		log.Printf("Failed to create automation execution: %v", err)
 		return
 	}
 
-	// 2. Fetch platform name for the target account
-	var platform string
-	err = s.db.QueryRow("SELECT platform FROM platform_accounts WHERE id = $1", targetAccountID).Scan(&platform)
+	// 5. Enqueue V2 Payload
+	payload, _ := json.Marshal(map[string]interface{}{
+		"content_id":      normalized.ContentID,
+		"target_platform": targetPlatform,
+		"account_id":      targetAccountID,
+		"execution_id":    executionID,
+	})
+
+	err = s.queue.Client.LPush(ctx, QueueUpload, payload).Err()
 	if err != nil {
-		log.Printf("Failed to fetch target platform name: %v", err)
-		s.db.Exec("UPDATE automation_jobs SET status = 'failed', error = $1 WHERE id = $2", "target platform not found", jobID)
-		return
+		log.Printf("Failed to enqueue V2 automation job: %v", err)
+		s.db.Exec("UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", "failed to enqueue", executionID)
 	}
 
-	// 3. Queue for worker
-	job := UploadJob{
-		AutomationJobID: jobID,
-		SourceVideoID:   sourceVideoID,
-		AccountID:       targetAccountID,
-		Platform:        platform,
-	}
-
-	if err := s.queue.EnqueueUpload(context.Background(), job); err != nil {
-		log.Printf("Failed to enqueue automation job: %v", err)
-		s.db.Exec("UPDATE automation_jobs SET status = 'failed', error = $1 WHERE id = $2", "failed to enqueue job", jobID)
-		return
-	}
-
-	log.Printf("Automation Job %d enqueued for rule %d -> target %d (%s)", jobID, ruleID, targetAccountID, platform)
+	log.Printf("V2 Automation %s enqueued for content %s -> %s", executionID, normalized.ContentID, targetPlatform)
 }
 
 // BlastVideos initiates a one-off distribution of multiple past videos
@@ -203,4 +227,64 @@ func (s *AutomationService) BlastVideos(userID int, sourceAccountID int, videoID
 	}
 
 	return ruleID, nil
+}
+func (s *AutomationService) RetryExecution(ctx context.Context, executionID string) error {
+	// 1. Fetch details for re-queueing
+	var contentID, targetPlatform string
+	var targetAccountID int
+	err := s.db.QueryRow(`
+		SELECT content_id, target_platform, target_account_id
+		FROM automation_executions WHERE id = $1
+	`, executionID).Scan(&contentID, &targetPlatform, &targetAccountID)
+
+	if err != nil {
+		return err
+	}
+
+	// 2. Update status to queued
+	_, err = s.db.ExecContext(ctx, "UPDATE automation_executions SET status = 'queued', error = NULL WHERE id = $1", executionID)
+	if err != nil {
+		return err
+	}
+
+	// 3. Enqueue to V2 Upload Queue
+	payload, _ := json.Marshal(map[string]interface{}{
+		"content_id":      contentID,
+		"target_platform": targetPlatform,
+		"account_id":      targetAccountID,
+		"execution_id":    executionID,
+	})
+
+	return s.queue.Client.LPush(ctx, QueueUpload, payload).Err()
+}
+
+func (s *AutomationService) RetryRule(ctx context.Context, ruleID int) error {
+	// 1. Fetch all failed executions for this rule
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id FROM automation_executions 
+		WHERE rule_id = $1 AND status = 'failed'
+	`, ruleID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var count int
+	for rows.Next() {
+		var executionID string
+		if err := rows.Scan(&executionID); err != nil {
+			continue
+		}
+
+		// Use existing RetryExecution logic for each
+		if err := s.RetryExecution(ctx, executionID); err == nil {
+			count++
+		}
+	}
+
+	if count == 0 {
+		return fmt.Errorf("no failed executions found to retry")
+	}
+
+	return nil
 }

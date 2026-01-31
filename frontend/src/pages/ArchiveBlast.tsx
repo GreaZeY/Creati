@@ -29,7 +29,13 @@ interface BlastSummary {
   total: number;
 }
 
-function BlastProgress({ summary }: { summary?: BlastSummary }) {
+function BlastProgress({
+  summary,
+  onRetry,
+}: {
+  summary?: BlastSummary;
+  onRetry?: () => void;
+}) {
   if (!summary || summary.total === 0) return null;
 
   const progress = (summary.completed / summary.total) * 100;
@@ -72,9 +78,19 @@ function BlastProgress({ summary }: { summary?: BlastSummary }) {
       </div>
 
       {summary.failed > 0 && (
-        <p className="text-[9px] font-black text-red-500 flex items-center gap-1 uppercase tracking-widest">
-          <XCircle size={10} /> {summary.failed} DROPS_DETECTED
-        </p>
+        <div className="flex items-center justify-between gap-4">
+          <p className="text-[9px] font-black text-red-500 flex items-center gap-1 uppercase tracking-widest">
+            <XCircle size={10} /> {summary.failed} DROPS_DETECTED
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onRetry}
+            className="h-6 px-3 rounded-lg border-red-500/20 text-[8px] font-black text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all uppercase tracking-tighter"
+          >
+            RETRY_FAILS <Zap size={8} className="ml-1 fill-current" />
+          </Button>
+        </div>
       )}
     </div>
   );
@@ -96,7 +112,7 @@ export function ArchiveBlast() {
 
   // Real-time SSE Connection
   useEffect(() => {
-    const url = `${import.meta.env.VITE_API_BASE || "http://localhost:8080/api"}/realtime/blasts`;
+    const url = "/api/realtime/blasts";
     const eventSource = new EventSource(url, { withCredentials: true });
 
     eventSource.onmessage = (event) => {
@@ -122,6 +138,14 @@ export function ArchiveBlast() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["automation-rules"] });
       toast.success("Operational history cleared.");
+    },
+  });
+
+  const retryMutation = useMutation({
+    mutationFn: (id: number) => automationAPI.retryRule(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["automation-rules"] });
+      toast.success("Re-initializing failed uplink sectors...");
     },
   });
 
@@ -253,7 +277,10 @@ export function ArchiveBlast() {
                       </div>
                     </div>
 
-                    <BlastProgress summary={rule.summary} />
+                    <BlastProgress
+                      summary={rule.summary}
+                      onRetry={() => retryMutation.mutate(rule.id)}
+                    />
                   </div>
                 </LensedCard>
               </motion.div>

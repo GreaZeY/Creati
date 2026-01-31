@@ -138,7 +138,7 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 		if r.TriggerType == "manual" {
 			summaryRows, err := h.db.Query(`
 				SELECT status, COUNT(*) 
-				FROM automation_jobs 
+				FROM automation_executions 
 				WHERE rule_id = $1 
 				GROUP BY status
 			`, r.ID)
@@ -149,14 +149,14 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 					var count int
 					if err := summaryRows.Scan(&status, &count); err == nil {
 						switch status {
-						case "pending":
-							s.Pending = count
+						case "queued", "pending":
+							s.Pending += count
 						case "processing":
-							s.Processing = count
+							s.Processing += count
 						case "completed":
-							s.Completed = count
+							s.Completed += count
 						case "failed":
-							s.Failed = count
+							s.Failed += count
 						}
 						s.Total += count
 					}
@@ -267,6 +267,51 @@ func (h *AutomationHandler) HandleBlast(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, fiber.Map{"ruleID": ruleID}, "Quick Blast initiated successfully! 🚀")
 }
 
+func (h *AutomationHandler) RetryExecution(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	executionID := c.Params("id")
+
+	// Verify ownership through rule
+	var exists bool
+	err := h.db.QueryRow(`
+		SELECT EXISTS(
+			SELECT 1 FROM automation_executions e
+			JOIN automation_rules r ON e.rule_id = r.id
+			WHERE e.id = $1 AND r.user_id = $2
+		)
+	`, executionID, userID).Scan(&exists)
+
+	if err != nil || !exists {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "execution not found")
+	}
+
+	err = h.service.RetryExecution(c.Context(), executionID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to retry execution")
+	}
+
+	return utils.SuccessResponse(c, nil, "Retry initiated! 🚀")
+}
+
+func (h *AutomationHandler) RetryRule(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	ruleID, _ := c.ParamsInt("id")
+
+	// Verify ownership
+	var exists bool
+	err := h.db.QueryRow(`SELECT EXISTS(SELECT 1 FROM automation_rules WHERE id = $1 AND user_id = $2)`, ruleID, userID).Scan(&exists)
+	if err != nil || !exists {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "blast history not found")
+	}
+
+	err = h.service.RetryRule(c.Context(), ruleID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+	}
+
+	return utils.SuccessResponse(c, nil, "Operational sectors re-primed for dispatch! ⚡")
+}
+
 func (h *AutomationHandler) GetRuleJobSummary(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	ruleID := c.Params("id")
@@ -280,7 +325,7 @@ func (h *AutomationHandler) GetRuleJobSummary(c *fiber.Ctx) error {
 
 	rows, err := h.db.Query(`
 		SELECT status, COUNT(*) 
-		FROM automation_jobs 
+		FROM automation_executions 
 		WHERE rule_id = $1 
 		GROUP BY status
 	`, ruleID)
@@ -302,7 +347,11 @@ func (h *AutomationHandler) GetRuleJobSummary(c *fiber.Ctx) error {
 		var status string
 		var count int
 		if err := rows.Scan(&status, &count); err == nil {
-			summary[status] = count
+			if status == "queued" {
+				status = "pending"
+			}
+			val, _ := summary[status].(int)
+			summary[status] = val + count
 			total += count
 		}
 	}

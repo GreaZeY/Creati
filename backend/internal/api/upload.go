@@ -1,8 +1,8 @@
 package api
 
 import (
-	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -138,31 +138,45 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to save video metadata")
 	}
 
-	// 2. Create Platform Jobs & Enqueue
+	// 2. Normalize Content (V2)
+	normalizer := services.NewContentNormalizer(h.db)
+	normalized, err := normalizer.NormalizeContent(
+		c.Context(),
+		"creati", // Manual upload origin
+		fmt.Sprintf("%d", videoID),
+		0, // No specific account for manual origin
+		req.Title,
+		req.Description,
+		0,     // Duration not known yet
+		s3URL, // Staged S3 URL
+	)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to normalize content")
+	}
+
+	// 3. Create Automation Executions & Enqueue (V2)
 	for accountID, platform := range targetAccounts {
-		var jobID int
+		var executionID string
 		err = tx.QueryRow(`
-			INSERT INTO video_platform_jobs (video_id, platform, account_id, status)
-			VALUES ($1, $2, $3, 'pending')
+			INSERT INTO automation_executions 
+			(content_id, rule_id, source_platform, target_platform, target_account_id, status, trace_id)
+			VALUES ($1, $2, 'creati', $3, $4, 'queued', gen_random_uuid())
 			RETURNING id
-		`, videoID, platform, accountID).Scan(&jobID)
+		`, normalized.ContentID, 0, platform, accountID).Scan(&executionID)
 
 		if err != nil {
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to queue platform jobs")
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to create execution record")
 		}
 
-		// Enqueue to Redis
+		// Enqueue V2 Payload
 		if h.Queue != nil {
-			err = h.Queue.EnqueueUpload(context.Background(), services.UploadJob{
-				VideoID:    videoID,
-				JobID:      jobID,
-				AccountID:  accountID,
-				Platform:   platform,
-				RetryCount: 0,
+			payload, _ := json.Marshal(map[string]interface{}{
+				"content_id":      normalized.ContentID,
+				"target_platform": platform,
+				"account_id":      accountID,
+				"execution_id":    executionID,
 			})
-			if err != nil {
-				fmt.Printf("⚠️  Failed to enqueue job to Redis: %v\n", err)
-			}
+			h.Queue.Client.LPush(c.Context(), services.QueueUpload, payload)
 		}
 	}
 
@@ -172,7 +186,8 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 	}
 
 	return utils.SuccessResponse(c, fiber.Map{
-		"videoId": videoID,
-		"status":  "queued",
+		"videoId":   videoID,
+		"contentId": normalized.ContentID,
+		"status":    "queued",
 	}, "Upload confirmed and jobs queued")
 }

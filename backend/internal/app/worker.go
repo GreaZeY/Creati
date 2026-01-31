@@ -14,6 +14,7 @@ import (
 	"creati.in/creati/backend/internal/db/models"
 	"creati.in/creati/backend/internal/logger"
 	"creati.in/creati/backend/internal/services"
+	"creati.in/creati/backend/internal/workers"
 	"github.com/kkdai/youtube/v2"
 	"github.com/sirupsen/logrus"
 )
@@ -42,42 +43,58 @@ func RunWorker(ctx context.Context, db *sql.DB, throttle *services.ThrottleServi
 		return err
 	}
 
-	logger.Get("worker").Info("Worker starting...")
-	logger.Get("worker").Info("Polling for jobs...")
+	logger.Get("worker").Info("V2 Worker Pipeline starting...")
+
+	// 1. Initialize Workers
+	pipeline := []workers.Worker{
+		workers.NewIngestionWorker(db, queueService),
+		workers.NewOrchestrationWorker(db, queueService),
+		workers.NewUploadWorker(db, queueService, storageService, throttle),
+		workers.NewPostProcessWorker(db, queueService),
+		workers.NewNotificationWorker(db, queueService),
+	}
+
+	// 2. Start each worker stage in a goroutine
+	for _, w := range pipeline {
+		go startWorkerStage(ctx, w, queueService)
+	}
+
+	// 3. Keep old loop for legacy 'upload_queue' compatibility if necessary,
+	// or just wait for context cancellation
+	<-ctx.Done()
+	logger.Get("worker").Info("V2 Worker Pipeline stopped")
+	return nil
+}
+
+func startWorkerStage(ctx context.Context, w workers.Worker, q *services.QueueService) {
+	logger.Get("worker").WithField("stage", w.Name()).WithField("queue", w.Queue()).Info("Stage started")
 
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Get("worker").Info("Worker stopped")
-			return nil
+			return
 		default:
-			job, err := queueService.DequeueUpload(ctx)
+			payload, err := q.Dequeue(ctx, w.Queue())
 			if err != nil {
-				if ctx.Err() != nil {
-					return nil
+				if ctx.Err() == nil {
+					logger.Get("worker").WithError(err).Errorf("Error dequeuing for %s", w.Name())
+					time.Sleep(1 * time.Second)
 				}
-				logger.Get("worker").WithError(err).Error("Error dequeuing job")
-				time.Sleep(2 * time.Second)
 				continue
 			}
 
-			logger.Get("worker").WithFields(logrus.Fields{
-				"video_id": job.VideoID,
-				"platform": job.Platform,
-			}).Info("Processing job")
-
-			err = ProcessJob(db, storageService, throttle, job)
-			if err != nil {
-				handleJobError(db, queueService, job, err)
-			} else {
+			if err := w.Process(ctx, payload); err != nil {
 				logger.Get("worker").WithFields(logrus.Fields{
-					"video_id": job.VideoID,
-					"platform": job.Platform,
-				}).Info("Job completed")
+					"stage": w.Name(),
+					"error": err,
+				}).Error("Job processing failed")
 			}
 		}
 	}
 }
+
+// Keep HandleAutomationJob and ProcessJob for now to avoid reference errors if they are used elsewhere,
+// though they should eventually be removed or redirected.
 
 func ProcessJob(db *sql.DB, storage *services.StorageService, throttle *services.ThrottleService, job *services.UploadJob) error {
 	// 0. Global Platform Rate Limiting

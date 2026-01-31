@@ -56,6 +56,7 @@ func Run(cfg Config) error {
 				logger.Get("app").WithError(err).Error("Failed to initialize QueueService for worker")
 				return err
 			}
+			// Throttle service primarily uses the queue client for global rate limiting
 			throttle := services.NewThrottleService(queueService.Client)
 
 			return RunWorker(ctx, db, throttle)

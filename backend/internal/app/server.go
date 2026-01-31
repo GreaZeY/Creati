@@ -15,6 +15,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	fiberlog "github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/redis/go-redis/v9"
 )
 
 func RunServer(ctx context.Context, db *sql.DB) error {
@@ -48,10 +49,17 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	// Static storage (for local driver)
 	app.Static("/storage", "./storage")
 
-	var cacheService *services.CacheService
-	if queueService != nil && queueService.Client != nil {
-		cacheService = services.NewCacheService(queueService.Client)
+	// Initialize Cache Client independently
+	cacheRedisURL := os.Getenv("REDIS_CACHE_URL")
+	if cacheRedisURL == "" {
+		cacheRedisURL = "localhost:6379"
 	}
+	cacheOpt, _ := redis.ParseURL(cacheRedisURL)
+	if cacheOpt == nil {
+		cacheOpt = &redis.Options{Addr: cacheRedisURL}
+	}
+	cacheClient := redis.NewClient(cacheOpt)
+	cacheService := services.NewCacheService(cacheClient)
 
 	// Initialize RealtimeService (SSE)
 	realtimeService := services.NewRealtimeService()
@@ -110,6 +118,8 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	automationGroup.Get("", automationHandler.ListRules)
 	automationGroup.Post("", automationHandler.CreateRule)
 	automationGroup.Post("/blast", automationHandler.HandleBlast)
+	automationGroup.Post("/executions/:id/retry", automationHandler.RetryExecution)
+	automationGroup.Post("/rules/:id/retry", automationHandler.RetryRule)
 	automationGroup.Get("/rules/:id/summary", automationHandler.GetRuleJobSummary)
 	automationGroup.Put("/:id", automationHandler.ToggleRule)
 	automationGroup.Delete("/:id", automationHandler.DeleteRule)
@@ -126,6 +136,9 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 		app.Shutdown()
 	}()
 
-	port := "8080"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
 	return app.Listen(":" + port)
 }
