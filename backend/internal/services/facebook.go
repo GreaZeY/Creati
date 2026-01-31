@@ -410,3 +410,8 @@ func (f *FacebookService) FetchRecentVideos(accountID int) ([]ExternalVideo, err
 
 	return videos, nil
 }
+
+// GetStream implements Platform interface
+func (f *FacebookService) GetStream(ctx context.Context, platformVideoID string) (io.ReadCloser, string, error) {
+	return nil, "", fmt.Errorf("GetStream not implemented for Facebook")
+}

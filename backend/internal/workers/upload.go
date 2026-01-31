@@ -7,13 +7,11 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
 	"time"
 
 	"creati.in/creati/backend/internal/db/models"
 	"creati.in/creati/backend/internal/logger"
 	"creati.in/creati/backend/internal/services"
-	"github.com/kkdai/youtube/v2"
 	"github.com/sirupsen/logrus"
 )
 
@@ -80,7 +78,7 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 	exists, _ := w.Storage.Exists(ctx, s3Key)
 	if !exists {
 		// Download from source (YouTube example)
-		err = w.downloadToStorage(ctx, originPlatform, originID, s3Key)
+		err = w.downloadToStorage(ctx, originPlatform, originID, s3Key, title)
 		if err != nil {
 			return w.fail(ctx, job, payload, err)
 		}
@@ -136,49 +134,25 @@ func (w *UploadWorker) fail(ctx context.Context, job UploadJob, payload []byte, 
 	return w.SendToDLQ(ctx, services.QueueUploadDLQ, payload, err)
 }
 
-func (w *UploadWorker) downloadToStorage(ctx context.Context, platform, vidID, s3Key string) error {
+func (w *UploadWorker) downloadToStorage(ctx context.Context, platform, vidID, s3Key, title string) error {
 	if platform == "creati" {
 		// Already in S3 or local storage, no download needed
 		return nil
 	}
 
-	if platform != "youtube" {
-		return fmt.Errorf("source platform %s not supported for auto-download in V2 yet", platform)
-	}
-
-	client := youtube.Client{}
-	video, err := client.GetVideoContext(ctx, vidID)
+	// Dynamic platform resolution via factory
+	platformSvc, err := services.GetPlatformService(platform, w.DB)
 	if err != nil {
 		return err
 	}
 
-	formats := video.Formats.WithAudioChannels()
-	// Filter for mp4 to maximize compatibility, fallback to any if no mp4
-	mp4Formats := formats.Type("video/mp4")
-	if len(mp4Formats) > 0 {
-		formats = mp4Formats
-	}
-
-	sort.Slice(formats, func(i, j int) bool { return formats[i].Height > formats[j].Height })
-	if len(formats) == 0 {
-		return fmt.Errorf("no suitable audio-video formats found for %s", vidID)
-	}
-
-	bestFormat := &formats[0]
-	logger.Get("worker").WithFields(logrus.Fields{
-		"vid":    vidID,
-		"height": bestFormat.Height,
-		"fps":    bestFormat.FPS,
-		"type":   bestFormat.MimeType,
-	}).Info("Selected highest quality stream")
-
-	stream, _, err := client.GetStreamContext(ctx, video, bestFormat)
+	stream, contentType, err := platformSvc.GetStream(ctx, vidID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get stream from %s: %w", platform, err)
 	}
 	defer stream.Close()
 
-	temp, err := os.CreateTemp("", "v2-upload-*.mp4")
+	temp, err := os.CreateTemp("", fmt.Sprintf("v2-upload-%s-*.mp4", platform))
 	if err != nil {
 		return err
 	}
@@ -191,5 +165,5 @@ func (w *UploadWorker) downloadToStorage(ctx context.Context, platform, vidID, s
 	}
 
 	temp.Seek(0, 0)
-	return w.Storage.Upload(ctx, s3Key, temp, "video/mp4")
+	return w.Storage.Upload(ctx, s3Key, temp, contentType)
 }

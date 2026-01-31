@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"creati.in/creati/backend/internal/db/models"
 	"golang.org/x/oauth2"
@@ -264,7 +266,92 @@ func (r *RedditService) FetchAnalytics(platformVideoID string, accountID int) (*
 	}, nil
 }
 
-// FetchRecentVideos retrieves past videos (not yet implemented for Reddit)
+// FetchRecentVideos retrieves past videos from Reddit
 func (r *RedditService) FetchRecentVideos(accountID int) ([]ExternalVideo, error) {
-	return nil, fmt.Errorf("archive blast not supported for reddit yet")
+	var encAccess, handle string
+	err := r.db.QueryRow(
+		"SELECT access_token, handle FROM platform_accounts WHERE id = $1", accountID,
+	).Scan(&encAccess, &handle)
+	if err != nil {
+		return nil, fmt.Errorf("account not found: %w", err)
+	}
+
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt access token: %w", err)
+	}
+
+	// Handle is stored as "u/username", we need just "username"
+	username := strings.TrimPrefix(handle, "u/")
+
+	// Reddit API: Get user submitted posts
+	submittedURL := fmt.Sprintf("https://oauth.reddit.com/user/%s/submitted?limit=50", username)
+	req, _ := http.NewRequest("GET", submittedURL, nil)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("User-Agent", r.userAgent)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch reddit posts: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Data struct {
+			Children []struct {
+				Data struct {
+					ID         string  `json:"id"`
+					Title      string  `json:"title"`
+					Selftext   string  `json:"selftext"`
+					Thumbnail  string  `json:"thumbnail"`
+					URL        string  `json:"url"`
+					Permalink  string  `json:"permalink"`
+					CreatedUTC float64 `json:"created_utc"`
+					IsVideo    bool    `json:"is_video"`
+					PostHint   string  `json:"post_hint"`
+					Media      struct {
+						RedditVideo struct {
+							FallbackURL string `json:"fallback_url"`
+						} `json:"reddit_video"`
+					} `json:"media"`
+				} `json:"data"`
+			} `json:"children"`
+		} `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to parse reddit response: %w", err)
+	}
+
+	videos := make([]ExternalVideo, 0)
+	for _, child := range result.Data.Children {
+		item := child.Data
+		// We prioritize items that are explicitly videos or have video hints
+		if !item.IsVideo && item.PostHint != "video" && item.PostHint != "rich:video" {
+			continue
+		}
+
+		publishedAt := time.Unix(int64(item.CreatedUTC), 0)
+
+		thumbnail := item.Thumbnail
+		if thumbnail == "self" || thumbnail == "default" || thumbnail == "" {
+			thumbnail = ""
+		}
+
+		videos = append(videos, ExternalVideo{
+			ID:          item.ID,
+			Title:       item.Title,
+			Description: item.Selftext,
+			Thumbnail:   thumbnail,
+			URL:         "https://www.reddit.com" + item.Permalink,
+			PublishedAt: publishedAt,
+		})
+	}
+
+	return videos, nil
+}
+
+// GetStream implements Platform interface
+func (r *RedditService) GetStream(ctx context.Context, platformVideoID string) (io.ReadCloser, string, error) {
+	return nil, "", fmt.Errorf("GetStream not implemented for Reddit")
 }

@@ -373,8 +373,11 @@ func (i *InstagramService) FetchRecentVideos(accountID int) ([]ExternalVideo, er
 
 	// Fetch media from Instagram Graph API
 	// Fields: id, media_type, media_url, thumbnail_url, caption, timestamp, permalink
+	// Note: We use the Instagram Business Account ID stored in platform_user_id
+	// If the ID looks correct but fails with 'Object does not exist', it usually means
+	// the token doesn't have the 'instagram_basic' permission for THIS account.
 	mediaURL := fmt.Sprintf(
-		"https://graph.facebook.com/v18.0/%s/media?fields=id,media_type,media_url,thumbnail_url,caption,timestamp,permalink&access_token=%s",
+		"https://graph.facebook.com/v19.0/%s/media?fields=id,media_type,media_url,thumbnail_url,caption,timestamp,permalink&access_token=%s",
 		igAccountID, accessToken,
 	)
 
@@ -444,4 +447,9 @@ func (i *InstagramService) FetchRecentVideos(accountID int) ([]ExternalVideo, er
 	}
 
 	return videos, nil
+}
+
+// GetStream implements Platform interface
+func (i *InstagramService) GetStream(ctx context.Context, platformVideoID string) (io.ReadCloser, string, error) {
+	return nil, "", fmt.Errorf("GetStream not implemented for Instagram")
 }

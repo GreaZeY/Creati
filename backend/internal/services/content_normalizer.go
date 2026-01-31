@@ -56,12 +56,15 @@ func (cn *ContentNormalizer) NormalizeContent(
 		logger.Get("normalizer").WithField("content_id", existingContentID).Debug("Existing platform link found")
 
 		// SYNC-ON-DEMAND: Update metadata while we have it fresh
+		// We overwrite if the existing title is empty or a known placeholder
 		_, err = cn.db.ExecContext(ctx, `
 			UPDATE contents 
-			SET title = COALESCE(NULLIF(title, ''), $1),
+			SET title = $1,
 			    description = COALESCE(NULLIF(description, ''), $2),
 				updated_at = NOW()
-			WHERE id = $3 AND (title = '' OR description = '' OR title IS NULL OR description IS NULL)
+			WHERE id = $3 AND (
+				title = '' OR title IS NULL OR title = 'Archive Blast Video'
+			) AND $1 != '' AND $1 != 'Archive Blast Video'
 		`, title, description, existingContentID)
 
 		return &NormalizedContent{

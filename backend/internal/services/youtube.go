@@ -4,13 +4,18 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"net/http"
 	url "net/url"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
 	"creati.in/creati/backend/internal/db/models"
+	"creati.in/creati/backend/internal/logger"
+	youtube_dl "github.com/kkdai/youtube/v2"
+	"github.com/sirupsen/logrus"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -457,4 +462,59 @@ func (y *YouTubeService) FetchRecentVideos(accountID int) ([]ExternalVideo, erro
 	}
 
 	return videos, nil
+}
+
+// GetStream implements Platform interface for YouTube
+func (y *YouTubeService) GetStream(ctx context.Context, vidID string) (io.ReadCloser, string, error) {
+	client := youtube_dl.Client{}
+	video, err := client.GetVideoContext(ctx, vidID)
+	if err != nil {
+		return nil, "", err
+	}
+
+	formats := video.Formats.WithAudioChannels()
+
+	// Prioritize itag 22 (720p combined mp4) if available
+	var bestFormat *youtube_dl.Format
+	for i := range formats {
+		if formats[i].ItagNo == 22 {
+			bestFormat = &formats[i]
+			break
+		}
+	}
+
+	if bestFormat == nil {
+		// Fallback to highest height mp4
+		mp4Formats := formats.Type("video/mp4")
+		if len(mp4Formats) > 0 {
+			sort.Slice(mp4Formats, func(i, j int) bool { return mp4Formats[i].Height > mp4Formats[j].Height })
+			bestFormat = &mp4Formats[0]
+		}
+	}
+
+	if bestFormat == nil {
+		// Absolute fallback to highest height anything
+		sort.Slice(formats, func(i, j int) bool { return formats[i].Height > formats[j].Height })
+		if len(formats) > 0 {
+			bestFormat = &formats[0]
+		}
+	}
+
+	if bestFormat == nil {
+		return nil, "", fmt.Errorf("no suitable audio-video formats found for %s", vidID)
+	}
+
+	logger.Get("youtube").WithFields(logrus.Fields{
+		"vid":    vidID,
+		"itag":   bestFormat.ItagNo,
+		"height": bestFormat.Height,
+		"type":   bestFormat.MimeType,
+	}).Info("Selected highest quality combined stream")
+
+	stream, _, err := client.GetStreamContext(ctx, video, bestFormat)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return stream, "video/mp4", nil
 }

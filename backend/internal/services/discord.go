@@ -223,7 +223,14 @@ func (d *DiscordService) FetchAnalytics(platformVideoID string, accountID int) (
 	return &Analytics{}, nil
 }
 
-// FetchRecentVideos retrieves past videos (not yet implemented for Discord)
+// FetchRecentVideos retrieves past videos (not supported for Discord source discovery)
 func (d *DiscordService) FetchRecentVideos(accountID int) ([]ExternalVideo, error) {
-	return nil, fmt.Errorf("archive blast not supported for discord yet")
+	// Discord is primarily a target platform via webhooks.
+	// Source discovery is not supported as webhooks are write-only.
+	return nil, fmt.Errorf("discord can currently only be used as a target platform, not a source")
+}
+
+// GetStream implements Platform interface
+func (d *DiscordService) GetStream(ctx context.Context, platformVideoID string) (io.ReadCloser, string, error) {
+	return nil, "", fmt.Errorf("GetStream not implemented for Discord")
 }

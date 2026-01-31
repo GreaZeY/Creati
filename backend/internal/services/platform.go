@@ -1,6 +1,8 @@
 package services
 
 import (
+	"context"
+	"io"
 	"time"
 
 	"creati.in/creati/backend/internal/db/models"
@@ -37,6 +39,9 @@ type Platform interface {
 
 	// FetchRecentVideos retrieves past videos from the platform
 	FetchRecentVideos(accountID int) ([]ExternalVideo, error)
+
+	// GetStream returns an io.ReadCloser for the video content
+	GetStream(ctx context.Context, platformVideoID string) (io.ReadCloser, string, error)
 }
 
 // ExternalVideo - standardized past video info

@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -424,7 +425,108 @@ func (t *TwitterService) FetchAnalytics(platformVideoID string, accountID int) (
 	}, nil
 }
 
-// FetchRecentVideos retrieves past videos (not yet implemented for X)
+// FetchRecentVideos retrieves past videos from X
 func (t *TwitterService) FetchRecentVideos(accountID int) ([]ExternalVideo, error) {
-	return nil, fmt.Errorf("archive blast not supported for x yet")
+	var encAccess, twitterUserID string
+	err := t.db.QueryRow(
+		"SELECT access_token, platform_user_id FROM platform_accounts WHERE id = $1", accountID,
+	).Scan(&encAccess, &twitterUserID)
+	if err != nil {
+		return nil, fmt.Errorf("account not found: %w", err)
+	}
+
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt access token: %w", err)
+	}
+
+	// Twitter API v2: Get user tweets with media expansions
+	// We need expansions=attachments.media_keys to get media info
+	// max_results=50 to get a good history
+	url := fmt.Sprintf("https://api.twitter.com/2/users/%s/tweets?expansions=attachments.media_keys&media.fields=url,preview_image_url,variants,type&tweet.fields=created_at,text&max_results=50", twitterUserID)
+
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch tweets: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Data []struct {
+			ID          string    `json:"id"`
+			Text        string    `json:"text"`
+			CreatedAt   time.Time `json:"created_at"`
+			Attachments struct {
+				MediaKeys []string `json:"media_keys"`
+			} `json:"attachments"`
+		} `json:"data"`
+		Includes struct {
+			Media []struct {
+				MediaKey     string `json:"media_key"`
+				Type         string `json:"type"`
+				URL          string `json:"url"`
+				PreviewImage string `json:"preview_image_url"`
+				Variants     []struct {
+					URL         string `json:"url"`
+					ContentType string `json:"content_type"`
+				} `json:"variants"`
+			} `json:"media"`
+		} `json:"includes"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to parse twitter response: %w", err)
+	}
+
+	if len(result.Errors) > 0 {
+		return nil, fmt.Errorf("twitter API error: %s", result.Errors[0].Message)
+	}
+
+	videos := make([]ExternalVideo, 0)
+	for _, tweet := range result.Data {
+		if len(tweet.Attachments.MediaKeys) == 0 {
+			continue
+		}
+
+		// Find the first video in this tweet's media keys
+		for _, mk := range tweet.Attachments.MediaKeys {
+			found := false
+			for _, m := range result.Includes.Media {
+				if m.MediaKey == mk && m.Type == "video" {
+					thumbnail := m.PreviewImage
+					if thumbnail == "" && m.URL != "" {
+						thumbnail = m.URL
+					}
+
+					videos = append(videos, ExternalVideo{
+						ID:          tweet.ID,
+						Title:       tweet.Text,
+						Description: tweet.Text,
+						Thumbnail:   thumbnail,
+						URL:         fmt.Sprintf("https://twitter.com/i/status/%s", tweet.ID),
+						PublishedAt: tweet.CreatedAt,
+					})
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+	}
+
+	return videos, nil
+}
+
+// GetStream implements Platform interface
+func (t *TwitterService) GetStream(ctx context.Context, platformVideoID string) (io.ReadCloser, string, error) {
+	return nil, "", fmt.Errorf("GetStream not implemented for X/Twitter")
 }
