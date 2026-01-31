@@ -70,14 +70,14 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 		return w.fail(ctx, job, payload, fmt.Errorf("failed to fetch content: %w", err))
 	}
 
-	// 3. Platform Specific Download/Storage Logic (Example: YT to S3)
-	// In the real system, this would be polymorphic. Simplified for now.
-	s3Key := fmt.Sprintf("automation/v2/%s/%s.mp4", job.ContentID, job.TargetPlatform)
+	// 3. Optimized Download/Storage Logic (Shared Source)
+	// We use a unified source key per ContentID to prevent redundant downloads when blasting to multiple platforms.
+	s3Key := fmt.Sprintf("automation/v2/source/%s.mp4", job.ContentID)
 	s3URL := w.Storage.GetObjectURL(s3Key)
 
 	exists, _ := w.Storage.Exists(ctx, s3Key)
 	if !exists {
-		// Download from source (YouTube example)
+		// Download from source only if not already present in shared storage
 		err = w.downloadToStorage(ctx, originPlatform, originID, s3Key, title)
 		if err != nil {
 			return w.fail(ctx, job, payload, err)
