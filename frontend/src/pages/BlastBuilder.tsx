@@ -13,11 +13,9 @@ import {
 import { platformsAPI, automationAPI } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Input } from "@/components/ui/Input";
 import { toast } from "@/lib/events";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
-import { PLATFORMS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 export function BlastBuilder() {
@@ -86,6 +84,25 @@ export function BlastBuilder() {
     setSelectedTargets((prev) =>
       prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id],
     );
+  };
+
+  const selectAllVideos = () => {
+    if (selectedVideos.length === filteredVideos.length) {
+      setSelectedVideos([]);
+    } else {
+      setSelectedVideos([...filteredVideos]);
+    }
+  };
+
+  const selectAllTargets = () => {
+    const targetAccounts = connectedAccounts.filter(
+      (a: any) => a.accountId !== sourceAccountId,
+    );
+    if (selectedTargets.length === targetAccounts.length) {
+      setSelectedTargets([]);
+    } else {
+      setSelectedTargets(targetAccounts.map((a: any) => a.accountId));
+    }
   };
 
   const handleLaunch = () => {
@@ -190,9 +207,21 @@ export function BlastBuilder() {
                 <h2 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">
                   2. Select Bangers
                 </h2>
-                <p className="text-[10px] font-medium text-muted-foreground/60 mt-0.5">
-                  Raiding {sourceAccount?.profileName || "Your Archive"}
-                </p>
+                <div className="flex items-center gap-4 mt-1">
+                  <p className="text-[10px] font-medium text-muted-foreground/60">
+                    Raiding {sourceAccount?.profileName || "Your Archive"}
+                  </p>
+                  {filteredVideos.length > 0 && (
+                    <button
+                      onClick={selectAllVideos}
+                      className="text-[9px] font-black uppercase tracking-tighter text-primary hover:text-primary/70 transition-colors"
+                    >
+                      {selectedVideos.length === filteredVideos.length
+                        ? "Deselect All"
+                        : "Select All"}
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="relative w-48">
                 <Search
@@ -282,9 +311,25 @@ export function BlastBuilder() {
         {/* Right Side: Deployment */}
         <div className="flex-1 flex flex-col gap-6 max-w-[400px]">
           <Card className="flex-1 flex flex-col p-6 bg-primary/5 border-primary/20">
-            <h2 className="text-xs font-black uppercase tracking-[0.2em] mb-6 text-primary">
-              3. Target Destinations
-            </h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xs font-black uppercase tracking-[0.2em] text-primary">
+                3. Target Destinations
+              </h2>
+              {connectedAccounts.filter((a) => a.accountId !== sourceAccountId)
+                .length > 0 && (
+                <button
+                  onClick={selectAllTargets}
+                  className="text-[9px] font-black uppercase tracking-tighter text-primary/60 hover:text-primary transition-colors"
+                >
+                  {selectedTargets.length ===
+                  connectedAccounts.filter(
+                    (a) => a.accountId !== sourceAccountId,
+                  ).length
+                    ? "UNSET_ALL"
+                    : "SELECT_ALL"}
+                </button>
+              )}
+            </div>
 
             <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
               {connectedAccounts

@@ -20,8 +20,7 @@ import (
 
 /**
  * InstagramService implements the Platform interface
- * Uses Meta's Instagram Graph API for authentication and content publishing
- * Instagram Business/Creator accounts are required for API access
+ * Uses Meta's Instagram Login for Business (native Instagram domains)
  */
 type InstagramService struct {
 	db          *sql.DB
@@ -57,61 +56,117 @@ func (i *InstagramService) GetAuthURL(state string) string {
 // GetAuthURLWithHint returns OAuth URL with optional hint/prompt
 func (i *InstagramService) GetAuthURLWithHint(state, prompt, loginHint string) string {
 	config := *i.oauthConfig
-	config.RedirectURL = fmt.Sprintf("%s/platforms/instagram/callback", os.Getenv("FRONTEND_URL"))
+	frontendURL := strings.TrimSuffix(os.Getenv("FRONTEND_URL"), "/")
+	config.RedirectURL = fmt.Sprintf("%s/platforms/instagram/callback", frontendURL)
 
 	opts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline}
-	// Note: Direct Instagram OAuth might use 'enable_fb_login=0' to force Instagram login window
-	// but usually the endpoint itself handles it.
 	return config.AuthCodeURL(state, opts...)
 }
 
 // Authenticate implements Platform interface
-// Exchanges OAuth code for tokens and stores them
 func (i *InstagramService) Authenticate(code string, userID int) error {
 	config := *i.oauthConfig
-	config.RedirectURL = fmt.Sprintf("%s/platforms/instagram/callback", os.Getenv("FRONTEND_URL"))
+	frontendURL := strings.TrimSuffix(os.Getenv("FRONTEND_URL"), "/")
+	config.RedirectURL = fmt.Sprintf("%s/platforms/instagram/callback", frontendURL)
 
-	// Exchange code for token using Facebook OAuth
+	// Exchange code for token using api.instagram.com
 	token, err := config.Exchange(context.Background(), code)
 	if err != nil {
 		return fmt.Errorf("oauth exchange failed: %w", err)
 	}
 
-	// Get long-lived token (Facebook tokens are short-lived by default)
+	// Exchange for long-lived token using graph.instagram.com
 	longLivedToken, err := i.exchangeForLongLivedToken(token.AccessToken)
 	if err != nil {
-		// Continue with short-lived token if exchange fails
 		longLivedToken = token.AccessToken
 	}
 
-	// Get Instagram Business Account ID and username
-	igAccountID, username, profileName, err := i.getInstagramBusinessAccount(longLivedToken)
+	// Discover Instagram Account using graph.instagram.com
+	igUserID, username, profileName, err := i.discoverInstagramAccount(longLivedToken)
+	status := "connected"
+
 	if err != nil {
-		return fmt.Errorf("failed to get instagram account: %w", err)
+		// Fallback to identity info if discovery fails
+		fbID, fbName, fbErr := i.getIdentityProfile(longLivedToken)
+		if fbErr != nil {
+			return fmt.Errorf("failed discovery and identity fallback: %w (discovery error: %v)", fbErr, err)
+		}
+		igUserID = fbID
+		username = "ig_" + fbID
+		profileName = fbName + " (Action Required)"
+		status = "action_required"
 	}
 
 	// Encrypt tokens before storing
 	encAccess, err := utils.Encrypt(longLivedToken)
 	if err != nil {
-		return fmt.Errorf("failed to encrypt access token: %w", err)
+		return fmt.Errorf("failed to encrypt tokens: %w", err)
 	}
 
-	// Store tokens in database
 	query := `
 		INSERT INTO platform_accounts (user_id, platform, access_token, platform_user_id, status, profile_name, handle)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (user_id, platform, platform_user_id) 
 		DO UPDATE SET access_token = $3, status = $5, profile_name = $6, handle = $7, connected_at = NOW()
 	`
-	_, err = i.db.Exec(query, userID, "instagram", encAccess, igAccountID, "connected", profileName, username)
+	_, err = i.db.Exec(query, userID, "instagram", encAccess, igUserID, status, profileName, username)
 	return err
+}
+
+// discoverInstagramAccount retrieves the IG User identity directly from graph.instagram.com
+func (i *InstagramService) discoverInstagramAccount(accessToken string) (string, string, string, error) {
+	reqURL := fmt.Sprintf("https://graph.instagram.com/v19.0/me?fields=id,username,name&access_token=%s", accessToken)
+	resp, err := http.Get(reqURL)
+	if err != nil {
+		return "", "", "", err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		ID       string `json:"id"`
+		Username string `json:"username"`
+		Name     string `json:"name"`
+		Error    struct {
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", "", "", err
+	}
+
+	if result.Error.Message != "" {
+		return "", "", "", fmt.Errorf("discovery error: %s", result.Error.Message)
+	}
+
+	return result.ID, result.Username, result.Name, nil
+}
+
+// getIdentityProfile retrieves the basic identity as a fallback
+func (i *InstagramService) getIdentityProfile(accessToken string) (string, string, error) {
+	reqURL := fmt.Sprintf("https://graph.instagram.com/v19.0/me?fields=id,name&access_token=%s", accessToken)
+	resp, err := http.Get(reqURL)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", "", err
+	}
+
+	return result.ID, result.Name, nil
 }
 
 // exchangeForLongLivedToken exchanges a short-lived token for a long-lived one (60 days)
 func (i *InstagramService) exchangeForLongLivedToken(shortLivedToken string) (string, error) {
 	reqURL := fmt.Sprintf(
-		"https://graph.facebook.com/v18.0/oauth/access_token?grant_type=fb_exchange_token&client_id=%s&client_secret=%s&fb_exchange_token=%s",
-		i.oauthConfig.ClientID,
+		"https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=%s&access_token=%s",
 		i.oauthConfig.ClientSecret,
 		shortLivedToken,
 	)
@@ -124,8 +179,6 @@ func (i *InstagramService) exchangeForLongLivedToken(shortLivedToken string) (st
 
 	var result struct {
 		AccessToken string `json:"access_token"`
-		TokenType   string `json:"token_type"`
-		ExpiresIn   int    `json:"expires_in"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -135,102 +188,23 @@ func (i *InstagramService) exchangeForLongLivedToken(shortLivedToken string) (st
 	return result.AccessToken, nil
 }
 
-// getInstagramBusinessAccount retrieves the Instagram Business Account ID linked to the user's Facebook Page
-func (i *InstagramService) getInstagramBusinessAccount(accessToken string) (string, string, string, error) {
-	// First, get the user's Facebook Pages
-	pagesURL := fmt.Sprintf("https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token&access_token=%s", accessToken)
-	resp, err := http.Get(pagesURL)
-	if err != nil {
-		return "", "", "", err
-	}
-	defer resp.Body.Close()
-
-	var pagesResult struct {
-		Data []struct {
-			ID          string `json:"id"`
-			Name        string `json:"name"`
-			AccessToken string `json:"access_token"`
-		} `json:"data"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&pagesResult); err != nil {
-		return "", "", "", err
-	}
-
-	if len(pagesResult.Data) == 0 {
-		return "", "", "", fmt.Errorf("INSTAGRAM_NO_PAGES: No Facebook Pages found. You need a Facebook Page linked to your professional Instagram account to connect correctly.")
-	}
-
-	// For each page, check for linked IG account
-	for _, page := range pagesResult.Data {
-		pageID := page.ID
-		pageToken := page.AccessToken
-		pageName := page.Name
-
-		igURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s?fields=instagram_business_account&access_token=%s", pageID, pageToken)
-		resp, err = http.Get(igURL)
-		if err != nil {
-			continue
-		}
-		defer resp.Body.Close()
-
-		var igResult struct {
-			InstagramBusinessAccount struct {
-				ID string `json:"id"`
-			} `json:"instagram_business_account"`
-		}
-
-		if err := json.NewDecoder(resp.Body).Decode(&igResult); err != nil {
-			continue
-		}
-
-		igAccountID := igResult.InstagramBusinessAccount.ID
-		if igAccountID != "" {
-			// Fetch username and name
-			usernameURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s?fields=username,name&access_token=%s",
-				igAccountID, pageToken)
-			userResp, err := http.Get(usernameURL)
-			if err == nil {
-				defer userResp.Body.Close()
-				var user struct {
-					Username string `json:"username"`
-					Name     string `json:"name"`
-				}
-				if err := json.NewDecoder(userResp.Body).Decode(&user); err == nil {
-					displayName := user.Name
-					if displayName == "" {
-						displayName = pageName
-					}
-					return igAccountID, user.Username, displayName, nil
-				}
-			}
-			return igAccountID, "unknown", pageName, nil
-		}
-	}
-
-	return "", "", "", fmt.Errorf("INSTAGRAM_NOT_PROFESSIONAL: No linked Instagram Business or Creator account found. Please switch your Instagram account to Professional and link it to a Facebook Page.")
-}
-
-// Upload implements Platform interface
-// Uploads a Reel to Instagram
+// Upload implements Platform interface - publishes a Reel
 func (i *InstagramService) Upload(video *models.Video, accountID int) (string, error) {
-	// Get specific account's tokens and Instagram account ID
-	var encAccess, igAccountID string
+	var encAccess, igUserID string
 	err := i.db.QueryRow(
 		"SELECT access_token, platform_user_id FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&encAccess, &igAccountID)
+	).Scan(&encAccess, &igUserID)
 	if err != nil {
 		return "", fmt.Errorf("account not found: %w", err)
 	}
 
-	// Decrypt token
 	accessToken, err := utils.Decrypt(encAccess)
 	if err != nil {
-		return "", fmt.Errorf("failed to decrypt access token: %w", err)
+		return "", fmt.Errorf("failed to decrypt tokens: %w", err)
 	}
 
-	// Step 1: Create media container for Reel
-	containerURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/media", igAccountID)
+	// Step 1: Create media container using graph.instagram.com
+	containerURL := fmt.Sprintf("https://graph.instagram.com/v19.0/%s/media", igUserID)
 	data := url.Values{}
 	data.Set("media_type", "REELS")
 	data.Set("video_url", video.S3URL)
@@ -243,7 +217,6 @@ func (i *InstagramService) Upload(video *models.Video, accountID int) (string, e
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
 	var containerResult struct {
 		ID    string `json:"id"`
 		Error struct {
@@ -251,7 +224,7 @@ func (i *InstagramService) Upload(video *models.Video, accountID int) (string, e
 		} `json:"error"`
 	}
 
-	if err := json.Unmarshal(body, &containerResult); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&containerResult); err != nil {
 		return "", fmt.Errorf("failed to parse container response: %w", err)
 	}
 
@@ -259,17 +232,57 @@ func (i *InstagramService) Upload(video *models.Video, accountID int) (string, e
 		return "", fmt.Errorf("instagram API error: %s", containerResult.Error.Message)
 	}
 
-	// Step 2: Publish the container
-	publishURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/media_publish", igAccountID)
+	containerID := containerResult.ID
+
+	// Step 2: Poll for processing status
+	maxRetries := 30
+	statusURL := fmt.Sprintf("https://graph.instagram.com/v19.0/%s?fields=status_code&access_token=%s", containerID, accessToken)
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		time.Sleep(10 * time.Second)
+
+		statusResp, err := http.Get(statusURL)
+		if err != nil {
+			continue
+		}
+
+		var statusResult struct {
+			StatusCode string `json:"status_code"`
+			Error      struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+
+		err = json.NewDecoder(statusResp.Body).Decode(&statusResult)
+		statusResp.Body.Close()
+		if err != nil {
+			continue
+		}
+
+		if statusResult.StatusCode == "FINISHED" {
+			break
+		}
+
+		if statusResult.StatusCode == "ERROR" || statusResult.StatusCode == "EXPIRED" {
+			return "", fmt.Errorf("instagram processing failed: %s", statusResult.StatusCode)
+		}
+
+		if attempt == maxRetries-1 {
+			return "", fmt.Errorf("instagram processing timed out")
+		}
+	}
+
+	// Step 3: Publish the Reel
+	publishURL := fmt.Sprintf("https://graph.instagram.com/v19.0/%s/media_publish", igUserID)
 	publishData := url.Values{}
-	publishData.Set("creation_id", containerResult.ID)
+	publishData.Set("creation_id", containerID)
 	publishData.Set("access_token", accessToken)
 
-	resp, err = http.PostForm(publishURL, publishData)
+	publishResp, err := http.PostForm(publishURL, publishData)
 	if err != nil {
-		return "", fmt.Errorf("failed to publish media: %w", err)
+		return "", fmt.Errorf("failed to publish Reel: %w", err)
 	}
-	defer resp.Body.Close()
+	defer publishResp.Body.Close()
 
 	var publishResult struct {
 		ID    string `json:"id"`
@@ -278,7 +291,7 @@ func (i *InstagramService) Upload(video *models.Video, accountID int) (string, e
 		} `json:"error"`
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&publishResult); err != nil {
+	if err := json.NewDecoder(publishResp.Body).Decode(&publishResult); err != nil {
 		return "", fmt.Errorf("failed to parse publish response: %w", err)
 	}
 
@@ -291,8 +304,6 @@ func (i *InstagramService) Upload(video *models.Video, accountID int) (string, e
 
 // GetStatus implements Platform interface
 func (i *InstagramService) GetStatus(platformVideoID string) (string, error) {
-	// Instagram doesn't have a processing status like YouTube
-	// Media is either published or not
 	return "completed", nil
 }
 
@@ -306,15 +317,13 @@ func (i *InstagramService) FetchAnalytics(platformVideoID string, accountID int)
 		return nil, fmt.Errorf("account not found: %w", err)
 	}
 
-	// Decrypt token
 	accessToken, err := utils.Decrypt(encAccess)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt access token: %w", err)
+		return nil, fmt.Errorf("failed to decrypt tokens: %w", err)
 	}
 
-	// Get media insights
 	insightsURL := fmt.Sprintf(
-		"https://graph.facebook.com/v18.0/%s/insights?metric=plays,likes,comments,shares&access_token=%s",
+		"https://graph.instagram.com/v19.0/%s/insights?metric=plays,likes,comments,shares&access_token=%s",
 		platformVideoID, accessToken,
 	)
 
@@ -358,32 +367,27 @@ func (i *InstagramService) FetchAnalytics(platformVideoID string, accountID int)
 
 // FetchRecentVideos retrieves past videos from Instagram
 func (i *InstagramService) FetchRecentVideos(accountID int) ([]ExternalVideo, error) {
-	var encAccess, igAccountID string
+	var encAccess, igUserID string
 	err := i.db.QueryRow(
 		"SELECT access_token, platform_user_id FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&encAccess, &igAccountID)
+	).Scan(&encAccess, &igUserID)
 	if err != nil {
 		return nil, fmt.Errorf("account not found: %w", err)
 	}
 
 	accessToken, err := utils.Decrypt(encAccess)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt access token: %w", err)
+		return nil, fmt.Errorf("failed to decrypt tokens: %w", err)
 	}
 
-	// Fetch media from Instagram Graph API
-	// Fields: id, media_type, media_url, thumbnail_url, caption, timestamp, permalink
-	// Note: We use the Instagram Business Account ID stored in platform_user_id
-	// If the ID looks correct but fails with 'Object does not exist', it usually means
-	// the token doesn't have the 'instagram_basic' permission for THIS account.
 	mediaURL := fmt.Sprintf(
-		"https://graph.facebook.com/v19.0/%s/media?fields=id,media_type,media_url,thumbnail_url,caption,timestamp,permalink&access_token=%s",
-		igAccountID, accessToken,
+		"https://graph.instagram.com/v19.0/%s/media?fields=id,media_type,media_url,thumbnail_url,caption,timestamp,permalink&access_token=%s",
+		igUserID, accessToken,
 	)
 
 	resp, err := http.Get(mediaURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch instagram media: %w", err)
+		return nil, fmt.Errorf("failed to fetch media: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -397,29 +401,19 @@ func (i *InstagramService) FetchRecentVideos(accountID int) ([]ExternalVideo, er
 			Timestamp    string `json:"timestamp"`
 			Permalink    string `json:"permalink"`
 		} `json:"data"`
-		Error struct {
-			Message string `json:"message"`
-		} `json:"error"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to parse instagram response: %w", err)
-	}
-
-	if result.Error.Message != "" {
-		return nil, fmt.Errorf("instagram API error: %s", result.Error.Message)
+		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	videos := make([]ExternalVideo, 0)
 	for _, item := range result.Data {
-		// We only want videos/reels
 		if item.MediaType != "VIDEO" {
 			continue
 		}
 
 		publishedAt, _ := time.Parse(time.RFC3339, item.Timestamp)
-
-		// Title for Instagram is often just the first line of caption or generic
 		title := item.Caption
 		if idx := strings.Index(title, "\n"); idx != -1 {
 			title = title[:idx]
@@ -431,16 +425,11 @@ func (i *InstagramService) FetchRecentVideos(accountID int) ([]ExternalVideo, er
 			title = "Instagram Video"
 		}
 
-		thumbnail := item.ThumbnailURL
-		if thumbnail == "" {
-			thumbnail = item.MediaURL // Fallback, though media_url is often the video itself
-		}
-
 		videos = append(videos, ExternalVideo{
 			ID:          item.ID,
 			Title:       title,
 			Description: item.Caption,
-			Thumbnail:   thumbnail,
+			Thumbnail:   item.ThumbnailURL,
 			URL:         item.Permalink,
 			PublishedAt: publishedAt,
 		})

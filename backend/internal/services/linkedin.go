@@ -215,6 +215,45 @@ func (l *LinkedInService) Upload(video *models.Video, accountID int) (string, er
 			return "", fmt.Errorf("failed to upload video: %w", err)
 		}
 		uploadResp.Body.Close()
+
+		// Step 2.5: Poll for video processing status
+		// LinkedIn videos must be 'AVAILABLE' before they can be used in a post.
+		maxRetries := 30 // 5 minutes (30 * 10s)
+		pollURL := fmt.Sprintf("https://api.linkedin.com/v2/videos/%s", videoURN)
+
+		for i := 0; i < maxRetries; i++ {
+			time.Sleep(10 * time.Second)
+
+			pollReq, _ := http.NewRequest("GET", pollURL, nil)
+			pollReq.Header.Set("Authorization", "Bearer "+accessToken)
+			pollReq.Header.Set("X-Restli-Protocol-Version", "2.0.0")
+
+			pollResp, err := client.Do(pollReq)
+			if err != nil {
+				continue
+			}
+
+			var pollResult struct {
+				Status string `json:"status"`
+			}
+			err = json.NewDecoder(pollResp.Body).Decode(&pollResult)
+			pollResp.Body.Close()
+			if err != nil {
+				continue
+			}
+
+			if pollResult.Status == "AVAILABLE" {
+				break
+			}
+
+			if pollResult.Status == "FAILED" {
+				return "", fmt.Errorf("linkedin video processing failed")
+			}
+
+			if i == maxRetries-1 {
+				return "", fmt.Errorf("linkedin video processing timed out after 5 minutes")
+			}
+		}
 	}
 
 	// Step 3: Create post with video

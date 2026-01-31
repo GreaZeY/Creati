@@ -1,11 +1,13 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -150,26 +152,88 @@ func (r *RedditService) Upload(video *models.Video, accountID int) (string, erro
 		return "", fmt.Errorf("failed to decrypt access token: %w", err)
 	}
 
-	// In a real app, we'd let user choose a subreddit.
-	// For MVP, we'll try to post to their own profile or a default subreddit if we had one.
-	// Reddit submit API: https://www.reddit.com/dev/api/#POST_api_submit
+	// Step 1: Initialize media asset
+	// Reddit requires videos to be uploaded to their S3 lease first.
+	assetURL := "https://oauth.reddit.com/api/media/asset.json"
+	assetData := url.Values{}
+	assetData.Set("filepath", "video.mp4")
+	assetData.Set("mimetype", "video/mp4")
+	assetData.Set("resettable", "true")
+
+	assetReq, _ := http.NewRequest("POST", assetURL, strings.NewReader(assetData.Encode()))
+	assetReq.Header.Set("Authorization", "Bearer "+accessToken)
+	assetReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	assetReq.Header.Set("User-Agent", r.userAgent)
+
+	assetResp, err := http.DefaultClient.Do(assetReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to initialize reddit asset: %w", err)
+	}
+	defer assetResp.Body.Close()
+
+	var assetResult struct {
+		Args struct {
+			Action string `json:"action"`
+			Fields []struct {
+				Name  string `json:"name"`
+				Value string `json:"value"`
+			} `json:"fields"`
+		} `json:"args"`
+		AssetID string `json:"asset_id"`
+	}
+
+	if err := json.NewDecoder(assetResp.Body).Decode(&assetResult); err != nil {
+		return "", fmt.Errorf("failed to parse reddit asset lease: %w", err)
+	}
+
+	// Step 2: Download video from S3 and upload to Reddit's S3
+	tmpFile, err := utils.DownloadToTempFile(video.S3URL)
+	if err != nil {
+		return "", fmt.Errorf("failed to download video to temp file: %w", err)
+	}
+	defer func() {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+	}()
+
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	for _, field := range assetResult.Args.Fields {
+		_ = writer.WriteField(field.Name, field.Value)
+	}
+	part, err := writer.CreateFormFile("file", "video.mp4")
+	if err != nil {
+		return "", err
+	}
+	_, _ = io.Copy(part, tmpFile)
+	_ = writer.Close()
+
+	uploadReq, _ := http.NewRequest("POST", "https:"+assetResult.Args.Action, body)
+	uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
+	uploadResp, err := http.DefaultClient.Do(uploadReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to upload video to reddit s3: %w", err)
+	}
+	uploadResp.Body.Close()
+
+	// Step 3: Submit the video post
+	var handle string
+	_ = r.db.QueryRow("SELECT handle FROM platform_accounts WHERE id = $1", accountID).Scan(&handle)
+	subreddit := strings.Replace(handle, "u/", "u_", 1)
+	if subreddit == "" {
+		subreddit = "u_creati_archive" // Absolute fallback
+	}
 
 	submitURL := "https://oauth.reddit.com/api/submit"
-	data := url.Values{}
-	data.Set("sr", "u_"+video.Title) // Reddit uses u_username for user profiles, but we need the actual username
-	// For now, let's assume we post to a "testing" subreddit or similar if we can't get the user's name easily here.
-	// Actually, we should have stored the ProfileName.
+	submitData := url.Values{}
+	submitData.Set("sr", subreddit)
+	submitData.Set("kind", "video")
+	submitData.Set("title", video.Title)
+	submitData.Set("video_poster_url", "") // models.Video has no thumbnail field yet
+	submitData.Set("video_asset_id", assetResult.AssetID)
+	submitData.Set("resubmit", "true")
 
-	var profileName string
-	_ = r.db.QueryRow("SELECT profile_name FROM platform_accounts WHERE user_id = $1 AND platform = 'reddit'", video.UserID).Scan(&profileName)
-
-	data.Set("sr", "u_"+profileName)
-	data.Set("kind", "link")
-	data.Set("title", video.Title)
-	data.Set("url", video.S3URL)
-	data.Set("resubmit", "true")
-
-	req, _ := http.NewRequest("POST", submitURL, strings.NewReader(data.Encode()))
+	req, _ := http.NewRequest("POST", submitURL, strings.NewReader(submitData.Encode()))
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("User-Agent", r.userAgent)
@@ -194,7 +258,7 @@ func (r *RedditService) Upload(video *models.Video, accountID int) (string, erro
 	}
 
 	if len(result.JSON.Errors) > 0 {
-		return "", fmt.Errorf("reddit api error: %v", result.JSON.Errors[0])
+		return "", fmt.Errorf("reddit submit error: %v", result.JSON.Errors[0])
 	}
 
 	return result.JSON.Data.ID, nil

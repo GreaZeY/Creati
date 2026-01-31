@@ -55,7 +55,8 @@ func (f *FacebookService) GetAuthURL(state string) string {
 // GetAuthURLWithHint returns OAuth URL with optional hint/prompt
 func (f *FacebookService) GetAuthURLWithHint(state, prompt, loginHint string) string {
 	config := *f.oauthConfig
-	config.RedirectURL = fmt.Sprintf("%s/platforms/facebook/callback", os.Getenv("FRONTEND_URL"))
+	frontendURL := strings.TrimSuffix(os.Getenv("FRONTEND_URL"), "/")
+	config.RedirectURL = fmt.Sprintf("%s/platforms/facebook/callback", frontendURL)
 
 	opts := []oauth2.AuthCodeOption{oauth2.AccessTypeOffline}
 	if prompt == "reauthenticate" || prompt == "consent" {
@@ -68,7 +69,8 @@ func (f *FacebookService) GetAuthURLWithHint(state, prompt, loginHint string) st
 // Authenticate implements Platform interface
 func (f *FacebookService) Authenticate(code string, userID int) error {
 	config := *f.oauthConfig
-	config.RedirectURL = fmt.Sprintf("%s/platforms/facebook/callback", os.Getenv("FRONTEND_URL"))
+	frontendURL := strings.TrimSuffix(os.Getenv("FRONTEND_URL"), "/")
+	config.RedirectURL = fmt.Sprintf("%s/platforms/facebook/callback", frontendURL)
 
 	// Exchange code for token
 	token, err := config.Exchange(context.Background(), code)
@@ -111,7 +113,7 @@ func (f *FacebookService) Authenticate(code string, userID int) error {
 // exchangeForLongLivedToken exchanges a short-lived token for a long-lived one
 func (f *FacebookService) exchangeForLongLivedToken(shortLivedToken string) (string, error) {
 	reqURL := fmt.Sprintf(
-		"https://graph.facebook.com/v18.0/oauth/access_token?grant_type=fb_exchange_token&client_id=%s&client_secret=%s&fb_exchange_token=%s",
+		"https://graph.facebook.com/v19.0/oauth/access_token?grant_type=fb_exchange_token&client_id=%s&client_secret=%s&fb_exchange_token=%s",
 		f.oauthConfig.ClientID,
 		f.oauthConfig.ClientSecret,
 		shortLivedToken,
@@ -136,7 +138,7 @@ func (f *FacebookService) exchangeForLongLivedToken(shortLivedToken string) (str
 
 // getPageInfo retrieves the user's Facebook Page
 func (f *FacebookService) getPageInfo(accessToken string) (string, string, string, string, error) {
-	pagesURL := fmt.Sprintf("https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token,username&access_token=%s", accessToken)
+	pagesURL := fmt.Sprintf("https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,username&access_token=%s", accessToken)
 	resp, err := http.Get(pagesURL)
 	if err != nil {
 		return "", "", "", "", err
@@ -183,7 +185,7 @@ func (f *FacebookService) Upload(video *models.Video, accountID int) (string, er
 
 	// Upload video using single request with hosted URL
 	// Since we provide an S3/Local public URL, we don't need resumable upload phases
-	uploadURL := fmt.Sprintf("https://graph.facebook.com/v18.0/%s/videos", pageID)
+	uploadURL := fmt.Sprintf("https://graph.facebook.com/v19.0/%s/videos", pageID)
 	data := url.Values{}
 	data.Set("file_url", video.S3URL)
 	data.Set("title", video.Title)
@@ -231,7 +233,7 @@ func (f *FacebookService) GetStatus(platformVideoID string) (string, error) {
 	}
 
 	statusURL := fmt.Sprintf(
-		"https://graph.facebook.com/v18.0/%s?fields=status&access_token=%s",
+		"https://graph.facebook.com/v19.0/%s?fields=status&access_token=%s",
 		platformVideoID, pageToken,
 	)
 
@@ -270,7 +272,7 @@ func (f *FacebookService) FetchAnalytics(platformVideoID string, accountID int) 
 	}
 
 	insightsURL := fmt.Sprintf(
-		"https://graph.facebook.com/v18.0/%s/video_insights?metric=total_video_views,total_video_reactions_by_type_total,total_video_comments&access_token=%s",
+		"https://graph.facebook.com/v19.0/%s/video_insights?metric=total_video_views,total_video_reactions_by_type_total,total_video_comments&access_token=%s",
 		platformVideoID, pageToken,
 	)
 
@@ -339,7 +341,7 @@ func (f *FacebookService) FetchRecentVideos(accountID int) ([]ExternalVideo, err
 	// Fetch videos from Facebook Page
 	// Fields: id,title,description,thumbnails,source,created_time
 	videosURL := fmt.Sprintf(
-		"https://graph.facebook.com/v18.0/%s/videos?fields=id,title,description,thumbnails,source,created_time&access_token=%s",
+		"https://graph.facebook.com/v19.0/%s/videos?fields=id,title,description,thumbnails,source,created_time&access_token=%s",
 		pageID, pageToken,
 	)
 
