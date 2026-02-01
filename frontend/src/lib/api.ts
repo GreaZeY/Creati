@@ -135,8 +135,8 @@ export const uploadAPI = {
 };
 
 export const videosAPI = {
-    list: () =>
-        api.get('/videos'),
+    list: (clientId?: number) =>
+        api.get('/videos' + (clientId ? `?clientId=${clientId}` : '')),
 
     getStatus: (videoId: string) =>
         api.get(`/videos/${videoId}/status`),
@@ -146,12 +146,12 @@ export const videosAPI = {
 };
 
 export const analyticsAPI = {
-    getOverview: () =>
-        api.get('/analytics/overview'),
+    getOverview: (clientId?: number) =>
+        api.get('/analytics/overview' + (clientId ? `?clientId=${clientId}` : '')),
 };
 export const automationAPI = {
-    list: () =>
-        api.get<ApiResponse<any[]>>('/automation'),
+    list: (clientId?: number) =>
+        api.get<ApiResponse<any[]>>('/automation' + (clientId ? `?clientId=${clientId}` : '')),
 
     create: (data: any) =>
         api.post<ApiResponse<{ id: number }>>('/automation', data),

@@ -21,6 +21,7 @@ import { toast } from "@/lib/events";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { cn } from "@/lib/utils";
+import { useClient } from "@/context/ClientContext";
 
 interface BlastSummary {
   pending: number;
@@ -114,12 +115,13 @@ function BlastProgress({
 
 export function ArchiveBlast() {
   const queryClient = useQueryClient();
+  const { selectedClient } = useClient();
   const [ruleToDelete, setRuleToDelete] = useState<number | null>(null);
 
   const { data: rules = [], isLoading } = useQuery({
-    queryKey: ["automation-rules"],
+    queryKey: ["automation-rules", selectedClient?.id],
     queryFn: async () => {
-      const resp = await automationAPI.list();
+      const resp = await automationAPI.list(selectedClient?.id);
       return (resp.data.data || []).filter(
         (r: any) => r.triggerType === "manual",
       );
@@ -136,7 +138,7 @@ export function ArchiveBlast() {
         const data = JSON.parse(event.data);
         if (data.type === "blast_update") {
           queryClient.invalidateQueries({
-            queryKey: ["automation-rules"],
+            queryKey: ["automation-rules", selectedClient?.id],
           });
         }
       } catch (err) {
@@ -147,12 +149,14 @@ export function ArchiveBlast() {
     return () => {
       eventSource.close();
     };
-  }, [queryClient]);
+  }, [queryClient, selectedClient?.id]);
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => automationAPI.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["automation-rules"] });
+      queryClient.invalidateQueries({
+        queryKey: ["automation-rules", selectedClient?.id],
+      });
       toast.success("Operational history cleared.");
     },
   });
@@ -160,7 +164,9 @@ export function ArchiveBlast() {
   const retryMutation = useMutation({
     mutationFn: (id: number) => automationAPI.retryRule(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["automation-rules"] });
+      queryClient.invalidateQueries({
+        queryKey: ["automation-rules", selectedClient?.id],
+      });
       toast.success("Re-initializing failed uplink sectors...");
     },
   });

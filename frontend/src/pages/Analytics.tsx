@@ -21,6 +21,7 @@ import {
 } from "recharts";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
 import { motion } from "framer-motion";
+import { useClient } from "@/context/ClientContext";
 
 // Fallback mock data if no history yet
 const mockPulseData = [
@@ -34,10 +35,12 @@ const mockPulseData = [
 ];
 
 export const Analytics = () => {
+  const { selectedClient } = useClient();
+
   const { data: analytics, isLoading } = useQuery({
-    queryKey: ["analytics-overview"],
+    queryKey: ["analytics-overview", selectedClient?.id],
     queryFn: async () => {
-      const res = await analyticsAPI.getOverview();
+      const res = await analyticsAPI.getOverview(selectedClient?.id);
       return res.data.data;
     },
   });

@@ -37,7 +37,7 @@ const queryClient = new QueryClient({
 import { AnimatePresence } from "framer-motion";
 import { useLocation } from "react-router-dom";
 import { Sidebar } from "./components/layout/Sidebar";
-import { Breadcrumbs } from "./components/layout/Breadcrumbs";
+import { Header } from "./components/layout/Header";
 import { cn } from "./lib/utils";
 import { PlatformCallback } from "./pages/PlatformCallback";
 
@@ -232,20 +232,20 @@ const AppRoutes = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground">
+    <div className="flex min-h-screen bg-background text-foreground overflow-x-hidden">
       {showSidebar && <Sidebar />}
 
-      <main
+      <div
         className={cn(
-          "flex-1 p-8 min-h-screen relative transition-all duration-300",
-          showSidebar ? "ml-60" : "ml-0",
+          "flex-1 flex flex-col min-h-screen transition-all duration-300",
+          showSidebar ? "ml-64" : "ml-0",
         )}
       >
-        <div className="max-w-7xl mx-auto">
-          <Breadcrumbs />
-          {content}
-        </div>
-      </main>
+        {showSidebar && <Header />}
+        <main className="flex-1 p-8">
+          <div className="max-w-7xl mx-auto">{content}</div>
+        </main>
+      </div>
     </div>
   );
 };

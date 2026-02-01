@@ -20,6 +20,7 @@ import { PlatformLogo } from "@/components/platforms/PlatformLogo";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { CAPABILITIES } from "@/lib/features";
+import { useClient } from "@/context/ClientContext";
 
 interface AccountInfo {
   accountId: number;
@@ -47,13 +48,14 @@ interface AutomationRule {
 export function Automation() {
   const queryClient = useQueryClient();
   const { canUse, isLoading: isEntitlementLoading } = useEntitlement();
+  const { selectedClient } = useClient();
 
   const [ruleToDelete, setRuleToDelete] = useState<number | null>(null);
 
   const { data: rules = [], isLoading: isRulesLoading } = useQuery({
-    queryKey: ["automation-rules"],
+    queryKey: ["automation-rules", selectedClient?.id],
     queryFn: async () => {
-      const resp = await automationAPI.list();
+      const resp = await automationAPI.list(selectedClient?.id);
       return (resp.data.data || []).filter(
         (r: any) => r.triggerType === "new_upload",
       );
@@ -65,7 +67,9 @@ export function Automation() {
     mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
       automationAPI.toggle(id, isActive),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["automation-rules"] });
+      queryClient.invalidateQueries({
+        queryKey: ["automation-rules", selectedClient?.id],
+      });
       toast.success("Status updated. ✨");
     },
   });
@@ -73,7 +77,9 @@ export function Automation() {
   const deleteMutation = useMutation({
     mutationFn: (id: number) => automationAPI.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["automation-rules"] });
+      queryClient.invalidateQueries({
+        queryKey: ["automation-rules", selectedClient?.id],
+      });
       toast.success("Workflow removed.");
     },
   });

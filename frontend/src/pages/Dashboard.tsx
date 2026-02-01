@@ -16,30 +16,32 @@ import { LensedCard } from "@/components/ui/LensedCard";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
+import { useClient } from "@/context/ClientContext";
 
 export const Dashboard = () => {
   const navigate = useNavigate();
+  const { selectedClient } = useClient();
 
   const { data: videos = [], isLoading: videosLoading } = useQuery({
-    queryKey: ["videos"],
+    queryKey: ["videos", selectedClient?.id],
     queryFn: async () => {
-      const resp = await videosAPI.list();
+      const resp = await videosAPI.list(selectedClient?.id);
       return resp.data.data;
     },
   });
 
   const { data: platforms = [], isLoading: platformsLoading } = useQuery({
-    queryKey: ["platforms"],
+    queryKey: ["platforms", selectedClient?.id],
     queryFn: async () => {
-      const resp = await platformsAPI.list();
+      const resp = await platformsAPI.list(selectedClient?.id);
       return resp.data.data as any[];
     },
   });
 
   const { data: analytics, isLoading: analyticsLoading } = useQuery({
-    queryKey: ["analytics-overview"],
+    queryKey: ["analytics-overview", selectedClient?.id],
     queryFn: async () => {
-      const res = await analyticsAPI.getOverview();
+      const res = await analyticsAPI.getOverview(selectedClient?.id);
       return res.data.data;
     },
   });
