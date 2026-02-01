@@ -18,6 +18,8 @@ import (
 	"golang.org/x/oauth2"
 
 	"creati.in/creati/backend/internal/utils"
+
+	"creati.in/creati/backend/internal/db/repositories"
 )
 
 /**
@@ -28,12 +30,14 @@ type RedditService struct {
 	db          *sql.DB
 	oauthConfig *oauth2.Config
 	userAgent   string
+	repo        *repositories.PlatformRepository
 }
 
 // NewRedditService creates a new Reddit service instance
 func NewRedditService(db *sql.DB) *RedditService {
 	return &RedditService{
-		db: db,
+		db:   db,
+		repo: repositories.NewPlatformRepository(db),
 		oauthConfig: &oauth2.Config{
 			ClientID:     os.Getenv("REDDIT_CLIENT_ID"),
 			ClientSecret: os.Getenv("REDDIT_CLIENT_SECRET"),
@@ -75,7 +79,7 @@ func (r *RedditService) GetAuthURLWithHint(state, prompt, loginHint string) stri
 }
 
 // Authenticate implements Platform interface
-func (r *RedditService) Authenticate(code string, userID int) error {
+func (r *RedditService) Authenticate(code string, userID int, clientID *int) error {
 	ctx := context.Background()
 	config := *r.oauthConfig
 	config.RedirectURL = fmt.Sprintf("%s/platforms/reddit/callback", os.Getenv("FRONTEND_URL"))
@@ -123,15 +127,20 @@ func (r *RedditService) Authenticate(code string, userID int) error {
 		return fmt.Errorf("failed to encrypt refresh token: %w", err)
 	}
 
-	// Store tokens in database
-	query := `
-		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, status, profile_name, platform_user_id, handle)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (user_id, platform, platform_user_id) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, status = $5, profile_name = $6, handle = $8, connected_at = NOW()
-	`
-	_, err = r.db.Exec(query, userID, "reddit", encAccess, encRefresh, "connected", displayName, user.ID, "u/"+user.Name)
-	return err
+	// Use Repository to persist account
+	account := &models.PlatformAccount{
+		UserID:         userID,
+		ClientID:       clientID,
+		Platform:       "reddit",
+		AccessToken:    encAccess,
+		RefreshToken:   encRefresh,
+		PlatformUserID: user.ID,
+		Status:         "connected",
+		ProfileName:    displayName,
+		Handle:         "u/" + user.Name,
+	}
+
+	return r.repo.UpsertAccount(context.Background(), account)
 }
 
 // Upload implements Platform interface - posts to Reddit

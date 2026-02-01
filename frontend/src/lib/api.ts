@@ -104,14 +104,14 @@ export const preferencesAPI = {
 };
 
 export const platformsAPI = {
-    list: () =>
-        api.get<ApiResponse<any[]>>('/platforms'),
+    list: (clientId?: number) =>
+        api.get<ApiResponse<any[]>>('/platforms' + (clientId ? `?clientId=${clientId}` : '')),
 
     getCount: () =>
         api.get<ApiResponse<Record<string, number>>>('/platforms/count'),
 
-    connect: (platform: string) =>
-        api.get(`/platforms/${platform}/connect`),
+    connect: (platform: string, clientId?: number) =>
+        api.get(`/platforms/${platform}/connect` + (clientId ? `?clientId=${clientId}` : '')),
 
     disconnect: (platform: string) =>
         api.put(`/platforms/${platform}/disconnect`),
@@ -173,6 +173,14 @@ export const automationAPI = {
 
     retryRule: (id: number) =>
         api.post<ApiResponse>(`/automation/rules/${id}/retry`),
+};
+
+export const agencyAPI = {
+    listClients: () =>
+        api.get<ApiResponse<any[]>>('/agency/clients'),
+
+    createClient: (name: string, color?: string) =>
+        api.post<ApiResponse<{ id: number; name: string }>>('/agency/clients', { name, color }),
 };
 
 export const paymentsAPI = {

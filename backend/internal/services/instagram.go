@@ -67,7 +67,7 @@ func (i *InstagramService) GetAuthURLWithHint(state, prompt, loginHint string) s
 }
 
 // Authenticate implements Platform interface
-func (i *InstagramService) Authenticate(code string, userID int) error {
+func (i *InstagramService) Authenticate(code string, userID int, clientID *int) error {
 	config := *i.oauthConfig
 	frontendURL := strings.TrimSuffix(os.Getenv("FRONTEND_URL"), "/")
 	config.RedirectURL = fmt.Sprintf("%s/platforms/instagram/callback", frontendURL)
@@ -109,6 +109,7 @@ func (i *InstagramService) Authenticate(code string, userID int) error {
 	// Use Repository to persist account
 	account := &models.PlatformAccount{
 		UserID:         userID,
+		ClientID:       clientID,
 		Platform:       "instagram",
 		AccessToken:    encAccess,
 		PlatformUserID: igUserID,

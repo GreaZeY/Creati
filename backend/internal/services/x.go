@@ -17,6 +17,7 @@ import (
 
 	"golang.org/x/oauth2"
 
+	"creati.in/creati/backend/internal/db/repositories"
 	"creati.in/creati/backend/internal/utils"
 )
 
@@ -28,12 +29,14 @@ import (
 type TwitterService struct {
 	db          *sql.DB
 	oauthConfig *oauth2.Config
+	repo        *repositories.PlatformRepository
 }
 
 // NewTwitterService creates a new Twitter/X service instance
 func NewTwitterService(db *sql.DB) *TwitterService {
 	return &TwitterService{
-		db: db,
+		db:   db,
+		repo: repositories.NewPlatformRepository(db),
 		oauthConfig: &oauth2.Config{
 			ClientID:     os.Getenv("TWITTER_CLIENT_ID"),
 			ClientSecret: os.Getenv("TWITTER_CLIENT_SECRET"),
@@ -82,7 +85,7 @@ func generateCodeChallenge() string {
 }
 
 // Authenticate implements Platform interface
-func (t *TwitterService) Authenticate(code string, userID int) error {
+func (t *TwitterService) Authenticate(code string, userID int, clientID *int) error {
 	config := *t.oauthConfig
 	config.RedirectURL = fmt.Sprintf("%s/platforms/x/callback", os.Getenv("FRONTEND_URL"))
 
@@ -110,15 +113,20 @@ func (t *TwitterService) Authenticate(code string, userID int) error {
 		return fmt.Errorf("failed to encrypt refresh token: %w", err)
 	}
 
-	// Store tokens in database
-	query := `
-		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, platform_user_id, status, profile_name, handle)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (user_id, platform, platform_user_id) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, status = $6, profile_name = $7, handle = $8, connected_at = NOW()
-	`
-	_, err = t.db.Exec(query, userID, "twitter", encAccess, encRefresh, twitterUserID, "connected", name, "@"+username)
-	return err
+	// Use Repository to persist account
+	account := &models.PlatformAccount{
+		UserID:         userID,
+		ClientID:       clientID,
+		Platform:       "twitter",
+		AccessToken:    encAccess,
+		RefreshToken:   encRefresh,
+		PlatformUserID: twitterUserID,
+		Status:         "connected",
+		ProfileName:    name,
+		Handle:         "@" + username,
+	}
+
+	return t.repo.UpsertAccount(context.Background(), account)
 }
 
 // getUserProfile retrieves the user's Twitter profile

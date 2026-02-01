@@ -42,7 +42,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     os.Getenv("FRONTEND_URL"),
 		AllowCredentials: true,
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-CSRF-Token",
 		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS",
 	}))
 
@@ -74,6 +74,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	automationHandler := api.NewAutomationHandler(db, automationService)
 	paymentHandler := api.NewPaymentHandler(db)
 	webhookHandler := api.NewWebhookHandler(db)
+	agencyHandler := api.NewAgencyHandler(db)
 
 	// Events
 	dbURL := os.Getenv("DATABASE_URL")
@@ -94,6 +95,12 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 
 	protected := apiRoutes.Use(middleware.AuthMiddleware)
 	protected.Get("/auth/me", authHandler.CheckAuth)
+
+	// Agency Routes
+	agencyRoutes := protected.Group("/agency")
+	agencyRoutes.Get("/clients", agencyHandler.ListClients)
+	agencyRoutes.Post("/clients", agencyHandler.CreateClient)
+
 	protected.Get("/realtime/blasts", func(c *fiber.Ctx) error {
 		userID := middleware.GetUserID(c)
 		return realtimeService.HandleConnection(c, userID)

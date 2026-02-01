@@ -24,7 +24,7 @@ type Platform interface {
 	GetAuthURLWithHint(state, prompt, loginHint string) string
 
 	// Authenticate handles OAuth flow and stores tokens
-	Authenticate(code string, userID int) error
+	Authenticate(code string, userID int, clientID *int) error
 
 	// Upload uploads a video to the platform for a specific account
 	// Returns platform-specific video ID

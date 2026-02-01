@@ -21,6 +21,7 @@ import { useState } from "react";
 import { toast } from "@/lib/events";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { CAPABILITIES } from "@/lib/features";
+import { useClient } from "@/context/ClientContext";
 
 interface PlatformData {
   accountId?: number;
@@ -46,10 +47,12 @@ export const Platforms = () => {
   const { limit } = useEntitlement();
   const maxAccounts = limit(CAPABILITIES.MAX_CONNECTED_ACCOUNTS);
 
+  const { selectedClient } = useClient();
+
   const { data: platformStats = [], isLoading } = useQuery({
-    queryKey: ["platforms"],
+    queryKey: ["platforms", selectedClient?.id],
     queryFn: async () => {
-      const response = await platformsAPI.list();
+      const response = await platformsAPI.list(selectedClient?.id);
       return response.data.data as PlatformData[];
     },
   });
@@ -253,22 +256,24 @@ export const Platforms = () => {
 
                     {/* Watermark Logo Background */}
                     <div className="absolute right-0 top-1/2 -translate-y-1/2 h-full aspect-square opacity-30 pointer-events-none select-none">
-                        <div 
-                          className={cn(
-                            "w-full h-full flex items-center justify-center scale-150 relative -right-10",
-                            accentClass.split(" ")[0]
-                          )}
-                          style={{
-                            maskImage: 'linear-gradient(to right, transparent 20%, black)',
-                            WebkitMaskImage: 'linear-gradient(to right, transparent 20%, black)'
-                          }}
-                        >
-                          <PlatformLogo
-                            platform={platform.platform}
-                            size={160}
-                            className="text-current"
-                          />
-                        </div>
+                      <div
+                        className={cn(
+                          "w-full h-full flex items-center justify-center scale-150 relative -right-10",
+                          accentClass.split(" ")[0],
+                        )}
+                        style={{
+                          maskImage:
+                            "linear-gradient(to right, transparent 20%, black)",
+                          WebkitMaskImage:
+                            "linear-gradient(to right, transparent 20%, black)",
+                        }}
+                      >
+                        <PlatformLogo
+                          platform={platform.platform}
+                          size={160}
+                          className="text-current"
+                        />
+                      </div>
                     </div>
 
                     <div className="flex-1 min-w-0 md:pl-2 relative z-10">
@@ -277,24 +282,24 @@ export const Platforms = () => {
                           <h3 className="text-3xl font-black tracking-tighter uppercase truncate leading-none">
                             {platform.profileName || platform.name}
                           </h3>
-                        {platform.connected ? (
-                          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase tracking-widest ring-1 ring-emerald-500/20">
-                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-                            Active
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 text-[9px] font-black uppercase tracking-widest ring-1 ring-amber-500/20">
-                            <AlertTriangle size={10} />
-                            Offline
-                          </div>
-                        )}
+                          {platform.connected ? (
+                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase tracking-widest ring-1 ring-emerald-500/20">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                              Active
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 text-[9px] font-black uppercase tracking-widest ring-1 ring-amber-500/20">
+                              <AlertTriangle size={10} />
+                              Offline
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-40 mt-1">
+                          {platform.platform}{" "}
+                          {platform.handle ? `// ${platform.handle}` : ""}
+                        </p>
                       </div>
-                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-40 mt-1">
-                        {platform.platform}{" "}
-                        {platform.handle ? `// ${platform.handle}` : ""}
-                      </p>
                     </div>
-                  </div>
 
                     {!platform.connected && (
                       <Button

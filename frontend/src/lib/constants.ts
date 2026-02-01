@@ -81,7 +81,8 @@ export const PLATFORMS = {
 export type PlatformId = keyof typeof PLATFORMS;
 
 // API endpoints (will be set from env)
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+// API endpoints (will be set from env)
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
 // Confetti settings
 export const CONFETTI = {

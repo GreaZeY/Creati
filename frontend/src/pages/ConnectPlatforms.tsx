@@ -18,6 +18,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { CAPABILITIES } from "@/lib/features";
+import { useClient } from "@/context/ClientContext";
 
 export const ConnectPlatforms = () => {
   const [searchParams] = useSearchParams();
@@ -42,9 +43,14 @@ export const ConnectPlatforms = () => {
   const connectedCount = countsData["total"] ?? 0;
   const isLimitReached = maxAccounts > 0 && connectedCount >= maxAccounts;
 
+  const { selectedClient } = useClient();
+
   const connectMutation = useMutation({
     mutationFn: async (platformId: string) => {
-      const { data } = await platformsAPI.connect(platformId);
+      const { data } = await platformsAPI.connect(
+        platformId,
+        selectedClient?.id,
+      );
       const { authUrl } = data.data;
       if (authUrl) {
         window.location.href = authUrl;

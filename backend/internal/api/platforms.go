@@ -2,13 +2,17 @@ package api
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"strconv"
+	"strings"
 
+	"time"
+
+	"creati.in/creati/backend/internal/db/repositories"
 	"creati.in/creati/backend/internal/middleware"
 	"creati.in/creati/backend/internal/services"
 	"creati.in/creati/backend/internal/utils"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -82,6 +86,7 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 		ID             string `json:"id"` // Unique ID for frontend list (e.g., accountID or platform)
 		Name           string `json:"name"`
 		Platform       string `json:"platform"`
+		Status         string `json:"status"`
 		Connected      bool   `json:"connected"`
 		ProfileName    string `json:"profileName,omitempty"`
 		PlatformUserID string `json:"platformUserId,omitempty"`
@@ -95,51 +100,48 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 		return utils.SuccessResponse(c, results, "")
 	}
 
-	// Get all connected accounts for user from DB
-	rows, err := h.db.Query(`
-		SELECT id, platform, status, COALESCE(profile_name, '') as profile_name, platform_user_id, COALESCE(handle, '') as handle
-		FROM platform_accounts 
-		WHERE user_id = $1
-	`, userID)
+	clientIDStr := c.Query("clientId")
+	var clientID *int
+	if clientIDStr != "" {
+		if cid, err := strconv.Atoi(clientIDStr); err == nil {
+			clientID = &cid
+		}
+	}
+
+	repo := repositories.NewPlatformRepository(h.db)
+	accounts, err := repo.ListAccounts(c.Context(), userID, clientID)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
 	}
-	defer rows.Close()
 
 	results = make([]PlatformData, 0)
 	connectedPlatforms := make(map[string]bool)
 
 	// 1. Add all connected accounts
-	for rows.Next() {
-		var accountID int
-		var platform, status, profileName, platformUserID, handle string
-		if err := rows.Scan(&accountID, &platform, &status, &profileName, &platformUserID, &handle); err != nil {
-			continue
-		}
-
-		isConnected := (status == "connected" || status == "active")
+	for _, acc := range accounts {
+		isConnected := (acc.Status == "connected" || acc.Status == "active")
 		if isConnected {
-			connectedPlatforms[platform] = true
+			connectedPlatforms[acc.Platform] = true
 		}
 
 		// Capitalize first letter for display name
-		displayName := platform
+		displayName := acc.Platform
 		if len(displayName) > 0 {
 			displayName = string(displayName[0]-32) + displayName[1:]
 		}
-		if platform == "youtube" {
+		if acc.Platform == "youtube" {
 			displayName = "YouTube"
 		}
 
 		results = append(results, PlatformData{
-			AccountID:      accountID,
-			ID:             strconv.Itoa(accountID),
+			AccountID:      acc.ID,
+			ID:             strconv.Itoa(acc.ID),
 			Name:           displayName,
-			Platform:       platform,
-			Connected:      isConnected,
-			ProfileName:    profileName,
-			PlatformUserID: platformUserID,
-			Handle:         handle,
+			Platform:       acc.Platform,
+			Status:         acc.Status,
+			ProfileName:    acc.ProfileName,
+			PlatformUserID: acc.PlatformUserID,
+			Handle:         acc.Handle,
 		})
 	}
 
@@ -153,8 +155,15 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 	platform := c.Params("platform")
 	userID := middleware.GetUserID(c)
-	// Generate state token for security (should include userID)
-	state := strconv.Itoa(userID) // Simplified - use secure state generation in production
+	clientIDStr := c.Query("clientId")
+
+	// Generate state token: "userID:clientID" or just "userID"
+	state := strconv.Itoa(userID)
+	if clientIDStr != "" {
+		if _, err := strconv.Atoi(clientIDStr); err == nil {
+			state = fmt.Sprintf("%d:%s", userID, clientIDStr)
+		}
+	}
 
 	var authURL string
 
@@ -229,10 +238,26 @@ func (h *PlatformHandler) HandleCallback(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "missing authorization code")
 	}
 
-	// In production: validate state token and extract userID securely
-	userID, err := strconv.Atoi(state)
-	if err != nil {
-		userID = 1 // Fallback if state parsing fails (should handle error better in prod)
+	// Parse state to get userID and clientID
+	// Format: "userID" or "userID:clientID"
+	var userID int
+	var clientID *int
+
+	if parts := strings.Split(state, ":"); len(parts) == 2 {
+		if uid, err := strconv.Atoi(parts[0]); err == nil {
+			userID = uid
+		}
+		if cid, err := strconv.Atoi(parts[1]); err == nil {
+			clientID = &cid
+		}
+	} else {
+		if uid, err := strconv.Atoi(state); err == nil {
+			userID = uid
+		}
+	}
+
+	if userID == 0 {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid state parameter")
 	}
 
 	// Get platform service
@@ -242,7 +267,7 @@ func (h *PlatformHandler) HandleCallback(c *fiber.Ctx) error {
 	}
 
 	// Authenticate using platform service
-	err = platformService.Authenticate(code, userID)
+	err = platformService.Authenticate(code, userID, clientID)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "authentication failed: "+err.Error())
 	}

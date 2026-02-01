@@ -19,6 +19,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PublicRoute } from "./components/PublicRoute";
 import { PageTransition } from "./components/layout/PageTransition";
 import { UIProvider } from "./context/UIContext";
+import { ClientProvider } from "./context/ClientContext";
 import { BackgroundEffect } from "./components/ui/BackgroundEffect";
 import { Toaster } from "./components/ui/Toaster";
 import "./index.css";
@@ -254,11 +255,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <UIProvider>
-          <BrowserRouter>
-            <BackgroundEffect />
-            <Toaster />
-            <AppRoutes />
-          </BrowserRouter>
+          <ClientProvider>
+            <BrowserRouter>
+              <BackgroundEffect />
+              <Toaster />
+              <AppRoutes />
+            </BrowserRouter>
+          </ClientProvider>
         </UIProvider>
       </AuthProvider>
     </QueryClientProvider>

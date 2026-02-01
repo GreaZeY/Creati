@@ -67,7 +67,7 @@ func (l *LinkedInService) GetAuthURLWithHint(state, prompt, loginHint string) st
 }
 
 // Authenticate implements Platform interface
-func (l *LinkedInService) Authenticate(code string, userID int) error {
+func (l *LinkedInService) Authenticate(code string, userID int, clientID *int) error {
 	config := *l.oauthConfig
 	config.RedirectURL = fmt.Sprintf("%s/platforms/x/callback", os.Getenv("FRONTEND_URL"))
 
@@ -100,6 +100,7 @@ func (l *LinkedInService) Authenticate(code string, userID int) error {
 	// Use Repository to persist account
 	account := &models.PlatformAccount{
 		UserID:         userID,
+		ClientID:       clientID,
 		Platform:       "linkedin",
 		AccessToken:    encAccess,
 		RefreshToken:   encRefresh,

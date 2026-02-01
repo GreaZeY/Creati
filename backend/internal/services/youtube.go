@@ -220,7 +220,7 @@ func (y *YouTubeService) GetAuthURLWithHint(state, prompt, loginHint string) str
 
 // Authenticate implements Platform interface
 // Exchanges OAuth code for tokens and stores them
-func (y *YouTubeService) Authenticate(code string, userID int) error {
+func (y *YouTubeService) Authenticate(code string, userID int, clientID *int) error {
 	config := *y.oauthConfig
 	config.RedirectURL = fmt.Sprintf("%s/platforms/youtube/callback", os.Getenv("FRONTEND_URL"))
 
@@ -281,6 +281,7 @@ func (y *YouTubeService) Authenticate(code string, userID int) error {
 	// Use Repository to persist account
 	account := &models.PlatformAccount{
 		UserID:         userID,
+		ClientID:       clientID,
 		Platform:       "youtube",
 		AccessToken:    encAccess,
 		RefreshToken:   encRefresh,

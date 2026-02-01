@@ -15,6 +15,8 @@ import (
 	"golang.org/x/oauth2"
 
 	"creati.in/creati/backend/internal/utils"
+
+	"creati.in/creati/backend/internal/db/repositories"
 )
 
 /**
@@ -24,6 +26,7 @@ import (
 type DiscordService struct {
 	db          *sql.DB
 	oauthConfig *oauth2.Config
+	repo        *repositories.PlatformRepository
 }
 
 type discordUser struct {
@@ -46,7 +49,8 @@ type discordWebhook struct {
 // NewDiscordService creates a new Discord service instance
 func NewDiscordService(db *sql.DB) *DiscordService {
 	return &DiscordService{
-		db: db,
+		db:   db,
+		repo: repositories.NewPlatformRepository(db),
 		oauthConfig: &oauth2.Config{
 			ClientID:     os.Getenv("DISCORD_CLIENT_ID"),
 			ClientSecret: os.Getenv("DISCORD_CLIENT_SECRET"),
@@ -81,7 +85,7 @@ func (d *DiscordService) GetAuthURLWithHint(state, prompt, loginHint string) str
 }
 
 // Authenticate implements Platform interface
-func (d *DiscordService) Authenticate(code string, userID int) error {
+func (d *DiscordService) Authenticate(code string, userID int, clientID *int) error {
 	config := *d.oauthConfig
 	config.RedirectURL = fmt.Sprintf("%s/platforms/discord/callback", os.Getenv("FRONTEND_URL"))
 
@@ -104,7 +108,6 @@ func (d *DiscordService) Authenticate(code string, userID int) error {
 	}
 
 	// Extract webhook info if present in token response
-	// The webhook info is actually in the token response extra fields when scope 'webhook.incoming' is used
 	webhookData, ok := token.Extra("webhook").(map[string]interface{})
 	webhookURL := ""
 	if ok {
@@ -130,15 +133,22 @@ func (d *DiscordService) Authenticate(code string, userID int) error {
 		return fmt.Errorf("failed to encrypt refresh token: %w", err)
 	}
 
-	// Store tokens in database
-	query := `
-		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, status, profile_name, email, webhook_url, platform_user_id, handle)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		ON CONFLICT (user_id, platform, platform_user_id) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, status = $5, profile_name = $6, email = $7, webhook_url = $8, handle = $10, connected_at = NOW()
-	`
-	_, err = d.db.Exec(query, userID, "discord", encAccess, encRefresh, "connected", profileName, user.Email, webhookURL, user.ID, handle)
-	return err
+	// Use Repository to persist account
+	account := &models.PlatformAccount{
+		UserID:         userID,
+		ClientID:       clientID,
+		Platform:       "discord",
+		AccessToken:    encAccess,
+		RefreshToken:   encRefresh,
+		PlatformUserID: user.ID,
+		Status:         "connected",
+		ProfileName:    profileName,
+		Handle:         handle,
+		Email:          user.Email,
+		WebhookURL:     webhookURL,
+	}
+
+	return d.repo.UpsertAccount(context.Background(), account)
 }
 
 // Upload implements Platform interface - sends video to Discord via Webhook

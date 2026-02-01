@@ -70,7 +70,7 @@ func (f *FacebookService) GetAuthURLWithHint(state, prompt, loginHint string) st
 }
 
 // Authenticate implements Platform interface
-func (f *FacebookService) Authenticate(code string, userID int) error {
+func (f *FacebookService) Authenticate(code string, userID int, clientID *int) error {
 	config := *f.oauthConfig
 	frontendURL := strings.TrimSuffix(os.Getenv("FRONTEND_URL"), "/")
 	config.RedirectURL = fmt.Sprintf("%s/platforms/facebook/callback", frontendURL)
@@ -106,6 +106,7 @@ func (f *FacebookService) Authenticate(code string, userID int) error {
 	// Use Repository to persist account
 	account := &models.PlatformAccount{
 		UserID:         userID,
+		ClientID:       clientID,
 		Platform:       "facebook",
 		AccessToken:    encPageToken,
 		RefreshToken:   encLongLived,
