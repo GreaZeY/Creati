@@ -68,6 +68,7 @@ type ConfirmUploadRequest struct {
 	Description string   `json:"description"`
 	Platforms   []string `json:"platforms"`  // Legacy/Optional
 	AccountIDs  []int    `json:"accountIds"` // Specific accounts
+	ClientID    *int     `json:"clientId"`
 }
 
 func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
@@ -129,10 +130,10 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 	// 1. Create Video record
 	var videoID int
 	err = tx.QueryRow(`
-		INSERT INTO videos (user_id, title, description, s3_url, status)
-		VALUES ($1, $2, $3, $4, 'uploaded')
+		INSERT INTO videos (user_id, client_id, title, description, s3_url, status)
+		VALUES ($1, $2, $3, $4, $5, 'uploaded')
 		RETURNING id
-	`, userID, req.Title, req.Description, s3URL).Scan(&videoID)
+	`, userID, req.ClientID, req.Title, req.Description, s3URL).Scan(&videoID)
 
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to save video metadata")
@@ -159,10 +160,10 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 		var executionID string
 		err = tx.QueryRow(`
 			INSERT INTO automation_executions 
-			(content_id, rule_id, source_platform, target_platform, target_account_id, status, trace_id)
-			VALUES ($1, $2, 'creati', $3, $4, 'queued', gen_random_uuid())
+			(content_id, client_id, rule_id, source_platform, target_platform, target_account_id, status, trace_id)
+			VALUES ($1, $2, $3, $4, $5, $6, 'queued', gen_random_uuid())
 			RETURNING id
-		`, normalized.ContentID, 0, platform, accountID).Scan(&executionID)
+		`, normalized.ContentID, req.ClientID, 0, platform, accountID).Scan(&executionID)
 
 		if err != nil {
 			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to create execution record")

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"log"
+	"strconv"
 
 	"creati.in/creati/backend/internal/middleware"
 	"creati.in/creati/backend/internal/services"
@@ -45,16 +46,32 @@ type AutomationRuleRequest struct {
 
 func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
+	clientIDStr := c.Query("clientId")
+	var clientID *int
+	if clientIDStr != "" {
+		if cid, err := strconv.Atoi(clientIDStr); err == nil {
+			clientID = &cid
+		}
+	}
 
-	rows, err := h.db.Query(`
+	query := `
 		SELECT 
 			ar.id, ar.name, ar.source_account_id, ar.trigger_type, ar.filters, ar.targets, ar.is_active, ar.last_run_at, ar.created_at,
 			pa.profile_name, pa.handle, pa.platform
 		FROM automation_rules ar
 		LEFT JOIN platform_accounts pa ON ar.source_account_id = pa.id
 		WHERE ar.user_id = $1
-		ORDER BY ar.created_at DESC
-	`, userID)
+	`
+	args := []interface{}{userID}
+	if clientID != nil {
+		query += " AND ar.client_id = $2"
+		args = append(args, *clientID)
+	} else {
+		query += " AND ar.client_id IS NULL"
+	}
+	query += " ORDER BY ar.created_at DESC"
+
+	rows, err := h.db.Query(query, args...)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
 	}
@@ -187,12 +204,20 @@ func (h *AutomationHandler) CreateRule(c *fiber.Ctx) error {
 	filters, _ := json.Marshal(req.Filters)
 	targets, _ := json.Marshal(req.Targets)
 
+	clientIDStr := c.Query("clientId")
+	var clientID *int
+	if clientIDStr != "" {
+		if cid, err := strconv.Atoi(clientIDStr); err == nil {
+			clientID = &cid
+		}
+	}
+
 	var id int
 	err := h.db.QueryRow(`
-		INSERT INTO automation_rules (user_id, name, source_account_id, trigger_type, filters, targets)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO automation_rules (user_id, client_id, name, source_account_id, trigger_type, filters, targets)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id
-	`, userID, req.Name, req.SourceAccountID, req.TriggerType, filters, targets).Scan(&id)
+	`, userID, clientID, req.Name, req.SourceAccountID, req.TriggerType, filters, targets).Scan(&id)
 
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create rule")

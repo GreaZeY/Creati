@@ -27,11 +27,11 @@ type PlatformStat struct {
 
 // UserStats represents aggregated user metrics
 type UserStats struct {
-	TotalVideos      int            `json:"totalVideos"`
-	TotalViews       int64          `json:"totalViews"`
-	TotalLikes       int64          `json:"totalLikes"`
-	TotalComments    int64          `json:"totalComments"`
-	TotalShares      int64          `json:"totalShares"`
+	TotalVideos       int            `json:"totalVideos"`
+	TotalViews        int64          `json:"totalViews"`
+	TotalLikes        int64          `json:"totalLikes"`
+	TotalComments     int64          `json:"totalComments"`
+	TotalShares       int64          `json:"totalShares"`
 	PlatformBreakdown []PlatformStat `json:"platformBreakdown"`
 	ProjectedRevenue  float64        `json:"projectedRevenue"`
 	PulseData         []PulsePoint   `json:"pulseData"`
@@ -55,19 +55,25 @@ type VideoStats struct {
 }
 
 // GetUserStats fetches aggregated stats from view (Fast)
-func (s *AnalyticsService) GetUserStats(userID int) (*UserStats, error) {
+func (s *AnalyticsService) GetUserStats(userID int, clientID *int) (*UserStats, error) {
 	stats := &UserStats{
 		PlatformBreakdown: []PlatformStat{},
 		PulseData:         []PulsePoint{},
 	}
 
-	log.Printf("DEBUG: Fetching stats for user %d", userID)
+	log.Printf("DEBUG: Fetching stats for user %d client %v", userID, clientID)
 
 	// 1. Core aggregates
-	err := s.db.QueryRow(`
-		SELECT total_videos, total_views, total_likes, total_comments, total_shares
-		FROM vw_user_stats WHERE user_id = $1
-	`, userID).Scan(
+	query := "SELECT total_videos, total_views, total_likes, total_comments, total_shares FROM vw_user_stats WHERE user_id = $1"
+	args := []interface{}{userID}
+	if clientID != nil {
+		query += " AND client_id = $2"
+		args = append(args, *clientID)
+	} else {
+		query += " AND client_id IS NULL"
+	}
+
+	err := s.db.QueryRow(query, args...).Scan(
 		&stats.TotalVideos, &stats.TotalViews, &stats.TotalLikes, &stats.TotalComments, &stats.TotalShares,
 	)
 
@@ -76,31 +82,40 @@ func (s *AnalyticsService) GetUserStats(userID int) (*UserStats, error) {
 	}
 
 	// 2. Fetch platform breakdown
-	rows, err := s.db.Query(`
+	pbQuery := `
 		SELECT platform, COALESCE(SUM(views), 0)
 		FROM (
 			SELECT DISTINCT ON (video_id, account_id) platform, views
 			FROM video_analytics
-			WHERE video_id IN (SELECT id FROM videos WHERE user_id = $1)
+			WHERE video_id IN (SELECT id FROM videos WHERE user_id = $1
+	`
+	pbArgs := []interface{}{userID}
+	if clientID != nil {
+		pbQuery += " AND client_id = $2"
+		pbArgs = append(pbArgs, *clientID)
+	} else {
+		pbQuery += " AND client_id IS NULL"
+	}
+	pbQuery += `)
 			ORDER BY video_id, account_id, fetched_at DESC
 		) latest_per_account
-		GROUP BY platform
-	`, userID)
+		GROUP BY platform`
+
+	rows, err := s.db.Query(pbQuery, pbArgs...)
 	if err == nil {
 		defer rows.Close()
 		for rows.Next() {
 			var p PlatformStat
 			if err := rows.Scan(&p.Platform, &p.Views); err == nil {
-				// Mock revenue calculation: $2.00 per 1k views (generic RPM)
 				p.Revenue = float64(p.Views) * 0.002
 				stats.PlatformBreakdown = append(stats.PlatformBreakdown, p)
 				stats.ProjectedRevenue += p.Revenue
-				}
+			}
 		}
 	}
 
-	// 3. Pulse Data (last 7 days) - Ensure we always have 7 days for the chart
-	pulse, err := s.GetGrowthPulse(userID)
+	// 3. Pulse Data (last 7 days)
+	pulse, err := s.GetGrowthPulse(userID, clientID)
 	if err == nil {
 		stats.PulseData = pulse
 	}
@@ -109,9 +124,8 @@ func (s *AnalyticsService) GetUserStats(userID int) (*UserStats, error) {
 }
 
 // GetGrowthPulse fetches time-series data for the last 7 days
-func (s *AnalyticsService) GetGrowthPulse(userID int) ([]PulsePoint, error) {
-	// Aggregate views and engagement per day, ensuring 0s for missing days
-	rows, err := s.db.Query(`
+func (s *AnalyticsService) GetGrowthPulse(userID int, clientID *int) ([]PulsePoint, error) {
+	gpQuery := `
 		WITH RECURSIVE days AS (
 			SELECT DATE_TRUNC('day', NOW()) as day
 			UNION ALL
@@ -127,7 +141,17 @@ func (s *AnalyticsService) GetGrowthPulse(userID int) ([]PulsePoint, error) {
 				MAX(views) as max_views,
 				MAX(likes + comments + shares) as max_engagement
 			FROM video_analytics
-			WHERE video_id IN (SELECT id FROM videos WHERE user_id = $1)
+			WHERE video_id IN (SELECT id FROM videos WHERE user_id = $1
+	`
+	gpArgs := []interface{}{userID}
+	if clientID != nil {
+		gpQuery += " AND client_id = $2"
+		gpArgs = append(gpArgs, *clientID)
+	} else {
+		gpQuery += " AND client_id IS NULL"
+	}
+
+	gpQuery += `)
 			  AND fetched_at > NOW() - INTERVAL '7 days'
 			GROUP BY 1, 2, 3
 		),
@@ -145,8 +169,9 @@ func (s *AnalyticsService) GetGrowthPulse(userID int) ([]PulsePoint, error) {
 			TO_CHAR(day, 'Dy') as name,
 			reach,
 			engagement
-		FROM summed_daily
-	`, userID)
+		FROM summed_daily`
+
+	rows, err := s.db.Query(gpQuery, gpArgs...)
 
 	if err != nil {
 		return nil, err
@@ -161,7 +186,6 @@ func (s *AnalyticsService) GetGrowthPulse(userID int) ([]PulsePoint, error) {
 		}
 	}
 
-	log.Printf("DEBUG: Found %d pulse points for user %d", len(pulse), userID)
 	return pulse, nil
 }
 
@@ -184,12 +208,20 @@ func (s *AnalyticsService) GetVideoStats(videoID int) (*VideoStats, error) {
 }
 
 // SyncUserAnalytics triggers synchronization for all user's videos (Async friendly)
-func (s *AnalyticsService) SyncUserAnalytics(userID int) {
-	// 1. Discover external videos first (ingest pre-existing platform content)
-	s.DiscoverVideos(userID)
+func (s *AnalyticsService) SyncUserAnalytics(userID int, clientID *int) {
+	// Discovery skipped for now to focus on direct analytics if needed,
+	// or update Discovery to support clientID as well.
 
-	// 2. Find all videos for user (now including newly discovered ones)
-	rows, err := s.db.Query("SELECT id FROM videos WHERE user_id = $1", userID)
+	query := "SELECT id FROM videos WHERE user_id = $1"
+	args := []interface{}{userID}
+	if clientID != nil {
+		query += " AND client_id = $2"
+		args = append(args, *clientID)
+	} else {
+		query += " AND client_id IS NULL"
+	}
+
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		log.Printf("Failed to list videos for sync: %v", err)
 		return
@@ -261,6 +293,7 @@ func (s *AnalyticsService) SyncVideoAnalytics(videoID int) {
 		}
 	}
 }
+
 // DiscoverVideos pulls existing videos from connected platforms and registers them in Creati
 func (s *AnalyticsService) DiscoverVideos(userID int) {
 	// Throttle discovery to once every 6 hours per user

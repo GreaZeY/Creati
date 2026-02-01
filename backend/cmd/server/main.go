@@ -142,6 +142,7 @@ func main() {
 		automationHandler := api.NewAutomationHandler(db, automationService)
 		paymentHandler := api.NewPaymentHandler(db)
 		webhookHandler := api.NewWebhookHandler(db)
+		agencyHandler := api.NewAgencyHandler(db)
 
 		// API routes
 		apiRoutes := app.Group("/api")
@@ -227,6 +228,10 @@ func main() {
 		protected.Put("/payments/subscription", paymentHandler.UpdateSubscription)
 		protected.Delete("/payments/subscription", paymentHandler.CancelSubscription)
 		protected.Get("/payments/subscription", paymentHandler.GetSubscription)
+
+		// Agency/Clients
+		protected.Get("/agency/clients", agencyHandler.ListClients)
+		protected.Post("/agency/clients", agencyHandler.CreateClient)
 
 		// Start server
 		port := os.Getenv("PORT")

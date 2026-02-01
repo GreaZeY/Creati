@@ -79,7 +79,7 @@ export function Header() {
                   )}
                 </div>
                 <span className="text-xs font-bold tracking-tight truncate">
-                  {selectedClient ? selectedClient.name : "Personal Workspace"}
+                  {selectedClient ? selectedClient.name : "Select Workspace"}
                 </span>
               </div>
               <ChevronsUpDown
@@ -102,22 +102,13 @@ export function Header() {
                     className="absolute top-full left-0 w-full mt-2 bg-popover border border-border rounded-xl shadow-2xl z-20 overflow-hidden py-1"
                   >
                     <div className="max-h-[240px] overflow-y-auto">
-                      <button
-                        onClick={() => {
-                          selectClient(null);
-                          setIsSwitcherOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent/10 text-xs font-medium text-left transition-colors"
-                      >
-                        <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center">
-                          <User size={10} />
+                      {clients.length === 0 && (
+                        <div className="px-4 py-8 text-center">
+                          <p className="text-[10px] font-black uppercase tracking-widest opacity-40">
+                            No Workspaces Found
+                          </p>
                         </div>
-                        <span className="flex-1">Personal Workspace</span>
-                        {selectedClient === null && (
-                          <Check size={14} className="text-primary" />
-                        )}
-                      </button>
-
+                      )}
                       {clients.map((client) => (
                         <button
                           key={client.id}

@@ -26,19 +26,19 @@ export const ConnectPlatforms = () => {
   const { limit } = useEntitlement();
   const maxAccounts = limit(CAPABILITIES.MAX_CONNECTED_ACCOUNTS);
 
+  const { selectedClient } = useClient();
+
   // Fetch counts and platform-wise connection status (lightweight endpoint)
   const { data: countsData = {} } = useQuery({
-    queryKey: ["platforms-count"],
+    queryKey: ["platforms-count", selectedClient?.id],
     queryFn: async () => {
-      const response = await platformsAPI.getCount();
+      const response = await platformsAPI.getCount(selectedClient?.id);
       return response.data.data;
     },
   });
 
   const connectedCount = countsData["total"] ?? 0;
   const isLimitReached = maxAccounts > 0 && connectedCount >= maxAccounts;
-
-  const { selectedClient } = useClient();
 
   const connectMutation = useMutation({
     mutationFn: async (platformId: string) => {

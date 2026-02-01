@@ -61,7 +61,12 @@ export const ClientProvider: React.FC<{ children: React.ReactNode }> = ({
           return;
         }
       }
-      // Default to "Personal Workspace" (null) if no memory or not found
+      // If no memory or not found, default to the first workspace
+      setSelectedClient(clients[0]);
+      localStorage.setItem(
+        "creati_selected_client_id",
+        clients[0].id.toString(),
+      );
     }
   }, [isLoading, clients]);
 

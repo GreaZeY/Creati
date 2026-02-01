@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/Label";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/events";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
+import { useClient } from "@/context/ClientContext";
 import { PLATFORMS } from "@/lib/constants";
 
 export function RuleBuilder() {
@@ -33,6 +34,8 @@ export function RuleBuilder() {
   const [keywords, setKeywords] = useState<string[]>([]);
   const [currentKeyword, setCurrentKeyword] = useState("");
 
+  const { selectedClient } = useClient();
+
   const STEPS = [
     { id: "source", title: "Source", icon: Youtube },
     { id: "filters", title: "Filters", icon: Filter },
@@ -41,15 +44,15 @@ export function RuleBuilder() {
   ];
 
   const { data: accounts = [] } = useQuery({
-    queryKey: ["connected-accounts"],
+    queryKey: ["connected-accounts", selectedClient?.id],
     queryFn: async () => {
-      const resp = await platformsAPI.list();
+      const resp = await platformsAPI.list(selectedClient?.id);
       return (resp.data.data || []).filter((a: any) => a.connected);
     },
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => automationAPI.create(data),
+    mutationFn: (data: any) => automationAPI.create(data, selectedClient?.id),
     onSuccess: () => {
       toast.success("Workflow is now active! ✨");
       navigate("/automation");

@@ -17,6 +17,7 @@ import { toast } from "@/lib/events";
 import { motion } from "framer-motion";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
 import { cn } from "@/lib/utils";
+import { useClient } from "@/context/ClientContext";
 
 export function BlastBuilder() {
   const navigate = useNavigate();
@@ -24,11 +25,12 @@ export function BlastBuilder() {
   const [selectedVideos, setSelectedVideos] = useState<any[]>([]);
   const [selectedTargets, setSelectedTargets] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const { selectedClient } = useClient();
 
   const { data: accounts = [] } = useQuery({
-    queryKey: ["connected-accounts"],
+    queryKey: ["connected-accounts", selectedClient?.id],
     queryFn: async () => {
-      const resp = await platformsAPI.list();
+      const resp = await platformsAPI.list(selectedClient?.id);
       return resp.data.data || [];
     },
   });
@@ -65,7 +67,7 @@ export function BlastBuilder() {
   }, [pastVideos, searchQuery]);
 
   const blastMutation = useMutation({
-    mutationFn: (data: any) => automationAPI.blast(data),
+    mutationFn: (data: any) => automationAPI.blast(data, selectedClient?.id),
     onSuccess: () => {
       toast.success("Blast enqueued! 🚀 Watch 'em fly.");
       navigate("/blast");

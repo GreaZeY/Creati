@@ -38,8 +38,15 @@ func (h *VideosHandler) ListVideos(c *fiber.Ctx) error {
 	if userID == 0 {
 		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "User not found")
 	}
+	clientIDStr := c.Query("clientId")
+	var clientID *int
+	if clientIDStr != "" {
+		if cid, err := strconv.Atoi(clientIDStr); err == nil {
+			clientID = &cid
+		}
+	}
 
-	rows, err := h.db.Query(`
+	query := `
 		SELECT v.id, v.title, v.description, v.s3_url, v.status, v.created_at,
 		       COALESCE(
 		           (SELECT CASE 
@@ -52,8 +59,17 @@ func (h *VideosHandler) ListVideos(c *fiber.Ctx) error {
 		       ) as job_status
 		FROM videos v
 		WHERE v.user_id = $1
-		ORDER BY v.created_at DESC
-	`, userID)
+	`
+	args := []interface{}{userID}
+	if clientID != nil {
+		query += " AND v.client_id = $2"
+		args = append(args, *clientID)
+	} else {
+		query += " AND v.client_id IS NULL"
+	}
+	query += " ORDER BY v.created_at DESC"
+
+	rows, err := h.db.Query(query, args...)
 
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to fetch videos")

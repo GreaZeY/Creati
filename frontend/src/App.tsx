@@ -15,6 +15,7 @@ import { ArchiveBlast } from "./pages/ArchiveBlast";
 import { RuleBuilder } from "./pages/RuleBuilder";
 import { BlastBuilder } from "./pages/BlastBuilder";
 import { Pricing } from "./pages/Pricing";
+import { WorkspaceSetup } from "./pages/WorkspaceSetup";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PublicRoute } from "./components/PublicRoute";
 import { PageTransition } from "./components/layout/PageTransition";
@@ -57,6 +58,7 @@ const AppRoutes = () => {
     "/blast",
     "/blast/new",
     "/pricing",
+    "/onboarding",
   ];
   const isProtectedPath = protectedPaths.includes(location.pathname);
 
@@ -98,6 +100,16 @@ const AppRoutes = () => {
                 <Register />
               </PublicRoute>
             </PageTransition>
+          }
+        />
+        <Route
+          path="/onboarding"
+          element={
+            <ProtectedRoute>
+              <PageTransition>
+                <WorkspaceSetup />
+              </PageTransition>
+            </ProtectedRoute>
           }
         />
         {/* Protected Routes */}

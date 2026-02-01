@@ -107,8 +107,8 @@ export const platformsAPI = {
     list: (clientId?: number) =>
         api.get<ApiResponse<any[]>>('/platforms' + (clientId ? `?clientId=${clientId}` : '')),
 
-    getCount: () =>
-        api.get<ApiResponse<Record<string, number>>>('/platforms/count'),
+    getCount: (clientId?: number) =>
+        api.get<ApiResponse<Record<string, number>>>('/platforms/counts' + (clientId ? `?clientId=${clientId}` : '')),
 
     connect: (platform: string, clientId?: number) =>
         api.get(`/platforms/${platform}/connect` + (clientId ? `?clientId=${clientId}` : '')),
@@ -130,7 +130,7 @@ export const uploadAPI = {
     init: (data: { filename: string; contentType: string; size: number }) =>
         api.post<ApiResponse<{ uploadUrl: string; key: string }>>('/upload/init', data),
 
-    confirm: (data: { key: string; title: string; description: string; platforms?: string[]; accountIds?: number[] }) =>
+    confirm: (data: { key: string; title: string; description: string; platforms?: string[]; accountIds?: number[]; clientId?: number }) =>
         api.post<ApiResponse>('/upload/confirm', data),
 };
 
@@ -153,8 +153,8 @@ export const automationAPI = {
     list: (clientId?: number) =>
         api.get<ApiResponse<any[]>>('/automation' + (clientId ? `?clientId=${clientId}` : '')),
 
-    create: (data: any) =>
-        api.post<ApiResponse<{ id: number }>>('/automation', data),
+    create: (data: any, clientId?: number) =>
+        api.post<ApiResponse<{ id: number }>>('/automation' + (clientId ? `?clientId=${clientId}` : ''), data),
 
     toggle: (id: number, isActive: boolean) =>
         api.put<ApiResponse>(`/automation/${id}`, { isActive }),
@@ -162,8 +162,8 @@ export const automationAPI = {
     delete: (id: number) =>
         api.delete<ApiResponse>(`/automation/${id}`),
 
-    blast: (data: { sourceAccountId: number; videoIds: string[]; targets: { accountId: number; captionTemplate: string }[] }) =>
-        api.post<ApiResponse>(`/automation/blast`, data),
+    blast: (data: { sourceAccountId: number; videoIds: string[]; targets: { accountId: number; captionTemplate: string }[] }, clientId?: number) =>
+        api.post<ApiResponse>(`/automation/blast` + (clientId ? `?clientId=${clientId}` : ''), data),
 
     getBlastSummary: (id: number) =>
         api.get<ApiResponse>(`/automation/rules/${id}/summary`),

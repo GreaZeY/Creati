@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import axios from "axios";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { useClient } from "@/context/ClientContext";
 
 interface ConnectedAccount {
   accountId: number;
@@ -36,13 +37,14 @@ export const Upload = () => {
   const [uploading, setUploading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { selectedClient } = useClient();
 
   // Fetch connected accounts
   // Fetch connected accounts with a specific key to avoid conflicts
   const { data: connectedAccounts = [] } = useQuery({
-    queryKey: ["connected-accounts"],
+    queryKey: ["connected-accounts", selectedClient?.id],
     queryFn: async () => {
-      const resp = await platformsAPI.list();
+      const resp = await platformsAPI.list(selectedClient?.id);
       const allAccounts = (resp.data.data || []) as ConnectedAccount[];
       return allAccounts.filter((a) => a.connected);
     },
@@ -107,6 +109,7 @@ export const Upload = () => {
         title: title || file.name,
         description: description,
         accountIds: selectedAccounts,
+        clientId: selectedClient?.id,
       });
 
       setSuccess(true);

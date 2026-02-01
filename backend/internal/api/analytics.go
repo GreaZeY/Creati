@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"strconv"
 
 	"creati.in/creati/backend/internal/middleware"
 	"creati.in/creati/backend/internal/services"
@@ -28,14 +29,22 @@ func (h *AnalyticsHandler) GetOverview(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "User not found")
 	}
 
-	// 1. Get Instant Stats from DB View (Fast)
-	stats, err := h.service.GetUserStats(userID)
+	clientIDStr := c.Query("clientId")
+	var clientID *int
+	if clientIDStr != "" {
+		if cid, err := strconv.Atoi(clientIDStr); err == nil {
+			clientID = &cid
+		}
+	}
+
+	// 1. Get Instant Stats from DB (Fast)
+	stats, err := h.service.GetUserStats(userID, clientID)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to fetch analytics")
 	}
 
 	// 2. Trigger Async Refresh (Non-blocking)
-	go h.service.SyncUserAnalytics(userID)
+	go h.service.SyncUserAnalytics(userID, clientID)
 
 	return utils.SuccessResponse(c, stats, "")
 }
