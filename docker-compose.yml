@@ -46,6 +46,6 @@ services:
       - redis_queue_data:/data
 
 volumes:
-  postgres_data:
+  # postgres_data:
   redis_cache_data:
   redis_queue_data:

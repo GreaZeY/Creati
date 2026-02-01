@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"creati.in/creati/backend/internal/db/models"
+	"creati.in/creati/backend/internal/db/repositories"
 	"creati.in/creati/backend/internal/logger"
 	youtube_dl "github.com/kkdai/youtube/v2"
 	"github.com/sirupsen/logrus"
@@ -33,12 +34,14 @@ import (
 type YouTubeService struct {
 	db          *sql.DB
 	oauthConfig *oauth2.Config
+	repo        *repositories.PlatformRepository
 }
 
 // NewYouTubeService creates a new YouTube service instance
 func NewYouTubeService(db *sql.DB) *YouTubeService {
 	return &YouTubeService{
-		db: db,
+		db:   db,
+		repo: repositories.NewPlatformRepository(db),
 		oauthConfig: &oauth2.Config{
 			ClientID:     os.Getenv("YOUTUBE_CLIENT_ID"),
 			ClientSecret: os.Getenv("YOUTUBE_CLIENT_SECRET"),
@@ -275,13 +278,20 @@ func (y *YouTubeService) Authenticate(code string, userID int) error {
 		return fmt.Errorf("failed to encrypt refresh token: %w", err)
 	}
 
-	query := `
-		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, status, profile_name, email, platform_user_id, handle)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		ON CONFLICT (user_id, platform, platform_user_id) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, status = $5, profile_name = $6, email = $7, handle = $9, connected_at = NOW()
-	`
-	_, err = y.db.Exec(query, userID, "youtube", encAccess, encRefresh, "connected", channelName, userEmail, channelID, handle)
+	// Use Repository to persist account
+	account := &models.PlatformAccount{
+		UserID:         userID,
+		Platform:       "youtube",
+		AccessToken:    encAccess,
+		RefreshToken:   encRefresh,
+		PlatformUserID: channelID,
+		Status:         "connected",
+		ProfileName:    channelName,
+		Handle:         handle,
+		Email:          userEmail,
+	}
+
+	err = y.repo.UpsertAccount(context.Background(), account)
 	if err != nil {
 		return err
 	}

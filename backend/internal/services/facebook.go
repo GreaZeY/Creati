@@ -17,6 +17,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/facebook"
 
+	"creati.in/creati/backend/internal/db/repositories"
 	"creati.in/creati/backend/internal/utils"
 )
 
@@ -27,12 +28,14 @@ import (
 type FacebookService struct {
 	db          *sql.DB
 	oauthConfig *oauth2.Config
+	repo        *repositories.PlatformRepository
 }
 
 // NewFacebookService creates a new Facebook service instance
 func NewFacebookService(db *sql.DB) *FacebookService {
 	return &FacebookService{
-		db: db,
+		db:   db,
+		repo: repositories.NewPlatformRepository(db),
 		oauthConfig: &oauth2.Config{
 			ClientID:     os.Getenv("FACEBOOK_CLIENT_ID"),
 			ClientSecret: os.Getenv("FACEBOOK_CLIENT_SECRET"),
@@ -100,14 +103,19 @@ func (f *FacebookService) Authenticate(code string, userID int) error {
 		return fmt.Errorf("failed to encrypt long-lived token: %w", err)
 	}
 
-	query := `
-		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, platform_user_id, status, profile_name, handle)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (user_id, platform, platform_user_id) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, status = $6, profile_name = $7, handle = $8, connected_at = NOW()
-	`
-	_, err = f.db.Exec(query, userID, "facebook", encPageToken, encLongLived, pageID, "connected", pageName, username)
-	return err
+	// Use Repository to persist account
+	account := &models.PlatformAccount{
+		UserID:         userID,
+		Platform:       "facebook",
+		AccessToken:    encPageToken,
+		RefreshToken:   encLongLived,
+		PlatformUserID: pageID,
+		Status:         "connected",
+		ProfileName:    pageName,
+		Handle:         username,
+	}
+
+	return f.repo.UpsertAccount(context.Background(), account)
 }
 
 // exchangeForLongLivedToken exchanges a short-lived token for a long-lived one

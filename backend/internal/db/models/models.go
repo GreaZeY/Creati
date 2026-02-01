@@ -29,6 +29,7 @@ type PlatformAccount struct {
 	Email          string    `json:"email" db:"email"`
 	WebhookURL     string    `json:"webhook_url,omitempty" db:"webhook_url"`
 	PlatformUserID string    `json:"platform_user_id,omitempty" db:"platform_user_id"`
+	Handle         string    `json:"handle" db:"handle"`
 	ConnectedAt    time.Time `json:"connected_at" db:"connected_at"`
 }
 

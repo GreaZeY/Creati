@@ -15,6 +15,7 @@ import (
 	"creati.in/creati/backend/internal/db/models"
 	"golang.org/x/oauth2"
 
+	"creati.in/creati/backend/internal/db/repositories"
 	"creati.in/creati/backend/internal/utils"
 )
 
@@ -25,12 +26,14 @@ import (
 type InstagramService struct {
 	db          *sql.DB
 	oauthConfig *oauth2.Config
+	repo        *repositories.PlatformRepository
 }
 
 // NewInstagramService creates a new Instagram service instance
 func NewInstagramService(db *sql.DB) *InstagramService {
 	return &InstagramService{
-		db: db,
+		db:   db,
+		repo: repositories.NewPlatformRepository(db),
 		oauthConfig: &oauth2.Config{
 			ClientID:     os.Getenv("INSTAGRAM_CLIENT_ID"),
 			ClientSecret: os.Getenv("INSTAGRAM_CLIENT_SECRET"),
@@ -103,14 +106,18 @@ func (i *InstagramService) Authenticate(code string, userID int) error {
 		return fmt.Errorf("failed to encrypt tokens: %w", err)
 	}
 
-	query := `
-		INSERT INTO platform_accounts (user_id, platform, access_token, platform_user_id, status, profile_name, handle)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (user_id, platform, platform_user_id) 
-		DO UPDATE SET access_token = $3, status = $5, profile_name = $6, handle = $7, connected_at = NOW()
-	`
-	_, err = i.db.Exec(query, userID, "instagram", encAccess, igUserID, status, profileName, username)
-	return err
+	// Use Repository to persist account
+	account := &models.PlatformAccount{
+		UserID:         userID,
+		Platform:       "instagram",
+		AccessToken:    encAccess,
+		PlatformUserID: igUserID,
+		Status:         status,
+		ProfileName:    profileName,
+		Handle:         username,
+	}
+
+	return i.repo.UpsertAccount(context.Background(), account)
 }
 
 // discoverInstagramAccount retrieves the IG User identity directly from graph.instagram.com

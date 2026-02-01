@@ -15,6 +15,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/linkedin"
 
+	"creati.in/creati/backend/internal/db/repositories"
 	"creati.in/creati/backend/internal/utils"
 )
 
@@ -25,12 +26,14 @@ import (
 type LinkedInService struct {
 	db          *sql.DB
 	oauthConfig *oauth2.Config
+	repo        *repositories.PlatformRepository
 }
 
 // NewLinkedInService creates a new LinkedIn service instance
 func NewLinkedInService(db *sql.DB) *LinkedInService {
 	return &LinkedInService{
-		db: db,
+		db:   db,
+		repo: repositories.NewPlatformRepository(db),
 		oauthConfig: &oauth2.Config{
 			ClientID:     os.Getenv("LINKEDIN_CLIENT_ID"),
 			ClientSecret: os.Getenv("LINKEDIN_CLIENT_SECRET"),
@@ -94,14 +97,19 @@ func (l *LinkedInService) Authenticate(code string, userID int) error {
 	}
 
 	// Store tokens in database
-	query := `
-		INSERT INTO platform_accounts (user_id, platform, access_token, refresh_token, platform_user_id, status, profile_name, handle)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		ON CONFLICT (user_id, platform, platform_user_id) 
-		DO UPDATE SET access_token = $3, refresh_token = $4, status = $6, profile_name = $7, handle = $8, connected_at = NOW()
-	`
-	_, err = l.db.Exec(query, userID, "linkedin", encAccess, encRefresh, profileID, "connected", profileName, handle)
-	return err
+	// Use Repository to persist account
+	account := &models.PlatformAccount{
+		UserID:         userID,
+		Platform:       "linkedin",
+		AccessToken:    encAccess,
+		RefreshToken:   encRefresh,
+		PlatformUserID: profileID,
+		Status:         "connected",
+		ProfileName:    profileName,
+		Handle:         handle,
+	}
+
+	return l.repo.UpsertAccount(context.Background(), account)
 }
 
 // getUserProfile retrieves the user's LinkedIn profile
