@@ -22,9 +22,8 @@ func (r *PlatformRepository) UpsertAccount(ctx context.Context, account *models.
 	query := `
 		INSERT INTO platform_accounts (user_id, client_id, platform, access_token, refresh_token, platform_user_id, status, profile_name, handle, email, webhook_url)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		ON CONFLICT (user_id, platform, platform_user_id) 
+		ON CONFLICT (user_id, platform, platform_user_id, (COALESCE(client_id, 0))) 
 		DO UPDATE SET 
-			client_id = $2,
 			access_token = $4, 
 			refresh_token = $5,
 			status = $7, 

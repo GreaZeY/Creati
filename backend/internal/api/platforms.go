@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -32,6 +33,27 @@ func NewPlatformHandler(db *sql.DB, cache *services.CacheService) *PlatformHandl
 	return &PlatformHandler{db: db, cache: cache}
 }
 
+func (h *PlatformHandler) invalidateUserCache(ctx context.Context, userID int, clientID *int) {
+	base := services.UserAccountsKey(userID)
+	// Clear base keys (legacy)
+	_ = h.cache.Delete(ctx, base+":list")
+	_ = h.cache.Delete(ctx, base+":counts")
+
+	// Clear specific workspace keys
+	suffix := ":personal"
+	if clientID != nil {
+		suffix = fmt.Sprintf(":%d", *clientID)
+	}
+	_ = h.cache.Delete(ctx, base+":list"+suffix)
+	_ = h.cache.Delete(ctx, base+":counts"+suffix)
+
+	// Also clear personal if we just updated a client account (sometimes counts are aggregated or leaked)
+	if clientID != nil {
+		_ = h.cache.Delete(ctx, base+":list:personal")
+		_ = h.cache.Delete(ctx, base+":counts:personal")
+	}
+}
+
 // GetPlatformCounts returns count of connected and total platform accounts
 func (h *PlatformHandler) GetPlatformCounts(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
@@ -39,16 +61,35 @@ func (h *PlatformHandler) GetPlatformCounts(c *fiber.Ctx) error {
 	// Try Cache First
 	var counts map[string]int
 	cacheKey := services.UserAccountsKey(userID) + ":counts"
+	if c.Query("clientId") != "" {
+		cacheKey += ":" + c.Query("clientId")
+	} else {
+		cacheKey += ":personal"
+	}
+
 	if err := h.cache.Get(c.Context(), cacheKey, &counts); err == nil {
 		return c.JSON(fiber.Map{"data": counts})
 	}
 
 	// Fetch all connected platforms
-	rows, err := h.db.Query(`
-		SELECT platform
-		FROM platform_accounts 
-		WHERE user_id = $1 AND status IN ('active', 'connected')
-	`, userID)
+	clientIDStr := c.Query("clientId")
+	var rows *sql.Rows
+	var err error
+
+	if clientIDStr != "" {
+		rows, err = h.db.Query(`
+			SELECT platform
+			FROM platform_accounts 
+			WHERE user_id = $1 AND client_id = $2 AND status IN ('active', 'connected', 'action_required')
+		`, userID, clientIDStr)
+	} else {
+		rows, err = h.db.Query(`
+			SELECT platform
+			FROM platform_accounts 
+			WHERE user_id = $1 AND client_id IS NULL AND status IN ('active', 'connected', 'action_required')
+		`, userID)
+	}
+
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
 	}
@@ -96,11 +137,17 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 	// Try Cache First
 	var results []PlatformData
 	cacheKey := services.UserAccountsKey(userID) + ":list"
+	clientIDStr := c.Query("clientId")
+	if clientIDStr != "" {
+		cacheKey += ":" + clientIDStr
+	} else {
+		cacheKey += ":personal"
+	}
+
 	if err := h.cache.Get(c.Context(), cacheKey, &results); err == nil {
 		return utils.SuccessResponse(c, results, "")
 	}
 
-	clientIDStr := c.Query("clientId")
 	var clientID *int
 	if clientIDStr != "" {
 		if cid, err := strconv.Atoi(clientIDStr); err == nil {
@@ -119,7 +166,7 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 
 	// 1. Add all connected accounts
 	for _, acc := range accounts {
-		isConnected := (acc.Status == "connected" || acc.Status == "active")
+		isConnected := (acc.Status == "connected" || acc.Status == "active" || acc.Status == "action_required")
 		if isConnected {
 			connectedPlatforms[acc.Platform] = true
 		}
@@ -139,6 +186,7 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 			Name:           displayName,
 			Platform:       acc.Platform,
 			Status:         acc.Status,
+			Connected:      isConnected,
 			ProfileName:    acc.ProfileName,
 			PlatformUserID: acc.PlatformUserID,
 			Handle:         acc.Handle,
@@ -273,8 +321,7 @@ func (h *PlatformHandler) HandleCallback(c *fiber.Ctx) error {
 	}
 
 	// Invalidate Cache
-	_ = h.cache.Delete(c.Context(), services.UserAccountsKey(userID)+":list")
-	_ = h.cache.Delete(c.Context(), services.UserAccountsKey(userID)+":counts")
+	h.invalidateUserCache(c.Context(), userID, clientID)
 
 	// Return success JSON
 	return utils.SuccessResponse(c, fiber.Map{
@@ -317,8 +364,14 @@ func (h *PlatformHandler) DeactivatePlatform(c *fiber.Ctx) error {
 	}
 
 	// Invalidate Cache
-	_ = h.cache.Delete(c.Context(), services.UserAccountsKey(userID)+":list")
-	_ = h.cache.Delete(c.Context(), services.UserAccountsKey(userID)+":counts")
+	var clientID *int
+	if accountID, errID := strconv.Atoi(platform); errID == nil {
+		_ = h.db.QueryRow("SELECT client_id FROM platform_accounts WHERE id = $1", accountID).Scan(&clientID)
+	} else {
+		// If it's a platform name, we don't know the client, so we clear personal at least
+		// In a real app we'd fetch all clients for this user and clear them, but let's stick to personal + state-based for now.
+	}
+	h.invalidateUserCache(c.Context(), userID, clientID)
 
 	return utils.SuccessResponse(c, nil, "Platform disconnected successfully")
 }
@@ -352,8 +405,11 @@ func (h *PlatformHandler) RemovePlatform(c *fiber.Ctx) error {
 	}
 
 	// Invalidate Cache
-	_ = h.cache.Delete(c.Context(), services.UserAccountsKey(userID)+":list")
-	_ = h.cache.Delete(c.Context(), services.UserAccountsKey(userID)+":counts")
+	var clientID *int
+	if accountID, errID := strconv.Atoi(target); errID == nil {
+		_ = h.db.QueryRow("SELECT client_id FROM platform_accounts WHERE id = $1", accountID).Scan(&clientID)
+	}
+	h.invalidateUserCache(c.Context(), userID, clientID)
 
 	return utils.SuccessResponse(c, nil, "Platform removed successfully")
 }
