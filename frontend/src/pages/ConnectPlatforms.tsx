@@ -3,13 +3,7 @@ import { useState } from "react";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { platformsAPI } from "@/lib/api";
-import {
-  CheckCheck,
-  Link as LinkIcon,
-  Network,
-  Zap,
-  AlertTriangle,
-} from "lucide-react";
+import { CheckCheck, Link as LinkIcon, Zap, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PLATFORMS } from "@/lib/constants";
@@ -19,6 +13,7 @@ import { PlatformLogo } from "@/components/platforms/PlatformLogo";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { CAPABILITIES } from "@/lib/features";
 import { useClient } from "@/context/ClientContext";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 export const ConnectPlatforms = () => {
   const [searchParams] = useSearchParams();
@@ -74,25 +69,10 @@ export const ConnectPlatforms = () => {
 
   return (
     <div className="max-w-5xl space-y-8 pb-10">
-      {/* ... (Header) */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="p-1.5 rounded-lg bg-primary/10 text-primary">
-                <Network size={18} />
-              </span>
-              <span className="text-4xl font-black uppercase text-primary">
-                Ecosystem Expansion
-              </span>
-            </div>
-            <p className="text-muted-foreground mt-2 text-lg font-medium opacity-80">
-              Link new delivery nodes to broadcast your message across the
-              digital fabric.
-            </p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Connect Platforms"
+        description="Link new delivery nodes to broadcast your message across the digital fabric."
+      />
 
       {/* Guidance Modal */}
       <Modal
@@ -212,7 +192,7 @@ export const ConnectPlatforms = () => {
             className="bg-destructive/10 border-2 border-destructive/20 p-6 rounded-3xl flex items-center gap-5 shadow-2xl shadow-destructive/10 backdrop-blur-md"
           >
             {/* ... */}
-            <div className="p-3 bg-destructive rounded-2xl text-white shadow-lg shadow-destructive/20">
+            <div className="p-3 bg-destructive rounded-2xl text-destructive-foreground shadow-lg shadow-destructive/20">
               <AlertTriangle className="w-6 h-6" />
             </div>
             <div>
@@ -295,7 +275,7 @@ export const ConnectPlatforms = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05, type: "spring", stiffness: 100 }}
             >
-              <Card className="p-8 bg-card/40 backdrop-blur-xl border-border/40 hover:border-primary/50 transition-all duration-500 group relative overflow-hidden rounded-[2rem] ring-1 ring-white/5 shadow-2xl hover:shadow-primary/5">
+              <Card className="p-8 bg-card/40 backdrop-blur-xl border-border/40 hover:border-primary/50 transition-all duration-500 group relative overflow-hidden rounded-[2rem] ring-1 ring-border/20 shadow-2xl hover:shadow-primary/5">
                 <div className="flex items-start gap-6 relative z-10">
                   <div className="w-20 h-20 rounded-[1.5rem] flex items-center justify-center transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 shadow-2xl">
                     <PlatformLogo platform={platform.id} size={40} />
@@ -339,7 +319,7 @@ export const ConnectPlatforms = () => {
 
                 {!platform.enabled && (
                   // ... disabled UI kept same
-                  <div className="absolute inset-0 bg-background/40 backdrop-blur-[16px] flex items-center justify-center p-8 text-center z-20 rounded-[2rem] transition-all duration-500 border border-white/5">
+                  <div className="absolute inset-0 bg-background/40 backdrop-blur-[16px] flex items-center justify-center p-8 text-center z-20 rounded-[2rem] transition-all duration-500 border border-border">
                     <div className="space-y-4">
                       <div className="bg-primary/20 text-primary px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest w-fit mx-auto shadow-lg shadow-primary/10 ring-1 ring-primary/20">
                         Coming Soon

@@ -14,8 +14,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 344.67 100% 64.71%;
-    /* Slightly darker teal for light mode contrast */
+    --primary: 345 100% 45%;
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -24,15 +23,18 @@
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 344.67 100% 64.71%;
+    --accent: 345 100% 45%;
     --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 157 69% 45%;
+    --success: 142 76% 45%;
+    --success-foreground: 144 100% 98%;
+
+    --border: 214.3 31.8% 85%;
+    --input: 214.3 31.8% 85%;
+    --ring: 345 100% 45%;
 
     --radius: 0.75rem;
   }
@@ -52,31 +54,33 @@
     --popover: 219 28% 15%;
     --popover-foreground: 216 20% 92%;
 
-    /* Accent: #6AE3B4 (Mint-Teal) */
-    /* --primary: 157 69% 65%; */
+    --primary: 345 100% 36%;
     /* Primary text on accent: Dark Bg Color (#0E1116) */
     --primary-foreground: 218 22% 7%;
 
     /* Secondary: Transparent/Bordered usually, but mapping slate for support */
-    --secondary: 215 25% 27%;
+    --secondary: 215 25% 15%;
     --secondary-foreground: 216 20% 92%;
 
     /* Muted Text: #6B7280 */
-    --muted: 215 25% 27%;
+    --muted: 215 25% 15%;
     --muted-foreground: 220 9% 46%;
 
     /* Accent/Ring */
-    --accent: 157 69% 65%;
+    --accent: 345 100% 36%;
     --accent-foreground: 218 22% 7%;
 
     /* Error: #F87171 */
     --destructive: 0 91% 71%;
     --destructive-foreground: 216 20% 92%;
 
+    --success: 142 70% 50%;
+    --success-foreground: 144 100% 98%;
+
     /* Borders: Subtle */
     --border: 216 20% 20%;
     --input: 216 20% 20%;
-    --ring: 157 69% 65%;
+    --ring: 345 100% 36%;
   }
 }
 
@@ -86,7 +90,7 @@
   }
 
   body {
-    @apply bg-background text-foreground selection:bg-primary/20 selection:text-primary;
+    @apply bg-background text-foreground selection:bg-primary/30 selection:text-primary-foreground;
     font-feature-settings:
       "rlig" 1,
       "calt" 1;
@@ -109,9 +113,9 @@
     --shadow-light: none;
     --shadow-hover: none;
 
-    --glare-opacity: 0.4;
-    --border-opacity: 0.2;
-    /* Reduced from 0.5 for lighter borders */
+    --glare-opacity: 0.1;
+    --border-opacity: 0.4;
+    /* Increased from 0.2 for better visibility in light mode */
   }
 
   .dark {
@@ -122,8 +126,8 @@
     --shadow-hover: none;
 
     --glare-opacity: 0.05;
-    --border-opacity: 0.1;
-    /* Reduced from 0.2 for lighter borders */
+    --border-opacity: 0.15;
+    /* Slightly increased for dark mode clarity too */
   }
 }
 

@@ -2,17 +2,18 @@ import { useQuery } from "@tanstack/react-query";
 import { videosAPI, platformsAPI, analyticsAPI } from "@/lib/api";
 import { VideoCard, VideoCardSkeleton } from "@/components/dashboard/VideoCard";
 import {
-  PlusCircle,
   UploadCloud,
+  Zap,
+  Plus,
   Link2,
   LayoutDashboard,
   ArrowRight,
-  Zap,
   BarChart,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Link, useNavigate } from "react-router-dom";
 import { LensedCard } from "@/components/ui/LensedCard";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
@@ -59,38 +60,18 @@ export const Dashboard = () => {
   };
 
   return (
-    <div className="space-y-12 pb-20 max-w-7xl mx-auto px-4">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-8 pb-4">
-        <div className="space-y-2">
-          <motion.h1
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="text-6xl font-black tracking-tighter uppercase italic font-outfit"
-          >
-            Command Center
-          </motion.h1>
-          <p className="text-muted-foreground text-xl font-medium max-w-lg">
-            Your global distribution engine is primed. Total control across all
-            nodes.
-          </p>
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-        >
-          <Button
-            asChild
-            size="lg"
-            className="h-16 px-10 rounded-2xl bg-primary text-slate-950 font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(var(--primary),0.3)] group border-0"
-          >
-            <Link to="/upload" className="flex items-center gap-3">
-              <PlusCircle className="w-6 h-6 transition-transform group-hover:rotate-90 duration-500" />
-              <span>INITIALIZE CONTENT</span>
-            </Link>
+    <div className="space-y-8 pb-12 max-w-7xl mx-auto px-4">
+      <PageHeader
+        title="Dashboard"
+        description="Your global distribution engine is primed. Total control across all nodes."
+      >
+        <Link to="/upload">
+          <Button className="gap-2">
+            <Plus size={18} />
+            Initialize Content
           </Button>
-        </motion.div>
-      </header>
+        </Link>
+      </PageHeader>
 
       {/* Hero Ecosystem Pulse */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 font-outfit">
@@ -129,12 +110,12 @@ export const Dashboard = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             {isLoading ? (
-              <Skeleton className="h-10 w-full rounded-xl bg-white/5" />
+              <Skeleton className="h-10 w-full rounded-xl bg-muted/50" />
             ) : connectedPlatforms.length > 0 ? (
               connectedPlatforms.map((p: any) => (
                 <div
                   key={p.id}
-                  className="p-2 rounded-xl bg-white/5 border border-white/5 flex items-center gap-2 group hover:bg-white/10 transition-all cursor-crosshair"
+                  className="p-2 rounded-xl bg-muted/30 border border-border flex items-center gap-2 group hover:bg-accent/10 transition-all cursor-crosshair"
                 >
                   <PlatformLogo
                     platform={p.platform}
@@ -177,7 +158,7 @@ export const Dashboard = () => {
               Assets Distributed
             </span>
           </div>
-          <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+          <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: "78%" }}
@@ -191,8 +172,8 @@ export const Dashboard = () => {
       <div className="pt-8">
         <div className="flex items-center justify-between mb-10">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-white/5">
-              <BarChart className="w-6 h-6 text-white/40" />
+            <div className="p-2 rounded-lg bg-muted">
+              <BarChart className="w-6 h-6 text-muted-foreground/40" />
             </div>
             <h3 className="text-3xl font-black tracking-tighter uppercase italic font-outfit">
               Asset Feed
@@ -227,8 +208,8 @@ export const Dashboard = () => {
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
           >
-            <LensedCard className="py-24 border-dashed border-2 border-white/5 flex flex-col items-center text-center">
-              <div className="w-20 h-20 bg-white/5 rounded-3xl flex items-center justify-center mb-8 ring-1 ring-white/10 group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+            <LensedCard className="py-24 border-dashed border-2 border-border flex flex-col items-center text-center">
+              <div className="w-20 h-20 bg-muted rounded-3xl flex items-center justify-center mb-8 ring-1 ring-border group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
                 <UploadCloud className="w-10 h-10 text-primary blur-[1px]" />
               </div>
               <h3 className="text-3xl font-black uppercase italic mb-4 tracking-tighter">
@@ -240,7 +221,7 @@ export const Dashboard = () => {
               </p>
               <Button
                 size="lg"
-                className="h-16 px-12 rounded-2xl bg-white text-black font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-2xl"
+                className="h-16 px-12 rounded-2xl bg-foreground text-background font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-2xl"
                 onClick={() => navigate("/upload")}
               >
                 START DISPATCH

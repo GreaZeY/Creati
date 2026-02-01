@@ -30,7 +30,7 @@ export function Sidebar() {
   const { logout } = useAuth();
 
   return (
-    <div className="fixed left-0 top-0 h-full w-64 bg-card/20 backdrop-blur-[30px] z-50 flex flex-col border-r border-white/5 font-outfit">
+    <div className="fixed left-0 top-0 h-full w-64 bg-card/20 backdrop-blur-[30px] z-50 flex flex-col border-r border-border font-outfit">
       {/* Brand */}
       <div className="h-24 flex items-center px-8">
         <h1 className="text-3xl font-black tracking-tighter italic uppercase text-foreground">
@@ -57,7 +57,7 @@ export function Sidebar() {
                   "flex items-center gap-4 px-4 py-3 rounded-2xl text-[11px] font-black tracking-[0.2em] transition-all duration-300 uppercase",
                   isActive
                     ? "bg-primary/10 text-primary shadow-[inset_0_0_15px_rgba(var(--primary),0.05)] ring-1 ring-primary/20"
-                    : "text-muted-foreground/60 hover:text-foreground hover:bg-white/5",
+                    : "text-muted-foreground/60 hover:text-foreground hover:bg-accent/10",
                 )}
               >
                 <Icon
@@ -85,7 +85,7 @@ export function Sidebar() {
       </nav>
 
       {/* Footer / Account */}
-      <div className="p-6 border-t border-white/5">
+      <div className="p-6 border-t border-border">
         <button
           onClick={logout}
           className="flex items-center gap-4 px-4 py-3 w-full rounded-2xl text-[11px] font-black tracking-[0.2em] text-muted-foreground/60 hover:bg-red-500/10 hover:text-red-400 transition-all duration-300 uppercase"

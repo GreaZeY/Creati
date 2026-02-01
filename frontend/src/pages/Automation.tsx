@@ -13,6 +13,7 @@ import {
 import { automationAPI } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/events";
@@ -139,20 +140,17 @@ export function Automation() {
 
   return (
     <div className="space-y-8 pb-12">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Workflows</h1>
-          <p className="text-muted-foreground mt-1">
-            Blast your content across platforms automatically.
-          </p>
-        </div>
+      <PageHeader
+        title="Workflows"
+        description="Blast your content across platforms automatically."
+      >
         <Link to="/automation/new">
           <Button className="gap-2">
             <Plus size={18} />
             New Workflow
           </Button>
         </Link>
-      </header>
+      </PageHeader>
 
       {rules.length === 0 ? (
         <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed bg-primary/5">

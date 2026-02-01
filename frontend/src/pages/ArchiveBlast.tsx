@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Rocket,
   Trash2,
   ArrowRight,
   Clock,
@@ -12,10 +11,12 @@ import {
   Loader2,
   Database,
   AlertTriangle,
+  Plus,
 } from "lucide-react";
 import { automationAPI } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { LensedCard } from "@/components/ui/LensedCard";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Link } from "react-router-dom";
 import { toast } from "@/lib/events";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
@@ -48,7 +49,7 @@ function BlastProgress({
           </span>
           <span className="text-xs font-black italic tracking-tighter">0%</span>
         </div>
-        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+        <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
           <div className="h-full w-0 bg-primary shadow-[0_0_10px_rgba(var(--primary),0.5)]" />
         </div>
       </div>
@@ -81,7 +82,7 @@ function BlastProgress({
         </span>
       </div>
 
-      <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden p-[1px] border border-white/5">
+      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden p-[1px] border border-border">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
@@ -183,41 +184,22 @@ export function ArchiveBlast() {
   }
 
   return (
-    <div className="space-y-12 pb-20 max-w-7xl mx-auto px-4 font-outfit">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-8 pb-4">
-        <div className="space-y-2">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-primary/10 rounded-xl text-primary border border-primary/20">
-              <Rocket size={24} fill="currentColor" />
-            </div>
-            <h1 className="text-6xl font-black tracking-tighter uppercase italic">
-              Quick Blast
-            </h1>
-          </div>
-          <p className="text-muted-foreground text-xl font-medium max-w-lg">
-            Rapid fire distribution. Sectorized asset broadcasting across all
-            active nodes.
-          </p>
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-        >
-          <Link to="/blast/new">
-            <Button
-              size="lg"
-              className="h-16 px-10 rounded-2xl bg-primary text-slate-950 font-black text-lg gap-3 hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(var(--primary),0.3)] group border-0"
-            >
-              NEW BLAST <Zap size={20} className="fill-current" />
-            </Button>
-          </Link>
-        </motion.div>
-      </header>
+    <div className="space-y-8 pb-12 max-w-7xl mx-auto px-4 font-outfit">
+      <PageHeader
+        title="Quick Blast"
+        description="Rapid fire distribution. Sectorized asset broadcasting across all active nodes."
+      >
+        <Link to="/blast/new">
+          <Button className="gap-2">
+            <Plus size={18} />
+            New Blast
+          </Button>
+        </Link>
+      </PageHeader>
 
       {rules.length === 0 ? (
-        <LensedCard className="py-32 flex flex-col items-center justify-center text-center border-dashed border-2 border-white/5">
-          <div className="w-24 h-24 rounded-3xl bg-white/5 flex items-center justify-center mb-8 ring-1 ring-white/10 group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700">
+        <LensedCard className="py-32 flex flex-col items-center justify-center text-center border-dashed border-2 border-border">
+          <div className="w-24 h-24 rounded-3xl bg-muted flex items-center justify-center mb-8 ring-1 ring-border group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700">
             <Database
               className="text-primary opacity-40 blur-[1px]"
               size={48}
@@ -233,7 +215,7 @@ export function ArchiveBlast() {
           <Link to="/blast/new" className="mt-12">
             <Button
               size="lg"
-              className="h-16 px-12 rounded-2xl bg-white text-black font-black text-lg hover:scale-105 active:scale-95 transition-all"
+              className="h-16 px-12 rounded-2xl bg-foreground text-background font-black text-lg hover:scale-105 active:scale-95 transition-all"
             >
               INITIALIZE FIRST BLAST
             </Button>
@@ -263,7 +245,7 @@ export function ArchiveBlast() {
                     </div>
                     <button
                       onClick={() => setRuleToDelete(rule.id)}
-                      className="p-3 text-muted-foreground/30 hover:text-red-400 transition-all rounded-xl bg-white/5 hover:bg-red-500/10"
+                      className="p-3 text-muted-foreground/30 hover:text-red-400 transition-all rounded-xl bg-muted/50 hover:bg-red-500/10"
                     >
                       <Trash2 color="red" size={18} />
                     </button>
@@ -296,13 +278,13 @@ export function ArchiveBlast() {
                             >
                               <div
                                 className={cn(
-                                  "w-10 h-10 rounded-full border-2 border-[#0a0a0c] bg-white/5 flex items-center justify-center shadow-2xl ring-1 ring-white/5 group-hover:ring-primary/20 transition-all",
+                                  "w-10 h-10 rounded-full border-2 border-background bg-muted flex items-center justify-center shadow-2xl ring-1 ring-border group-hover:ring-primary/20 transition-all",
                                   error && "ring-red-500/50 border-red-500/20",
                                 )}
                               >
                                 <PlatformLogo platform={t.platform} size={16} />
                                 {error && (
-                                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center ring-2 ring-[#0a0a0c]">
+                                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center ring-2 ring-background">
                                     <span className="text-[6px] font-black">
                                       !
                                     </span>
@@ -311,7 +293,7 @@ export function ArchiveBlast() {
                               </div>
                               {error && (
                                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-48 opacity-0 group-hover/node:opacity-100 pointer-events-none transition-all duration-300 translate-y-2 group-hover/node:translate-y-0 z-50">
-                                  <div className="bg-black/80 backdrop-blur-xl border border-red-500/30 p-3 rounded-xl shadow-2xl">
+                                  <div className="bg-popover/90 backdrop-blur-xl border border-red-500/30 p-3 rounded-xl shadow-2xl">
                                     <div className="flex items-center gap-2 mb-1">
                                       <AlertTriangle
                                         size={10}
@@ -321,11 +303,11 @@ export function ArchiveBlast() {
                                         Drop Failure
                                       </span>
                                     </div>
-                                    <p className="text-[10px] text-white/70 font-medium leading-relaxed">
+                                    <p className="text-[10px] text-foreground font-medium leading-relaxed">
                                       {error}
                                     </p>
                                   </div>
-                                  <div className="w-2 h-2 bg-black/80 rotate-45 border-r border-b border-red-500/30 mx-auto -mt-1" />
+                                  <div className="w-2 h-2 bg-popover/90 rotate-45 border-r border-b border-red-500/30 mx-auto -mt-1" />
                                 </div>
                               )}
                             </div>

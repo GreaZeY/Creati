@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
 import { DropdownMenu, DropdownItem } from "@/components/ui/DropdownMenu";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { useState } from "react";
 import { toast } from "@/lib/events";
 import { useEntitlement } from "@/hooks/useEntitlement";
@@ -127,55 +128,35 @@ export const Platforms = () => {
   };
 
   return (
-    <div className="space-y-12 pb-20 max-w-7xl mx-auto px-4 font-outfit">
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-8 pb-4">
-        <div className="space-y-2">
-          <motion.h1
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="text-6xl font-black tracking-tighter uppercase font-outfit"
-          >
-            Active Nodes
-          </motion.h1>
-          <p className="text-muted-foreground text-xl font-medium max-w-lg">
-            Manage your neural distribution network. Authenticate new nodes to
-            expand your reach.
-          </p>
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-        >
-          {isLimitReached ? (
-            <div className="flex flex-col items-end gap-2">
-              <Button
-                disabled
-                className="h-16 px-10 rounded-2xl bg-muted text-muted-foreground font-black text-lg opacity-50 cursor-not-allowed border-0"
-              >
-                NODE LIMIT REACHED
-              </Button>
-              <Link
-                to="/pricing"
-                className="text-xs text-primary font-black uppercase tracking-widest hover:underline"
-              >
-                Upgrade Plan →
-              </Link>
-            </div>
-          ) : (
+    <div className="space-y-8 pb-12 max-w-7xl mx-auto px-4 font-outfit">
+      <PageHeader
+        title="My Platforms"
+        description="Your connected neural pathways across the digital workspace."
+      >
+        {isLimitReached ? (
+          <div className="flex flex-col items-end gap-2">
             <Button
-              asChild
-              size="lg"
-              className="h-16 px-10 rounded-2xl bg-primary text-primary-foreground font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-[0_0_30px_rgba(var(--primary),0.3)] group border-0"
+              disabled
+              className="h-11 px-6 rounded-xl bg-muted text-muted-foreground font-bold text-sm opacity-50 cursor-not-allowed border-0"
             >
-              <Link to="/platforms/connect" className="flex items-center gap-3">
-                <Plus className="w-6 h-6 transition-transform group-hover:rotate-90 duration-500" />
-                <span>LINK NEW NODE</span>
-              </Link>
+              LIMIT REACHED
             </Button>
-          )}
-        </motion.div>
-      </header>
+            <Link
+              to="/pricing"
+              className="text-[10px] text-primary font-black uppercase tracking-widest hover:underline"
+            >
+              Upgrade Plan →
+            </Link>
+          </div>
+        ) : (
+          <Link to="/platforms/connect">
+            <Button className="gap-2">
+              <Plus size={18} />
+              Connect New
+            </Button>
+          </Link>
+        )}
+      </PageHeader>
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -320,8 +301,8 @@ export const Platforms = () => {
           </AnimatePresence>
         </div>
       ) : (
-        <LensedCard className="py-32 flex flex-col items-center justify-center text-center border-dashed border-2 border-white/5">
-          <div className="w-24 h-24 bg-white/5 rounded-3xl flex items-center justify-center mb-8 ring-1 ring-white/10 group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700">
+        <LensedCard className="py-32 flex flex-col items-center justify-center text-center border-dashed border-2 border-border">
+          <div className="w-24 h-24 bg-muted rounded-3xl flex items-center justify-center mb-8 ring-1 ring-border group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700">
             <Link2 className="w-12 h-12 text-primary opacity-40" />
           </div>
 
@@ -336,7 +317,7 @@ export const Platforms = () => {
           <Button
             asChild
             size="lg"
-            className="mt-12 h-16 px-12 rounded-2xl bg-primary text-slate-950 font-black text-lg hover:scale-105 active:scale-95 transition-all"
+            className="mt-12 h-16 px-12 rounded-2xl bg-primary text-primary-foreground font-black text-lg hover:scale-105 active:scale-95 transition-all"
           >
             <Link to="/platforms/connect">AUTH FIRST NODE</Link>
           </Button>
@@ -368,10 +349,10 @@ export const Platforms = () => {
 const PlatformSkeleton = () => {
   return (
     <LensedCard className="p-8 h-[140px] flex items-center gap-8">
-      <Skeleton className="w-20 h-20 rounded-2xl bg-white/5" />
+      <Skeleton className="w-20 h-20 rounded-2xl bg-muted/50" />
       <div className="flex-1 space-y-4">
-        <Skeleton className="h-8 w-2/3 rounded-xl bg-white/5" />
-        <Skeleton className="h-4 w-1/3 rounded-lg bg-white/5 opacity-50" />
+        <Skeleton className="h-8 w-2/3 rounded-xl bg-muted/50" />
+        <Skeleton className="h-4 w-1/3 rounded-lg bg-muted/50 opacity-50" />
       </div>
     </LensedCard>
   );

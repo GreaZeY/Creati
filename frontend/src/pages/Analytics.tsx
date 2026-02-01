@@ -1,11 +1,4 @@
-import {
-  BarChart3,
-  TrendingUp,
-  Play,
-  Target,
-  Zap,
-  DollarSign,
-} from "lucide-react";
+import { TrendingUp, Play, Target, Zap, DollarSign } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { analyticsAPI } from "@/lib/api";
 import { LensedCard } from "@/components/ui/LensedCard";
@@ -22,6 +15,7 @@ import {
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
 import { motion } from "framer-motion";
 import { useClient } from "@/context/ClientContext";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 // Fallback mock data if no history yet
 const mockPulseData = [
@@ -71,21 +65,11 @@ export const Analytics = () => {
       : (totalViews * 0.002).toFixed(2); // Fallback to mock RPV
 
   return (
-    <div className="space-y-10 pb-20 max-w-7xl mx-auto px-4">
-      <header className="space-y-4">
-        <div className="flex items-center gap-4">
-          <div className="p-3 rounded-2xl bg-primary/10 glass-card">
-            <BarChart3 className="w-8 h-8 text-primary shadow-[0_0_15px_rgba(var(--primary),0.5)]" />
-          </div>
-          <h1 className="text-5xl font-black tracking-tighter uppercase italic font-outfit">
-            Ecosystem Pulse
-          </h1>
-        </div>
-        <p className="text-muted-foreground text-lg font-medium max-w-2xl">
-          Actionable intelligence across your entire creator footprint. Pure
-          data, no noise.
-        </p>
-      </header>
+    <div className="space-y-8 pb-12 max-w-7xl mx-auto px-4">
+      <PageHeader
+        title="Analytics"
+        description="Actionable intelligence across your entire creator footprint. Pure data, no noise."
+      />
 
       {/* Hero Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 font-outfit">
@@ -212,7 +196,7 @@ export const Analytics = () => {
                 </defs>
                 <CartesianGrid
                   strokeDasharray="3 3"
-                  stroke="rgba(255,255,255,0.1)"
+                  stroke="hsl(var(--border))"
                   vertical={false}
                 />
                 <XAxis
@@ -220,7 +204,7 @@ export const Analytics = () => {
                   axisLine={false}
                   tickLine={false}
                   tick={{
-                    fill: "rgba(255,255,255,0.3)",
+                    fill: "hsl(var(--muted-foreground))",
                     fontSize: 10,
                     fontWeight: 900,
                   }}
@@ -229,12 +213,13 @@ export const Analytics = () => {
                 <YAxis hide />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "rgba(10,10,12,0.9)",
-                    border: "1px solid rgba(255,255,255,0.1)",
+                    backgroundColor: "hsl(var(--popover))",
+                    border: "1px solid hsl(var(--border))",
                     borderRadius: "16px",
                     backdropFilter: "blur(10px)",
                     fontSize: "12px",
                     fontFamily: "Outfit, sans-serif",
+                    color: "hsl(var(--popover-foreground))",
                   }}
                   itemStyle={{ fontWeight: 900, textTransform: "uppercase" }}
                 />
@@ -288,7 +273,7 @@ export const Analytics = () => {
                       {formatNumber(platform.views)}
                     </span>
                   </div>
-                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden ring-1 ring-white/5">
+                  <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden ring-1 ring-border">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{
@@ -304,7 +289,7 @@ export const Analytics = () => {
                 </div>
               ))
             ) : (
-              <div className="flex flex-col items-center justify-center py-20 opacity-40 border-dashed border-2 border-white/5 rounded-3xl">
+              <div className="flex flex-col items-center justify-center py-20 opacity-40 border-dashed border-2 border-border rounded-3xl">
                 <p className="text-[10px] font-black uppercase tracking-[0.3em]">
                   Sector Data Pending
                 </p>
@@ -312,7 +297,7 @@ export const Analytics = () => {
             )}
           </div>
 
-          <div className="mt-10 p-5 bg-white/5 rounded-2xl border border-white/5 relative overflow-hidden group">
+          <div className="mt-10 p-5 bg-muted rounded-2xl border border-border relative overflow-hidden group">
             <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
             <p className="relative z-10 text-[9px] font-black text-muted-foreground uppercase leading-relaxed tracking-[0.2em] text-center">
               Neural engine prioritizing high-affinity sectors. <br />
