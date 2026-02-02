@@ -176,6 +176,7 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 				"target_platform": platform,
 				"account_id":      accountID,
 				"execution_id":    executionID,
+				"enqueued_at":     time.Now(),
 			})
 			h.Queue.Client.LPush(c.Context(), services.QueueUpload, payload)
 		}

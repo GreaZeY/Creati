@@ -16,11 +16,17 @@ import (
 )
 
 type UploadJob struct {
-	ContentID      string `json:"content_id"`
-	TargetPlatform string `json:"target_platform"`
-	AccountID      int    `json:"account_id"`
-	ExecutionID    string `json:"execution_id"`
+	ContentID      string    `json:"content_id"`
+	TargetPlatform string    `json:"target_platform"`
+	AccountID      int       `json:"account_id"`
+	ExecutionID    string    `json:"execution_id"`
+	EnqueuedAt     time.Time `json:"enqueued_at"`
 }
+
+const (
+	// JobTTL defines how long a job can sit in the queue before being discarded
+	JobTTL = 24 * time.Hour
+)
 
 type UploadWorker struct {
 	BaseWorker
@@ -52,7 +58,22 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 		"platform":     job.TargetPlatform,
 	}).Info("Processing upload...")
 
-	// 0. Validation
+	// 0. TTL Check - Discard stale jobs
+	if !job.EnqueuedAt.IsZero() {
+		age := time.Since(job.EnqueuedAt)
+		if age > JobTTL {
+			logger.Get("worker").WithFields(logrus.Fields{
+				"execution_id": job.ExecutionID,
+				"age":          age.String(),
+				"ttl":          JobTTL.String(),
+			}).Warn("Job expired, discarding")
+			w.DB.ExecContext(ctx, "UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2",
+				fmt.Sprintf("job expired (age: %s, ttl: %s)", age, JobTTL), job.ExecutionID)
+			return nil // Return nil to ack and discard
+		}
+	}
+
+	// 1. Validation
 	if job.ExecutionID == "" || job.ContentID == "" {
 		return fmt.Errorf("invalid job payload: missing ExecutionID or ContentID")
 	}

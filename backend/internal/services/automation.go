@@ -198,6 +198,7 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 		"target_platform": targetPlatform,
 		"account_id":      targetAccountID,
 		"execution_id":    executionID,
+		"enqueued_at":     time.Now(),
 	})
 
 	err = s.queue.Client.LPush(ctx, QueueUpload, payload).Err()
@@ -277,6 +278,7 @@ func (s *AutomationService) RetryExecution(ctx context.Context, executionID stri
 		"target_platform": targetPlatform,
 		"account_id":      targetAccountID,
 		"execution_id":    executionID,
+		"enqueued_at":     time.Now(),
 	})
 
 	return s.queue.Client.LPush(ctx, QueueUpload, payload).Err()

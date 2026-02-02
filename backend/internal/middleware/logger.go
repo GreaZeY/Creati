@@ -75,12 +75,16 @@ func RequestLogger(c *fiber.Ctx) error {
 		logEntry = logEntry.WithField("user_id", userID)
 	}
 
-	// Log based on status
-	if err != nil {
+	// Check for internal error first (set by utils.ErrorResponse)
+	if internalErr := c.Locals("internal_error"); internalErr != nil {
+		if err, ok := internalErr.(error); ok {
+			logEntry.WithError(err).Error("Server error (captured)")
+		} else {
+			logEntry.WithField("error", internalErr).Error("Server error (captured)")
+		}
+	} else if err != nil {
+		// Fiber returned an error during processing
 		logEntry.WithError(err).Error("Request failed")
-	} else if internalErr := c.Locals("internal_error"); internalErr != nil {
-		// Captured internal error via utils.ErrorResponse
-		logEntry.WithField("error", internalErr).Error("Server error (captured)")
 	} else if status >= 500 {
 		logEntry.Error("Server error")
 	} else if status >= 400 {

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"creati.in/creati/backend/internal/logger"
 	"creati.in/creati/backend/internal/services"
@@ -92,6 +93,7 @@ func (w *OrchestrationWorker) Process(ctx context.Context, payload []byte) error
 			"target_platform": targetPlatform,
 			"account_id":      targetAccountID,
 			"execution_id":    executionID,
+			"enqueued_at":     time.Now(),
 		})
 
 		err = w.QueueSvc.Client.LPush(ctx, services.QueueUpload, uploadPayload).Err()
