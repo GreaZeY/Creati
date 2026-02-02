@@ -234,6 +234,7 @@ func main() {
 		agencyGroup.Get("/clients", agencyHandler.ListClients)
 		agencyGroup.Post("/clients", agencyHandler.CreateClient)
 		agencyGroup.Put("/clients/reorder", agencyHandler.ReorderClients)
+		agencyGroup.Put("/clients/commit", agencyHandler.BatchUpdateClients)
 		agencyGroup.Put("/clients/:id", agencyHandler.UpdateClient)
 		agencyGroup.Delete("/clients/:id", agencyHandler.DeleteClient)
 

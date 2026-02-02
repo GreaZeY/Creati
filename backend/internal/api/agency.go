@@ -305,3 +305,67 @@ func (h *AgencyHandler) ReorderClients(c *fiber.Ctx) error {
 
 	return utils.SuccessResponse(c, nil, "Clients reordered successfully")
 }
+
+// BatchUpdateClients updates multiple clients (name, color, order) in a single transaction
+func (h *AgencyHandler) BatchUpdateClients(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	var payload struct {
+		Clients []struct {
+			ID           int    `json:"id"`
+			Name         string `json:"name"`
+			Color        string `json:"color"`
+			DisplayOrder int    `json:"displayOrder"`
+		} `json:"clients"`
+	}
+
+	if err := c.BodyParser(&payload); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request")
+	}
+
+	if len(payload.Clients) == 0 {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no clients to update")
+	}
+
+	// Start Transaction
+	tx, err := h.db.Begin()
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to start transaction")
+	}
+	defer tx.Rollback()
+
+	for _, client := range payload.Clients {
+		// Verify ownership inside transaction for consistency
+		var exists bool
+		err := tx.QueryRow(`
+			SELECT EXISTS(
+				SELECT 1 FROM clients c
+				JOIN organizations o ON c.org_id = o.id
+				JOIN team_members tm ON o.id = tm.org_id
+				WHERE c.id = $1 AND tm.user_id = $2 AND tm.status = 'active'
+			)
+		`, client.ID, userID).Scan(&exists)
+
+		if err != nil || !exists {
+			return utils.ErrorResponse(c, fiber.StatusForbidden, fmt.Sprintf("not authorized for client %d", client.ID))
+		}
+
+		// Perform update
+		_, err = tx.Exec(`
+			UPDATE clients 
+			SET name = $1, color = $2, display_order = $3 
+			WHERE id = $4
+		`, client.Name, client.Color, client.DisplayOrder, client.ID)
+
+		if err != nil {
+			println("BatchUpdateClients: Failed to update client", client.ID, ":", err.Error())
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update client "+client.Name)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to commit changes")
+	}
+
+	return utils.SuccessResponse(c, nil, "All changes saved successfully")
+}

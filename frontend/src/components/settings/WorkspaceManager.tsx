@@ -58,6 +58,22 @@ const SortableWorkspaceItem = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(client.name);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [localColor, setLocalColor] = useState(client.color || "#000000");
+
+  // Sync back to parent with debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localColor !== client.color) {
+        onColorChange(client.id, localColor);
+      }
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [localColor, client.id, onColorChange, client.color]);
+
+  // Sync from parent if changed externally (e.g. discard)
+  useEffect(() => {
+    setLocalColor(client.color || "#000000");
+  }, [client.color]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -76,7 +92,7 @@ const SortableWorkspaceItem = ({
     <div
       ref={setNodeRef}
       style={style}
-      className={cn("mb-3", isDragging && "opacity-50")}
+      className={cn(isDragging && "opacity-50")}
     >
       <Card
         className={cn(
@@ -92,11 +108,22 @@ const SortableWorkspaceItem = ({
           <GripVertical className="w-4 h-4 text-muted-foreground" />
         </div>
 
-        <div
-          className="w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-white font-black text-sm shadow-inner group-hover:scale-110 transition-transform"
-          style={{ backgroundColor: client.color || "#000000" }}
-        >
-          {client.name.charAt(0).toUpperCase()}
+        {/* Circular Color Picker */}
+        <div className="relative group/color">
+          <div
+            className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-white font-black text-xs shadow-inner cursor-pointer hover:scale-110 transition-transform relative overflow-hidden ring-2 ring-background ring-offset-2 ring-offset-transparent"
+            style={{ backgroundColor: localColor }}
+          >
+            <span className="relative z-10">
+              {client.name.charAt(0).toUpperCase()}
+            </span>
+            <input
+              type="color"
+              value={localColor}
+              onChange={(e) => setLocalColor(e.target.value)}
+              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full scale-150"
+            />
+          </div>
         </div>
 
         <div className="flex-1 min-w-0">
@@ -109,12 +136,18 @@ const SortableWorkspaceItem = ({
                 onKeyDown={(e) => e.key === "Enter" && handleSave()}
                 className="h-8 py-0 text-sm font-bold bg-muted/50 border-0 ring-1 ring-primary/30"
               />
-              <Button size="icon" variant="ghost" onClick={handleSave}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="shrink-0"
+                onClick={handleSave}
+              >
                 <Check className="w-4 h-4 text-emerald-500" />
               </Button>
               <Button
                 size="icon"
                 variant="ghost"
+                className="shrink-0"
                 onClick={() => {
                   setIsEditing(false);
                   setEditName(client.name);
@@ -137,12 +170,6 @@ const SortableWorkspaceItem = ({
         </div>
 
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Input
-            type="color"
-            value={client.color || "#000000"}
-            onChange={(e) => onColorChange(client.id, e.target.value)}
-            className="w-6 h-6 p-0 border-0 bg-transparent cursor-pointer rounded-md overflow-hidden shrink-0"
-          />
           <Button
             size="icon"
             variant="ghost"
@@ -205,9 +232,14 @@ const SortableWorkspaceItem = ({
 
 export const WorkspaceManager = () => {
   const [workspaces, setWorkspaces] = useState<Client[]>([]);
+  const [draftWorkspaces, setDraftWorkspaces] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [newName, setNewName] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  const isDirty =
+    JSON.stringify(workspaces) !== JSON.stringify(draftWorkspaces);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -224,11 +256,11 @@ export const WorkspaceManager = () => {
     try {
       const resp = await agencyAPI.listClients();
       if (resp.data.success) {
-        // Sort by displayOrder if available
         const sorted = [...(resp.data.data || [])].sort(
           (a, b) => (a.displayOrder || 0) - (b.displayOrder || 0),
         );
         setWorkspaces(sorted);
+        setDraftWorkspaces(sorted);
       }
     } catch (err) {
       toast.error("Failed to load workspaces");
@@ -241,53 +273,40 @@ export const WorkspaceManager = () => {
     fetchWorkspaces();
   }, []);
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      const oldIndex = workspaces.findIndex((w) => w.id === active.id);
-      const newIndex = workspaces.findIndex((w) => w.id === over.id);
+      const oldIndex = draftWorkspaces.findIndex((w) => w.id === active.id);
+      const newIndex = draftWorkspaces.findIndex((w) => w.id === over.id);
 
-      const newWorkspaces = arrayMove(workspaces, oldIndex, newIndex);
-      setWorkspaces(newWorkspaces);
-
-      try {
-        await agencyAPI.reorderClients(newWorkspaces.map((w) => w.id));
-        toast.success("Order saved");
-      } catch (err) {
-        toast.error("Failed to save order");
-        fetchWorkspaces(); // Rollback
-      }
+      const reordered = arrayMove(draftWorkspaces, oldIndex, newIndex);
+      // Update displayOrder in draft
+      const withNewOrders = reordered.map((w, idx) => ({
+        ...w,
+        displayOrder: idx,
+      }));
+      setDraftWorkspaces(withNewOrders);
     }
   };
 
-  const handleRename = async (id: number, name: string) => {
-    try {
-      await agencyAPI.updateClient(id, { name });
-      setWorkspaces((prev) =>
-        prev.map((w) => (w.id === id ? { ...w, name } : w)),
-      );
-      toast.success("Workspace renamed");
-    } catch (err) {
-      toast.error("Failed to rename workspace");
-    }
+  const handleRename = (id: number, name: string) => {
+    setDraftWorkspaces((prev) =>
+      prev.map((w) => (w.id === id ? { ...w, name } : w)),
+    );
   };
 
-  const handleColorChange = async (id: number, color: string) => {
-    try {
-      await agencyAPI.updateClient(id, { color });
-      setWorkspaces((prev) =>
-        prev.map((w) => (w.id === id ? { ...w, color } : w)),
-      );
-    } catch (err) {
-      toast.error("Failed to update color");
-    }
+  const handleColorChange = (id: number, color: string) => {
+    setDraftWorkspaces((prev) =>
+      prev.map((w) => (w.id === id ? { ...w, color } : w)),
+    );
   };
 
   const handleDelete = async (id: number) => {
     try {
       await agencyAPI.deleteClient(id);
       setWorkspaces((prev) => prev.filter((w) => w.id !== id));
+      setDraftWorkspaces((prev) => prev.filter((w) => w.id !== id));
       toast.success("Workspace deleted");
     } catch (err) {
       toast.error("Failed to delete workspace");
@@ -305,6 +324,24 @@ export const WorkspaceManager = () => {
     } catch (err) {
       toast.error("Failed to create workspace");
     }
+  };
+
+  const handleCommit = async () => {
+    setIsSaving(true);
+    try {
+      await agencyAPI.commitClients(draftWorkspaces);
+      setWorkspaces(draftWorkspaces);
+      toast.success("Changes saved successfully");
+    } catch (err) {
+      toast.error("Failed to save changes");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDiscard = () => {
+    setDraftWorkspaces(workspaces);
+    toast.info("Changes discarded");
   };
 
   if (loading)
@@ -383,11 +420,11 @@ export const WorkspaceManager = () => {
         onDragEnd={handleDragEnd}
       >
         <SortableContext
-          items={workspaces.map((w) => w.id)}
+          items={draftWorkspaces.map((w) => w.id)}
           strategy={verticalListSortingStrategy}
         >
-          <div className="space-y-1">
-            {workspaces.map((workspace) => (
+          <div className="space-y-3">
+            {draftWorkspaces.map((workspace) => (
               <SortableWorkspaceItem
                 key={workspace.id}
                 client={workspace}
@@ -397,7 +434,7 @@ export const WorkspaceManager = () => {
               />
             ))}
 
-            {workspaces.length === 0 && (
+            {draftWorkspaces.length === 0 && (
               <div className="p-12 text-center rounded-[2rem] border-2 border-dashed border-border/50 opacity-40">
                 <p className="font-black uppercase tracking-widest text-xs">
                   No workspaces yet
@@ -410,6 +447,48 @@ export const WorkspaceManager = () => {
           </div>
         </SortableContext>
       </DndContext>
+
+      {/* Floating Save Bar */}
+      <AnimatePresence>
+        {isDirty && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-4"
+          >
+            <Card className="p-2.5 bg-background/60 backdrop-blur-2xl border-primary/20 shadow-2xl ring-1 ring-primary/20 flex items-center justify-between gap-4 rounded-2xl">
+              <div className="pl-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+                  Unsaved Changes
+                </p>
+                <p className="text-[9px] font-bold text-muted-foreground uppercase">
+                  Careful, don't lose your progress
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDiscard}
+                  disabled={isSaving}
+                  className="h-10 px-4 rounded-xl font-bold uppercase tracking-widest text-[10px]"
+                >
+                  Discard
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleCommit}
+                  disabled={isSaving}
+                  className="h-10 px-6 rounded-xl font-bold uppercase tracking-widest text-[10px] bg-primary shadow-lg shadow-primary/25"
+                >
+                  {isSaving ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

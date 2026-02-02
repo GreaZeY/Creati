@@ -222,6 +222,7 @@ export const agencyAPI = {
     api.put(`/agency/clients/${id}`, data),
   deleteClient: (id: number) => api.delete(`/agency/clients/${id}`),
   reorderClients: (order: number[]) => api.put('/agency/clients/reorder', { order }),
+  commitClients: (clients: Client[]) => api.put('/agency/clients/commit', { clients }),
 };
 
 export const paymentsAPI = {

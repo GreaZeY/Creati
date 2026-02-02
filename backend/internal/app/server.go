@@ -102,6 +102,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	agencyRoutes.Get("/clients", agencyHandler.ListClients)
 	agencyRoutes.Post("/clients", agencyHandler.CreateClient)
 	agencyRoutes.Put("/clients/reorder", agencyHandler.ReorderClients)
+	agencyRoutes.Put("/clients/commit", agencyHandler.BatchUpdateClients)
 	agencyRoutes.Put("/clients/:id", agencyHandler.UpdateClient)
 	agencyRoutes.Delete("/clients/:id", agencyHandler.DeleteClient)
 
