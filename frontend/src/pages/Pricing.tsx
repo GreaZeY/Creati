@@ -122,17 +122,17 @@ export function Pricing() {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="p-8 rounded-3xl border border-input bg-card/50 h-[500px] flex flex-col"
+              className="p-5 rounded-2xl border border-input bg-card/50 h-[500px] flex flex-col"
             >
-              <Skeleton className="h-8 w-1/3 mb-4" />
+              <Skeleton className="h-6 w-1/3 mb-4" />
               <Skeleton className="h-4 w-2/3 mb-8" />
-              <Skeleton className="h-12 w-1/2 mb-8" />
+              <Skeleton className="h-10 w-1/2 mb-8" />
               <div className="space-y-4 flex-1">
                 <Skeleton className="h-4 w-full" />
                 <Skeleton className="h-4 w-full" />
                 <Skeleton className="h-4 w-3/4" />
               </div>
-              <Skeleton className="h-12 w-full mt-8 rounded-xl" />
+              <Skeleton className="h-11 w-full mt-8 rounded-xl" />
             </div>
           ))}
         </div>
@@ -146,10 +146,10 @@ export function Pricing() {
   return (
     <div className="max-w-6xl mx-auto py-12 px-4 space-y-12">
       <div className="text-center space-y-4">
-        <h1 className="text-4xl md:text-5xl font-black tracking-tight">
+        <h1 className="text-3xl md:text-4xl font-black tracking-tight">
           Post once. Publish everywhere. Skip the busywork.
         </h1>
-        <p className="text-xl text-muted-foreground">
+        <p className="text-lg text-muted-foreground">
           Stop juggling uploads. automation is the new clout.
         </p>
 
@@ -224,7 +224,7 @@ export function Pricing() {
         {/* CREATOR PLAN */}
         <Card
           className={cn(
-            "p-8 rounded-3xl flex flex-col relative overflow-hidden transition-all hover:-translate-y-2 duration-300 ring-1",
+            "p-5 rounded-2xl flex flex-col relative overflow-hidden transition-all hover:-translate-y-2 duration-300 ring-1",
             currentPlan === "creator"
               ? "ring-primary border-primary bg-primary/10"
               : "bg-card border-input ring-border",
@@ -240,13 +240,13 @@ export function Pricing() {
               CANCELLED
             </div>
           )}
-          <div className="mb-8 relative z-10">
-            <h3 className="text-2xl font-bold text-primary">Creator</h3>
-            <p className="text-muted-foreground mt-2">
+          <div className="mb-6 relative z-10">
+            <h3 className="text-lg font-bold text-primary">Creator</h3>
+            <p className="text-sm text-muted-foreground mt-1">
               The everyday creator pack.
             </p>
-            <div className="mt-6 flex items-baseline gap-1">
-              <span className="text-4xl font-black">
+            <div className="mt-4 flex items-baseline gap-1">
+              <span className="text-3xl font-black">
                 ₹{billingCycle === "monthly" ? "499" : "4,999"}
               </span>
               <span className="text-muted-foreground">
@@ -255,26 +255,26 @@ export function Pricing() {
             </div>
           </div>
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-[80px] rounded-full -mr-16 -mt-16 pointer-events-none"></div>
-          <ul className="space-y-4 mb-8 flex-1 relative z-10">
+          <ul className="space-y-3 mb-6 flex-1 relative z-10">
             <li className="flex items-center gap-3 text-sm">
-              <Check className="text-primary w-5 h-5 flex-shrink-0" /> 10
+              <Check className="text-primary w-4 h-4 flex-shrink-0" /> 10
               Connected Accounts
             </li>
             <li className="flex items-center gap-3 text-sm">
-              <Check className="text-primary w-5 h-5 flex-shrink-0" /> Unlimited
+              <Check className="text-primary w-4 h-4 flex-shrink-0" /> Unlimited
               Uploads
             </li>
             <li className="flex items-center gap-3 text-sm">
-              <Check className="text-primary w-5 h-5 flex-shrink-0" /> Workflows
+              <Check className="text-primary w-4 h-4 flex-shrink-0" /> Workflows
             </li>
             <li className="flex items-center gap-3 text-sm opacity-50">
-              <X className="w-5 h-5 flex-shrink-0" /> Advanced Analytics
+              <X className="w-4 h-4 flex-shrink-0" /> Advanced Analytics
             </li>
           </ul>
           <Button
             onClick={() => handleSubscription(PLANS.CREATOR)}
             disabled={currentPlan === "creator" && !isCancelled}
-            className="w-full rounded-xl py-6 font-bold shadow-lg shadow-primary/25"
+            className="w-full h-11 rounded-xl font-bold shadow-lg shadow-primary/25"
           >
             {currentPlan === "creator" && isCancelled
               ? "Enable Auto-Pay Again"
@@ -289,7 +289,7 @@ export function Pricing() {
         {/* PRO PLAN */}
         <Card
           className={cn(
-            "p-8 rounded-3xl flex flex-col relative overflow-hidden transition-all hover:-translate-y-2 duration-300",
+            "p-5 rounded-2xl flex flex-col relative overflow-hidden transition-all hover:-translate-y-2 duration-300",
             currentPlan === "pro"
               ? "border-purple-500/50 bg-purple-500/5"
               : "bg-card/50 border-input",
@@ -305,15 +305,15 @@ export function Pricing() {
               CANCELLED
             </div>
           )}
-          <div className="mb-8">
-            <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
+          <div className="mb-6">
+            <h3 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
               Pro
             </h3>
-            <p className="text-muted-foreground mt-2">
+            <p className="text-sm text-muted-foreground mt-1">
               Build your brand like a pro.
             </p>
-            <div className="mt-6 flex items-baseline gap-1">
-              <span className="text-4xl font-black">
+            <div className="mt-4 flex items-baseline gap-1">
+              <span className="text-3xl font-black">
                 ₹{billingCycle === "monthly" ? "1,299" : "11,999"}
               </span>
               <span className="text-muted-foreground">
@@ -321,21 +321,21 @@ export function Pricing() {
               </span>
             </div>
           </div>
-          <ul className="space-y-4 mb-8 flex-1">
+          <ul className="space-y-3 mb-6 flex-1">
             <li className="flex items-center gap-3 text-sm">
-              <Check className="text-purple-400 w-5 h-5 flex-shrink-0" />{" "}
+              <Check className="text-purple-400 w-4 h-4 flex-shrink-0" />{" "}
               Unlimited Accounts
             </li>
             <li className="flex items-center gap-3 text-sm">
-              <Check className="text-purple-400 w-5 h-5 flex-shrink-0" />{" "}
+              <Check className="text-purple-400 w-4 h-4 flex-shrink-0" />{" "}
               Unlimited Uploads
             </li>
             <li className="flex items-center gap-3 text-sm">
-              <Check className="text-purple-400 w-5 h-5 flex-shrink-0" />{" "}
+              <Check className="text-purple-400 w-4 h-4 flex-shrink-0" />{" "}
               Workflows
             </li>
             <li className="flex items-center gap-3 text-sm">
-              <Check className="text-purple-400 w-5 h-5 flex-shrink-0" />{" "}
+              <Check className="text-purple-400 w-4 h-4 flex-shrink-0" />{" "}
               Advanced Analytics & AI
             </li>
           </ul>
@@ -343,7 +343,7 @@ export function Pricing() {
             onClick={() => handleSubscription(PLANS.PRO)}
             disabled={currentPlan === "pro" && !isCancelled}
             variant="ghost"
-            className="w-full rounded-xl py-6 font-bold bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/25"
+            className="w-full h-11 rounded-xl font-bold bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/25"
           >
             {currentPlan === "pro" && isCancelled
               ? "Enable Auto-Pay Again"
@@ -358,8 +358,8 @@ export function Pricing() {
 
       {isCancelled && periodEnd && (
         <div className="max-w-4xl mx-auto">
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-6 flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-amber-500/20">
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5 flex items-center gap-4">
+            <div className="p-2.5 rounded-xl bg-amber-500/20">
               <svg
                 className="w-6 h-6 text-amber-500"
                 fill="none"
@@ -413,7 +413,7 @@ export function Pricing() {
         </div>
       )}
 
-      <div className="bg-secondary/30 rounded-2xl p-6 text-center text-sm text-muted-foreground max-w-2xl mx-auto">
+      <div className="bg-secondary/30 rounded-2xl p-4 text-center text-sm text-muted-foreground max-w-2xl mx-auto">
         <p>Secured payments via Payment Gateway. Cancel anytime, no beef. ✨</p>
       </div>
 

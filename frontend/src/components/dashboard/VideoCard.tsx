@@ -42,9 +42,9 @@ export const VideoCard = ({ video }: VideoCardProps) => {
         </div>
       </div>
 
-      <div className="p-6 flex flex-col flex-1 gap-5">
+      <div className="p-5 flex flex-col flex-1 gap-4">
         <div className="space-y-2">
-          <h3 className="font-black text-xl line-clamp-1 group-hover:text-primary transition-colors tracking-tight font-outfit uppercase italic">
+          <h3 className="font-bold text-lg line-clamp-1 group-hover:text-primary transition-colors tracking-tight font-outfit uppercase italic">
             {video.title}
           </h3>
           <p className="text-sm text-muted-foreground/60 line-clamp-2 min-h-[2.5rem] font-medium leading-relaxed">
@@ -53,8 +53,8 @@ export const VideoCard = ({ video }: VideoCardProps) => {
         </div>
 
         <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 mt-auto">
-          <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-lg border border-white/5">
-            <Calendar className="w-3 h-3 text-primary/60" />
+          <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-white/5 rounded-lg border border-white/5">
+            <Calendar className="w-2.5 h-2.5 text-primary/60" />
             {date}
           </div>
         </div>
@@ -63,17 +63,17 @@ export const VideoCard = ({ video }: VideoCardProps) => {
           <Button
             variant="ghost"
             size="sm"
-            className="flex-1 h-11 gap-2 rounded-xl font-black transition-all hover:bg-primary/10 hover:text-primary text-[10px] uppercase tracking-widest"
+            className="flex-1 h-10 gap-2 rounded-xl font-bold transition-all hover:bg-primary/10 hover:text-primary text-[10px] uppercase tracking-widest"
             onClick={() => setIsAnalyticsOpen(true)}
             disabled={video.jobStatus !== "completed"}
           >
-            <BarChart2 className="w-4 h-4" />
+            <BarChart2 className="w-3.5 h-3.5" />
             Intelligence
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="w-11 h-11 p-0 rounded-xl bg-white/5 border-white/5 hover:border-primary/20 transition-all"
+            className="w-10 h-10 p-0 rounded-xl bg-white/5 border-white/5 hover:border-primary/20 transition-all"
             asChild
           >
             <a href={video.s3URL} target="_blank" rel="noopener noreferrer">

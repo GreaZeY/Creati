@@ -188,7 +188,7 @@ export const Platforms = () => {
                 >
                   <LensedCard
                     className={cn(
-                      "p-6 relative flex flex-row items-center gap-6",
+                      "p-5 relative flex flex-row items-center gap-6",
                       !platform.connected && "opacity-60",
                     )}
                   >
@@ -260,7 +260,7 @@ export const Platforms = () => {
                     <div className="flex-1 min-w-0 md:pl-2 relative z-10">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-3">
-                          <h3 className="text-3xl font-black tracking-tighter uppercase truncate leading-none">
+                          <h3 className="text-lg font-bold tracking-tight uppercase truncate leading-none">
                             {platform.profileName || platform.name}
                           </h3>
                           {platform.connected ? (
@@ -301,15 +301,15 @@ export const Platforms = () => {
           </AnimatePresence>
         </div>
       ) : (
-        <LensedCard className="py-32 flex flex-col items-center justify-center text-center border-dashed border-2 border-border">
-          <div className="w-24 h-24 bg-muted rounded-3xl flex items-center justify-center mb-8 ring-1 ring-border group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700">
-            <Link2 className="w-12 h-12 text-primary opacity-40" />
+        <LensedCard className="py-16 flex flex-col items-center justify-center text-center border-dashed border-2 border-border">
+          <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-6 ring-1 ring-border group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700">
+            <Link2 className="w-8 h-8 text-primary opacity-40" />
           </div>
 
-          <h3 className="text-4xl font-black uppercase italic tracking-tighter mb-4">
+          <h3 className="text-lg font-bold uppercase italic tracking-tight mb-2">
             Ecosystem Standby
           </h3>
-          <p className="text-muted-foreground mt-2 max-w-sm text-lg font-medium opacity-60">
+          <p className="text-muted-foreground mt-2 max-w-sm text-sm font-medium opacity-60">
             Your distribution network is waiting for its first node. Connect a
             platform to begin the blast.
           </p>
@@ -317,7 +317,7 @@ export const Platforms = () => {
           <Button
             asChild
             size="lg"
-            className="mt-12 h-16 px-12 rounded-2xl bg-primary text-primary-foreground font-black text-lg hover:scale-105 active:scale-95 transition-all"
+            className="mt-8 h-11 px-8 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:scale-105 active:scale-95 transition-all"
           >
             <Link to="/platforms/connect">AUTH FIRST NODE</Link>
           </Button>

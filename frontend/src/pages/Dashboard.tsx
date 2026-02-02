@@ -85,7 +85,7 @@ export const Dashboard = () => {
             </span>
           </div>
           <div className="flex items-baseline gap-4">
-            <h2 className="text-7xl font-black tracking-tighter">
+            <h2 className="text-5xl font-black tracking-tighter">
               {analyticsLoading
                 ? "---"
                 : formatNumber(analytics?.totalViews || 0)}
@@ -152,8 +152,8 @@ export const Dashboard = () => {
               Library Sync
             </span>
           </div>
-          <div className="flex items-baseline gap-2 mb-4">
-            <span className="text-5xl font-black">{videos.length}</span>
+          <div className="flex items-baseline gap-2 mb-3">
+            <span className="text-4xl font-black">{videos.length}</span>
             <span className="text-[10px] font-black opacity-40 uppercase tracking-widest">
               Assets Distributed
             </span>
@@ -169,13 +169,13 @@ export const Dashboard = () => {
       </div>
 
       {/* Recent Activity Section */}
-      <div className="pt-8">
-        <div className="flex items-center justify-between mb-10">
+      <div className="pt-4">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-muted">
               <BarChart className="w-6 h-6 text-muted-foreground/40" />
             </div>
-            <h3 className="text-3xl font-black tracking-tighter uppercase italic font-outfit">
+            <h3 className="text-lg font-bold tracking-tight uppercase italic font-outfit">
               Asset Feed
             </h3>
           </div>
@@ -208,20 +208,20 @@ export const Dashboard = () => {
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
           >
-            <LensedCard className="py-24 border-dashed border-2 border-border flex flex-col items-center text-center">
-              <div className="w-20 h-20 bg-muted rounded-3xl flex items-center justify-center mb-8 ring-1 ring-border group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
-                <UploadCloud className="w-10 h-10 text-primary blur-[1px]" />
+            <LensedCard className="py-12 border-dashed border-2 border-border flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-6 ring-1 ring-border group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
+                <UploadCloud className="w-8 h-8 text-primary blur-[0.5px]" />
               </div>
-              <h3 className="text-3xl font-black uppercase italic mb-4 tracking-tighter">
+              <h3 className="text-lg font-bold uppercase italic mb-2 tracking-tight">
                 Engine Standby
               </h3>
-              <p className="text-muted-foreground mb-12 max-w-sm text-lg font-medium leading-relaxed opacity-60">
+              <p className="text-muted-foreground mb-8 max-w-sm text-sm font-medium leading-relaxed opacity-60">
                 No content detected in the pipeline. Initialize your first
                 distribution to activate sensors.
               </p>
               <Button
                 size="lg"
-                className="h-16 px-12 rounded-2xl bg-foreground text-background font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-2xl"
+                className="h-12 px-10 rounded-xl bg-foreground text-background font-bold text-base hover:scale-105 active:scale-95 transition-all shadow-xl"
                 onClick={() => navigate("/upload")}
               >
                 START DISPATCH

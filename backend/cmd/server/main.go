@@ -230,11 +230,12 @@ func main() {
 		protected.Get("/payments/subscription", paymentHandler.GetSubscription)
 
 		// Agency/Clients
-		protected.Get("/agency/clients", agencyHandler.ListClients)
-		protected.Post("/agency/clients", agencyHandler.CreateClient)
-		protected.Put("/agency/clients/reorder", agencyHandler.ReorderClients)
-		protected.Put("/agency/clients/:id", agencyHandler.UpdateClient)
-		protected.Delete("/agency/clients/:id", agencyHandler.DeleteClient)
+		agencyGroup := protected.Group("/agency")
+		agencyGroup.Get("/clients", agencyHandler.ListClients)
+		agencyGroup.Post("/clients", agencyHandler.CreateClient)
+		agencyGroup.Put("/clients/reorder", agencyHandler.ReorderClients)
+		agencyGroup.Put("/clients/:id", agencyHandler.UpdateClient)
+		agencyGroup.Delete("/clients/:id", agencyHandler.DeleteClient)
 
 		// Start server
 		port := os.Getenv("PORT")

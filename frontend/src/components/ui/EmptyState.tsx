@@ -23,29 +23,31 @@ export function EmptyState({
   className,
 }: EmptyStateProps) {
   return (
-    <LensedCard className={`py-32 flex flex-col items-center justify-center text-center border-dashed border-2 border-border ${className}`}>
-      <div className="w-24 h-24 rounded-3xl bg-muted flex items-center justify-center mb-8 ring-1 ring-border group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700">
-        <Icon className="text-primary opacity-40 blur-[1px]" size={48} />
+    <LensedCard
+      className={`py-16 flex flex-col items-center justify-center text-center border-dashed border-2 border-border ${className}`}
+    >
+      <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-6 ring-1 ring-border group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700">
+        <Icon className="text-primary opacity-40 blur-[0.5px]" size={32} />
       </div>
-      <h3 className="text-4xl font-black uppercase italic tracking-tighter mb-4">
+      <h3 className="text-lg font-bold uppercase italic tracking-tight mb-2">
         {title}
       </h3>
-      <p className="text-muted-foreground font-medium max-w-md text-lg opacity-60">
+      <p className="text-muted-foreground font-medium max-w-sm text-sm opacity-60">
         {description}
       </p>
 
       {actionLabel && (
-        <div className="mt-12">
+        <div className="mt-8">
           {actionLink ? (
             <Link to={actionLink}>
-              <Button className="h-16 px-12 rounded-2xl bg-foreground text-background font-black text-lg hover:scale-105 active:scale-95 transition-all uppercase">
+              <Button className="h-11 px-8 rounded-xl bg-foreground text-background font-bold text-sm hover:scale-105 active:scale-95 transition-all uppercase">
                 {actionLabel}
               </Button>
             </Link>
           ) : (
             <Button
               onClick={onAction}
-              className="h-16 px-12 rounded-2xl bg-foreground text-background font-black text-lg hover:scale-105 active:scale-95 transition-all uppercase"
+              className="h-11 px-8 rounded-xl bg-foreground text-background font-bold text-sm hover:scale-105 active:scale-95 transition-all uppercase"
             >
               {actionLabel}
             </Button>

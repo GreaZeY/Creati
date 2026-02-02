@@ -189,14 +189,14 @@ export const ConnectPlatforms = () => {
             initial={{ opacity: 0, scale: 0.95, y: -20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -20 }}
-            className="bg-destructive/10 border-2 border-destructive/20 p-6 rounded-3xl flex items-center gap-5 shadow-2xl shadow-destructive/10 backdrop-blur-md"
+            className="bg-destructive/10 border-2 border-destructive/20 p-4 rounded-2xl flex items-center gap-5 shadow-2xl shadow-destructive/10 backdrop-blur-md"
           >
             {/* ... */}
-            <div className="p-3 bg-destructive rounded-2xl text-destructive-foreground shadow-lg shadow-destructive/20">
-              <AlertTriangle className="w-6 h-6" />
+            <div className="p-3 bg-destructive rounded-xl text-destructive-foreground shadow-lg shadow-destructive/20">
+              <AlertTriangle className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-black text-xl text-destructive capitalize leading-none">
+              <h3 className="font-bold text-lg text-destructive capitalize leading-none">
                 Connection Failed
               </h3>
               <p className="text-destructive/80 font-bold text-sm mt-1">
@@ -220,13 +220,13 @@ export const ConnectPlatforms = () => {
             initial={{ opacity: 0, scale: 0.95, y: -20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -20 }}
-            className="bg-emerald-500/10 border-2 border-emerald-500/20 p-6 rounded-3xl flex items-center gap-5 shadow-2xl shadow-emerald-500/10 backdrop-blur-md"
+            className="bg-emerald-500/10 border-2 border-emerald-500/20 p-4 rounded-2xl flex items-center gap-5 shadow-2xl shadow-emerald-500/10 backdrop-blur-md"
           >
-            <div className="p-3 bg-emerald-500 rounded-2xl text-slate-950 shadow-lg shadow-emerald-500/20">
-              <CheckCheck className="w-6 h-6" />
+            <div className="p-3 bg-emerald-500 rounded-xl text-slate-950 shadow-lg shadow-emerald-500/20">
+              <CheckCheck className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-black text-xl text-emerald-500 capitalize leading-none">
+              <h3 className="font-bold text-lg text-emerald-500 capitalize leading-none">
                 Connected {platformParam}!
               </h3>
               <p className="text-emerald-500/80 font-bold text-sm mt-1">
@@ -275,27 +275,27 @@ export const ConnectPlatforms = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05, type: "spring", stiffness: 100 }}
             >
-              <Card className="p-8 bg-card/40 backdrop-blur-xl border-border/40 hover:border-primary/50 transition-all duration-500 group relative overflow-hidden rounded-[2rem] ring-1 ring-border/20 shadow-2xl hover:shadow-primary/5">
-                <div className="flex items-start gap-6 relative z-10">
-                  <div className="w-20 h-20 rounded-[1.5rem] flex items-center justify-center transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 shadow-2xl">
-                    <PlatformLogo platform={platform.id} size={40} />
+              <Card className="p-5 bg-card/40 backdrop-blur-xl border-border/40 hover:border-primary/50 transition-all duration-500 group relative overflow-hidden rounded-2xl ring-1 ring-border/20 shadow-xl hover:shadow-primary/5">
+                <div className="flex items-start gap-4 relative z-10">
+                  <div className="w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 shadow-xl">
+                    <PlatformLogo platform={platform.id} size={32} />
                   </div>
 
-                  <div className="flex-1 space-y-2">
-                    <h3 className="text-2xl font-black tracking-tight">
+                  <div className="flex-1 space-y-1">
+                    <h3 className="text-lg font-bold tracking-tight">
                       {platform.name}
                     </h3>
-                    <p className="text-muted-foreground/80 font-medium mb-6 line-clamp-2 text-sm leading-relaxed">
+                    <p className="text-muted-foreground/80 font-medium mb-4 line-clamp-2 text-sm leading-relaxed">
                       Seamlessly link your {platform.name} account to automate
                       content distribution.
                     </p>
 
-                    <div className="pt-4 flex items-center gap-4">
+                    <div className="pt-2 flex items-center gap-4">
                       <Button
                         onClick={() => handleConnectClick(platform.id)} // Changed handler
                         disabled={finalDisabled}
                         variant="default"
-                        className="h-12 px-10 rounded-2xl font-black transition-all"
+                        className="h-10 px-8 rounded-xl font-bold transition-all"
                       >
                         {isSyncing
                           ? "Linking..."
@@ -319,7 +319,7 @@ export const ConnectPlatforms = () => {
 
                 {!platform.enabled && (
                   // ... disabled UI kept same
-                  <div className="absolute inset-0 bg-background/40 backdrop-blur-[16px] flex items-center justify-center p-8 text-center z-20 rounded-[2rem] transition-all duration-500 border border-border">
+                  <div className="absolute inset-0 bg-background/40 backdrop-blur-[16px] flex items-center justify-center p-8 text-center z-20 rounded-2xl transition-all duration-500 border border-border">
                     <div className="space-y-4">
                       <div className="bg-primary/20 text-primary px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest w-fit mx-auto shadow-lg shadow-primary/10 ring-1 ring-primary/20">
                         Coming Soon
@@ -338,7 +338,7 @@ export const ConnectPlatforms = () => {
       </div>
 
       {/* ... Footer Card kept same */}
-      <Card className="p-8 border-primary/20 bg-primary/[0.02] mt-10 rounded-3xl relative overflow-hidden group">
+      <Card className="p-5 border-primary/20 bg-primary/[0.02] mt-10 rounded-2xl relative overflow-hidden group">
         {/* ... */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-primary/10 transition-colors" />
         <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">

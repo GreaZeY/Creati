@@ -90,7 +90,7 @@ export const Analytics = () => {
                   Reach
                 </span>
               </div>
-              <h3 className="text-3xl font-black tracking-tighter">
+              <h3 className="text-2xl font-black tracking-tighter">
                 {formatNumber(totalViews)}
               </h3>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1 opacity-60">
@@ -107,7 +107,7 @@ export const Analytics = () => {
                   Velocity
                 </span>
               </div>
-              <h3 className="text-3xl font-black tracking-tighter">
+              <h3 className="text-2xl font-black tracking-tighter">
                 {viralityCoef}
               </h3>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1 opacity-60">
@@ -124,7 +124,7 @@ export const Analytics = () => {
                   Density
                 </span>
               </div>
-              <h3 className="text-3xl font-black tracking-tighter">
+              <h3 className="text-2xl font-black tracking-tighter">
                 {engagementDensity}%
               </h3>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1 opacity-60">
@@ -141,7 +141,7 @@ export const Analytics = () => {
                   Revenue
                 </span>
               </div>
-              <h3 className="text-3xl font-black tracking-tighter">
+              <h3 className="text-2xl font-black tracking-tighter">
                 ${projectedRevenue}
               </h3>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1 opacity-60">
@@ -156,7 +156,7 @@ export const Analytics = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <LensedCard className="lg:col-span-2 h-[450px] flex flex-col">
           <div className="flex justify-between items-center mb-8">
-            <h3 className="text-xl font-black uppercase tracking-tighter italic">
+            <h3 className="text-lg font-bold uppercase tracking-tight italic">
               Combined Growth Map
             </h3>
             <div className="flex gap-2">
@@ -244,12 +244,12 @@ export const Analytics = () => {
           </div>
         </LensedCard>
 
-        <LensedCard className="flex flex-col p-10 border-primary/10">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="p-3 rounded-2xl bg-primary/10 ring-1 ring-primary/20">
-              <TrendingUp className="w-6 h-6 text-primary shadow-[0_0_15px_rgba(var(--primary),0.5)]" />
+        <LensedCard className="flex flex-col p-5 border-primary/10">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 rounded-xl bg-primary/10 ring-1 ring-primary/20">
+              <TrendingUp className="w-5 h-5 text-primary shadow-[0_0_15px_rgba(var(--primary),0.5)]" />
             </div>
-            <h3 className="text-2xl font-black tracking-tighter italic uppercase">
+            <h3 className="text-lg font-bold tracking-tight italic uppercase">
               Resonance Mapping
             </h3>
           </div>
@@ -289,7 +289,7 @@ export const Analytics = () => {
                 </div>
               ))
             ) : (
-              <div className="flex flex-col items-center justify-center py-20 opacity-40 border-dashed border-2 border-border rounded-3xl">
+              <div className="flex flex-col items-center justify-center py-16 opacity-40 border-dashed border-2 border-border rounded-2xl">
                 <p className="text-[10px] font-black uppercase tracking-[0.3em]">
                   Sector Data Pending
                 </p>

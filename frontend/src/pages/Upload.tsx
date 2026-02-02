@@ -147,7 +147,7 @@ export const Upload = () => {
               <div
                 {...getRootProps()}
                 className={cn(
-                  "rounded-[3rem] bg-card/40 backdrop-blur-xl border-2 border-dashed flex flex-col items-center justify-center p-24 text-center cursor-pointer transition-all duration-500 relative overflow-hidden group shadow-2xl ring-1 ring-border",
+                  "rounded-2xl bg-card/40 backdrop-blur-xl border-2 border-dashed flex flex-col items-center justify-center p-12 text-center cursor-pointer transition-all duration-500 relative overflow-hidden group shadow-xl ring-1 ring-border",
                   isDragActive
                     ? "border-primary bg-primary/[0.05] ring-4 ring-primary/20 scale-[1.02]"
                     : "border-border hover:border-primary/50 hover:bg-card/60 hover:shadow-primary/5",
@@ -160,23 +160,23 @@ export const Upload = () => {
 
                 <div
                   className={cn(
-                    "w-28 h-28 rounded-[2.5rem] flex items-center justify-center mb-8 transition-all duration-700 relative z-10 shadow-2xl ring-1 ring-border",
+                    "w-16 h-16 rounded-xl flex items-center justify-center mb-6 transition-all duration-700 relative z-10 shadow-xl ring-1 ring-border",
                     isDragActive
                       ? "bg-primary text-slate-950 rotate-12 scale-110 shadow-primary/30"
                       : "bg-secondary/50 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary group-hover:rotate-3",
                   )}
                 >
-                  <UploadCloud className="w-12 h-12" />
+                  <UploadCloud className="w-8 h-8" />
                 </div>
-                <h3 className="text-3xl font-black mb-4 tracking-tight relative z-10">
+                <h3 className="text-lg font-bold mb-2 tracking-tight relative z-10">
                   Drop your masterpiece here
                 </h3>
-                <p className="text-muted-foreground mb-12 max-w-sm text-lg font-medium leading-relaxed relative z-10">
+                <p className="text-muted-foreground mb-8 max-w-sm text-sm font-medium leading-relaxed relative z-10">
                   MP4, MOV, or AVI up to 2GB. We'll handle the rest.
                 </p>
                 <Button
                   size="lg"
-                  className="rounded-2xl h-16 px-12 shadow-2xl shadow-primary/30 font-black text-lg bg-gradient-to-r from-primary to-cyan-500 hover:scale-105 active:scale-95 transition-all relative z-10"
+                  className="rounded-xl h-11 px-8 shadow-xl shadow-primary/30 font-bold text-sm bg-gradient-to-r from-primary to-cyan-500 hover:scale-105 active:scale-95 transition-all relative z-10"
                 >
                   Browse Files
                 </Button>
@@ -190,7 +190,7 @@ export const Upload = () => {
               className="grid grid-cols-1 lg:grid-cols-3 gap-8"
             >
               <div className="lg:col-span-2 space-y-8">
-                <Card className="p-10 space-y-8 border-0 bg-card/40 backdrop-blur-xl rounded-[2.5rem] shadow-2xl ring-1 ring-border relative overflow-hidden">
+                <Card className="p-5 space-y-6 border-0 bg-card/40 backdrop-blur-xl rounded-2xl shadow-xl ring-1 ring-border relative overflow-hidden">
                   <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/5 rounded-full blur-[80px]" />
 
                   <div className="space-y-6 relative z-10">
@@ -204,7 +204,7 @@ export const Upload = () => {
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="Catchy title for your video"
-                        className="w-full h-14 px-6 rounded-2xl bg-muted/30 border-border focus:ring-2 focus:ring-primary/20 outline-none transition-all font-black text-lg placeholder:text-muted-foreground/30 ring-1 ring-border/50"
+                        className="w-full h-11 px-4 rounded-xl bg-muted/30 border-border focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold text-sm placeholder:text-muted-foreground/30 ring-1 ring-border/50"
                       />
                     </div>
                     <div className="space-y-2.5">
@@ -298,12 +298,12 @@ export const Upload = () => {
               </div>
 
               <div className="space-y-8">
-                <Card className="p-8 border-0 bg-card/40 backdrop-blur-xl rounded-[2.5rem] shadow-2xl ring-1 ring-border relative overflow-hidden group">
+                <Card className="p-5 border-0 bg-card/40 backdrop-blur-xl rounded-2xl shadow-xl ring-1 ring-border relative overflow-hidden group">
                   <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/5 rounded-full blur-[80px] group-hover:bg-primary/10 transition-all duration-700" />
 
-                  <div className="flex items-center justify-between mb-8 relative z-10">
-                    <div className="p-4 rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20 shadow-inner group-hover:rotate-6 transition-transform">
-                      <FileVideo size={24} />
+                  <div className="flex items-center justify-between mb-6 relative z-10">
+                    <div className="p-3 rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20 shadow-inner group-hover:rotate-6 transition-transform">
+                      <FileVideo size={20} />
                     </div>
                     <button
                       onClick={() => setFile(null)}
@@ -313,9 +313,9 @@ export const Upload = () => {
                     </button>
                   </div>
 
-                  <div className="space-y-2 mb-10 relative z-10">
+                  <div className="space-y-1 mb-8 relative z-10">
                     <h4
-                      className="font-black text-xl tracking-tight truncate group-hover:text-primary transition-colors"
+                      className="font-bold text-lg tracking-tight truncate group-hover:text-primary transition-colors"
                       title={file.name}
                     >
                       {file.name}
@@ -336,7 +336,7 @@ export const Upload = () => {
                   )}
 
                   <Button
-                    className="w-full h-16 rounded-[1.5rem] font-black text-lg shadow-2xl shadow-primary/30 relative overflow-hidden group-hover:scale-105 active:scale-95 transition-all bg-gradient-to-r from-primary to-cyan-500"
+                    className="w-full h-11 rounded-xl font-bold text-sm shadow-xl shadow-primary/30 relative overflow-hidden group-hover:scale-105 active:scale-95 transition-all bg-gradient-to-r from-primary to-cyan-500"
                     onClick={handleUpload}
                     isLoading={uploading}
                     isSuccess={success}
@@ -348,7 +348,7 @@ export const Upload = () => {
                   </Button>
                 </Card>
 
-                <div className="p-6 bg-primary/5 rounded-[2rem] border border-primary/10 backdrop-blur-md relative overflow-hidden group hover:bg-primary/10 transition-colors">
+                <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 backdrop-blur-md relative overflow-hidden group hover:bg-primary/10 transition-colors">
                   <div className="flex gap-4 relative z-10">
                     <Sparkles className="w-5 h-5 text-primary shrink-0 animate-pulse" />
                     <p className="text-xs text-primary/80 leading-relaxed font-black uppercase tracking-widest">
