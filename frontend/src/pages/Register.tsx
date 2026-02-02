@@ -66,7 +66,7 @@ export const Register = () => {
           </p>
         </div>
 
-        <div className="bg-card p-8 rounded-2xl border border-border shadow-2xl">
+        <div className="bg-card p-8 rounded-2xl border border-border">
           <form
             onSubmit={handleSubmit}
             className="space-y-6"
@@ -80,7 +80,7 @@ export const Register = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder="you@creati.in"
                 required
               />
             </div>

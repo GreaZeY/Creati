@@ -64,7 +64,7 @@
 
     /* Muted Text: #6B7280 */
     --muted: 215 25% 15%;
-    --muted-foreground: 220 9% 46%;
+    --muted-foreground: 0 0% 70%;
 
     /* Accent/Ring */
     --accent: 345 100% 36%;

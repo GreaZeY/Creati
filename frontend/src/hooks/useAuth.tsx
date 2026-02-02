@@ -57,7 +57,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         setIsAuthenticated(false);
         // Let the router handle redirect if needed, or api.ts interceptor
-        window.location.href = '/login';
+        // window.location.href = '/login';
     };
 
     return (

@@ -73,7 +73,7 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 
 	rows, err := h.db.Query(query, args...)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
 	}
 	defer rows.Close()
 
@@ -220,7 +220,7 @@ func (h *AutomationHandler) CreateRule(c *fiber.Ctx) error {
 	`, userID, clientID, req.Name, req.SourceAccountID, req.TriggerType, filters, targets).Scan(&id)
 
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create rule")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create rule", err)
 	}
 
 	return utils.SuccessResponse(c, fiber.Map{"id": id}, "automation rule created")
@@ -245,7 +245,7 @@ func (h *AutomationHandler) ToggleRule(c *fiber.Ctx) error {
 	`, req.Active, id, userID)
 
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update rule")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update rule", err)
 	}
 
 	return utils.SuccessResponse(c, nil, "rule status updated")
@@ -261,7 +261,7 @@ func (h *AutomationHandler) DeleteRule(c *fiber.Ctx) error {
 	`, id, userID)
 
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to delete rule")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to delete rule", err)
 	}
 
 	return utils.SuccessResponse(c, nil, "rule deleted")
@@ -291,7 +291,7 @@ func (h *AutomationHandler) HandleBlast(c *fiber.Ctx) error {
 
 	ruleID, err := h.service.BlastVideos(userID, req.SourceAccountID, req.VideoIDs, req.Targets)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to initiate blast")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to initiate blast", err)
 	}
 
 	return utils.SuccessResponse(c, fiber.Map{"ruleID": ruleID}, "Quick Blast initiated successfully! 🚀")
@@ -317,7 +317,7 @@ func (h *AutomationHandler) RetryExecution(c *fiber.Ctx) error {
 
 	err = h.service.RetryExecution(c.Context(), executionID)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to retry execution")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to retry execution", err)
 	}
 
 	return utils.SuccessResponse(c, nil, "Retry initiated! 🚀")
@@ -336,7 +336,7 @@ func (h *AutomationHandler) RetryRule(c *fiber.Ctx) error {
 
 	err = h.service.RetryRule(c.Context(), ruleID)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, err.Error(), err)
 	}
 
 	return utils.SuccessResponse(c, nil, "Operational sectors re-primed for dispatch! ⚡")
@@ -360,7 +360,7 @@ func (h *AutomationHandler) GetRuleJobSummary(c *fiber.Ctx) error {
 		GROUP BY status, target_platform, error
 	`, ruleID)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
 	}
 	defer rows.Close()
 

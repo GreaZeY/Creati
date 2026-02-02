@@ -72,7 +72,7 @@ func (h *VideosHandler) ListVideos(c *fiber.Ctx) error {
 	rows, err := h.db.Query(query, args...)
 
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to fetch videos")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to fetch videos", err)
 	}
 	defer rows.Close()
 
@@ -80,7 +80,7 @@ func (h *VideosHandler) ListVideos(c *fiber.Ctx) error {
 	for rows.Next() {
 		var v VideoListItem
 		if err := rows.Scan(&v.ID, &v.Title, &v.Description, &v.S3URL, &v.Status, &v.CreatedAt, &v.JobStatus); err != nil {
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to parse videos")
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to parse videos", err)
 		}
 		videos = append(videos, v)
 	}
@@ -113,7 +113,7 @@ func (h *VideosHandler) GetVideoStatus(c *fiber.Ctx) error {
 	`, videoID)
 
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to fetch job statuses")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to fetch job statuses", err)
 	}
 	defer rows.Close()
 
@@ -130,7 +130,7 @@ func (h *VideosHandler) GetVideoStatus(c *fiber.Ctx) error {
 	for rows.Next() {
 		var j JobStatus
 		if err := rows.Scan(&j.Platform, &j.Status, &j.PlatformID, &j.RetryCount, &j.ErrorMsg, &j.UpdatedAt); err != nil {
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to parse job statuses")
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to parse job statuses", err)
 		}
 		jobs = append(jobs, j)
 	}

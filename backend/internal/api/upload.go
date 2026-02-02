@@ -53,7 +53,7 @@ func (h *UploadHandler) InitUpload(c *fiber.Ctx) error {
 	}
 	url, err := h.Storage.GeneratePresignedURL(key, req.ContentType)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to generate upload URL")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to generate upload URL", err)
 	}
 
 	return utils.SuccessResponse(c, fiber.Map{
@@ -123,7 +123,7 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 	// Start transaction
 	tx, err := h.db.Begin()
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to start transaction")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to start transaction", err)
 	}
 	defer tx.Rollback()
 
@@ -136,7 +136,7 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 	`, userID, req.ClientID, req.Title, req.Description, s3URL).Scan(&videoID)
 
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to save video metadata")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to save video metadata", err)
 	}
 
 	// 2. Normalize Content (V2)
@@ -152,7 +152,7 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 		s3URL, // Staged S3 URL
 	)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to normalize content")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to normalize content", err)
 	}
 
 	// 3. Create Automation Executions & Enqueue (V2)
@@ -166,7 +166,7 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 		`, normalized.ContentID, req.ClientID, 0, platform, accountID).Scan(&executionID)
 
 		if err != nil {
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to create execution record")
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to create execution record", err)
 		}
 
 		// Enqueue V2 Payload
@@ -183,7 +183,7 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 
 	// Commit transaction
 	if err := tx.Commit(); err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to commit transaction")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to commit transaction", err)
 	}
 
 	return utils.SuccessResponse(c, fiber.Map{
