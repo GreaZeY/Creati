@@ -289,7 +289,15 @@ func (h *AutomationHandler) HandleBlast(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no targets selected")
 	}
 
-	ruleID, err := h.service.BlastVideos(userID, req.SourceAccountID, req.VideoIDs, req.Targets)
+	clientIDStr := c.Query("clientId")
+	var clientID *int
+	if clientIDStr != "" {
+		if cid, err := strconv.Atoi(clientIDStr); err == nil {
+			clientID = &cid
+		}
+	}
+
+	ruleID, err := h.service.BlastVideos(userID, clientID, req.SourceAccountID, req.VideoIDs, req.Targets)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to initiate blast", err)
 	}

@@ -210,7 +210,7 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 }
 
 // BlastVideos initiates a one-off distribution of multiple past videos
-func (s *AutomationService) BlastVideos(userID int, sourceAccountID int, videoIDs []string, targets []RuleTarget) (int, error) {
+func (s *AutomationService) BlastVideos(userID int, clientID *int, sourceAccountID int, videoIDs []string, targets []RuleTarget) (int, error) {
 	// 1. Create a "Manual" rule to link these jobs (unique for each blast)
 	var ruleID int
 	name := fmt.Sprintf("Quick Blast - %s", time.Now().Format("Jan 02, 15:04"))
@@ -218,10 +218,10 @@ func (s *AutomationService) BlastVideos(userID int, sourceAccountID int, videoID
 	targetsJSON, _ := json.Marshal(targets)
 
 	err := s.db.QueryRow(`
-		INSERT INTO automation_rules (user_id, name, source_account_id, trigger_type, filters, targets, is_active)
-		VALUES ($1, $2, $3, 'manual', '{}', $4, false)
+		INSERT INTO automation_rules (user_id, client_id, name, source_account_id, trigger_type, filters, targets, is_active)
+		VALUES ($1, $2, $3, $4, 'manual', '{}', $5, false)
 		RETURNING id
-	`, userID, name, sourceAccountID, targetsJSON).Scan(&ruleID)
+	`, userID, clientID, name, sourceAccountID, targetsJSON).Scan(&ruleID)
 
 	if err != nil {
 		return 0, fmt.Errorf("failed to create blast rule: %w", err)
