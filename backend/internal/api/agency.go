@@ -43,41 +43,6 @@ func (h *AgencyHandler) ListClients(c *fiber.Ctx) error {
 		ORDER BY c.name ASC
 	`
 
-	// Debug: Check components separately
-	var clientCount, orgCount, teamMemberCount int
-	h.db.QueryRow("SELECT COUNT(*) FROM clients").Scan(&clientCount)
-	h.db.QueryRow("SELECT COUNT(*) FROM organizations WHERE owner_id = $1", userID).Scan(&orgCount)
-	h.db.QueryRow("SELECT COUNT(*) FROM team_members WHERE user_id = $1", userID).Scan(&teamMemberCount)
-	println("ListClients DEBUG: Total clients:", clientCount, "| User's orgs:", orgCount, "| User's team_members:", teamMemberCount)
-
-	// Debug: Check the actual data
-	var tmStatus string
-	var tmOrgID int
-	err := h.db.QueryRow("SELECT org_id, status FROM team_members WHERE user_id = $1 LIMIT 1", userID).Scan(&tmOrgID, &tmStatus)
-	if err == nil {
-		println("ListClients DEBUG: team_member for user", userID, "-> org_id:", tmOrgID, "status:", tmStatus)
-
-		// Check if any clients match this org_id
-		var matchingClients int
-		h.db.QueryRow("SELECT COUNT(*) FROM clients WHERE org_id = $1", tmOrgID).Scan(&matchingClients)
-		println("ListClients DEBUG: Clients with org_id", tmOrgID, ":", matchingClients)
-
-		// Show actual org_ids in clients table
-		clientRows, _ := h.db.Query("SELECT id, name, org_id FROM clients LIMIT 5")
-		if clientRows != nil {
-			defer clientRows.Close()
-			println("ListClients DEBUG: Sample clients:")
-			for clientRows.Next() {
-				var cid, corgid int
-				var cname string
-				clientRows.Scan(&cid, &cname, &corgid)
-				println("  - Client", cid, ":", cname, "-> org_id:", corgid)
-			}
-		}
-	} else {
-		println("ListClients DEBUG: No team_member found:", err.Error())
-	}
-
 	rows, err := h.db.Query(query, userID)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to fetch clients")
@@ -97,14 +62,10 @@ func (h *AgencyHandler) ListClients(c *fiber.Ctx) error {
 	for rows.Next() {
 		var c ClientResponse
 		if err := rows.Scan(&c.ID, &c.Name, &c.Color, &c.LogoURL, &c.CreatedAt, &c.OrgName); err != nil {
-			println("ListClients ERROR: Failed to scan row:", err.Error())
 			continue
 		}
 		clients = append(clients, c)
 	}
-
-	// Debug logging
-	println("ListClients: Found", len(clients), "clients for user", userID)
 
 	return utils.SuccessResponse(c, clients, "")
 }

@@ -61,8 +61,6 @@ func (s *AnalyticsService) GetUserStats(userID int, clientID *int) (*UserStats, 
 		PulseData:         []PulsePoint{},
 	}
 
-	log.Printf("DEBUG: Fetching stats for user %d client %v", userID, clientID)
-
 	// 1. Core aggregates
 	query := "SELECT total_videos, total_views, total_likes, total_comments, total_shares FROM vw_user_stats WHERE user_id = $1"
 	args := []interface{}{userID}

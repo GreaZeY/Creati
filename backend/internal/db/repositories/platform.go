@@ -49,40 +49,34 @@ func (r *PlatformRepository) UpsertAccount(ctx context.Context, account *models.
 	return err
 }
 
-// GetAccount retrieves a platform account for a user
-func (r *PlatformRepository) GetAccount(ctx context.Context, accountID int) (*models.PlatformAccount, error) {
-	var acc models.PlatformAccount
-	// Include client_id in key scan
-	query := `
-		SELECT id, user_id, client_id, platform, access_token, refresh_token, platform_user_id, status, profile_name, handle, email, webhook_url, connected_at
-		FROM platform_accounts WHERE id = $1
-	`
-	err := r.db.QueryRowContext(ctx, query, accountID).Scan(
-		&acc.ID, &acc.UserID, &acc.ClientID, &acc.Platform, &acc.AccessToken, &acc.RefreshToken,
-		&acc.PlatformUserID, &acc.Status, &acc.ProfileName, &acc.Handle, &acc.Email, &acc.WebhookURL, &acc.ConnectedAt,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &acc, nil
-}
-
 // ListAccounts retrieves platform accounts for a user, properly filtered by Workspace (Client)
 // If clientID is nil, it fetches "Personal" workspace accounts (where client_id IS NULL)
-func (r *PlatformRepository) ListAccounts(ctx context.Context, userID int, clientID *int) ([]models.PlatformAccount, error) {
+func (r *PlatformRepository) ListAccounts(
+	ctx context.Context,
+	userID int,
+	clientID *int,
+) ([]models.PlatformAccount, error) {
+
 	query := `
-		SELECT id, user_id, client_id, platform, access_token, refresh_token, platform_user_id, status, profile_name, handle, email, webhook_url, connected_at
-		FROM platform_accounts 
-		WHERE user_id = $1
-	`
-	args := []interface{}{userID}
+        SELECT
+            id,
+            user_id,
+            client_id,
+            platform,
+            platform_user_id,
+            status,
+            profile_name,
+            handle,
+            email
+        FROM platform_accounts
+        WHERE user_id = $1
+    `
+	args := []any{userID}
 
 	if clientID != nil {
 		query += " AND client_id = $2"
 		args = append(args, *clientID)
 	}
-
-	query += " ORDER BY platform ASC, profile_name ASC"
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -90,17 +84,54 @@ func (r *PlatformRepository) ListAccounts(ctx context.Context, userID int, clien
 	}
 	defer rows.Close()
 
-	var accounts []models.PlatformAccount
+	accounts := make([]models.PlatformAccount, 0, 16)
+
 	for rows.Next() {
-		var acc models.PlatformAccount
-		if err := rows.Scan(
-			&acc.ID, &acc.UserID, &acc.ClientID, &acc.Platform, &acc.AccessToken, &acc.RefreshToken,
-			&acc.PlatformUserID, &acc.Status, &acc.ProfileName, &acc.Handle, &acc.Email, &acc.WebhookURL, &acc.ConnectedAt,
-		); err != nil {
+		acc, err := scanPlatformAccount(rows)
+		if err != nil {
 			return nil, err
 		}
 		accounts = append(accounts, acc)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return accounts, nil
+}
+
+func scanPlatformAccount(rows *sql.Rows) (models.PlatformAccount, error) {
+	var acc models.PlatformAccount
+
+	var (
+		clientID                   sql.NullInt64
+		profileName, handle, email sql.NullString
+	)
+
+	err := rows.Scan(
+		&acc.ID,
+		&acc.UserID,
+		&clientID,
+		&acc.Platform,
+		&acc.PlatformUserID,
+		&acc.Status,
+		&profileName,
+		&handle,
+		&email,
+	)
+	if err != nil {
+		return acc, err
+	}
+
+	if clientID.Valid {
+		v := int(clientID.Int64)
+		acc.ClientID = &v
+	}
+
+	acc.ProfileName = profileName.String
+	acc.Handle = handle.String
+	acc.Email = email.String
+
+	return acc, nil
 }
