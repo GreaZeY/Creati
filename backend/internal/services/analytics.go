@@ -76,6 +76,7 @@ func (s *AnalyticsService) GetUserStats(userID int, clientID *int) (*UserStats, 
 	)
 
 	if err != nil && err != sql.ErrNoRows {
+		log.Printf("[ERROR] GetUserStats failed: %v (userID: %d, clientID: %+v)", err, userID, clientID)
 		return nil, err
 	}
 

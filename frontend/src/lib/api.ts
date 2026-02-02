@@ -16,6 +16,14 @@ export interface ApiResponse<T = any> {
   error?: string;
 }
 
+export interface Client {
+  id: number;
+  name: string;
+  color?: string;
+  orgId?: number;
+  displayOrder?: number;
+}
+
 // Create axios instance with defaults
 // Create axios instance with defaults
 export const api = axios.create({
@@ -208,13 +216,12 @@ export const automationAPI = {
 };
 
 export const agencyAPI = {
-  listClients: () => api.get<ApiResponse<any[]>>("/agency/clients"),
-
-  createClient: (name: string, color?: string) =>
-    api.post<ApiResponse<{ id: number; name: string }>>("/agency/clients", {
-      name,
-      color,
-    }),
+  listClients: () => api.get<ApiResponse<Client[]>>('/agency/clients'),
+  createClient: (name: string, color?: string) => api.post('/agency/clients', { name, color }),
+  updateClient: (id: number, data: { name?: string; color?: string }) =>
+    api.put(`/agency/clients/${id}`, data),
+  deleteClient: (id: number) => api.delete(`/agency/clients/${id}`),
+  reorderClients: (order: number[]) => api.put('/agency/clients/reorder', { order }),
 };
 
 export const paymentsAPI = {

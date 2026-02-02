@@ -106,7 +106,7 @@ export function Dropdown<T = any>({
   ) => (
     <button
       onClick={toggle}
-      className="w-full h-11 flex items-center justify-between px-4 rounded-xl bg-muted/50 hover:bg-muted border border-border/50 transition-all group"
+      className="w-full h-11 flex items-center justify-between px-4 rounded-xl bg-background hover:bg-muted border border-border/50 transition-all group"
     >
       <div className="flex items-center gap-3 overflow-hidden">
         {item?.icon && (
@@ -203,7 +203,7 @@ export function Dropdown<T = any>({
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Search..."
-                      className="w-full bg-muted/50 border border-border/30 rounded-lg py-2 pl-9 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      className="w-full bg-background border border-border/30 rounded-lg py-2 pl-9 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
                       onClick={(e) => e.stopPropagation()}
                     />
                   </div>

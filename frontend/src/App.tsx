@@ -1,5 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import {
+  createBrowserRouter,
+  RouterProvider,
+  Navigate,
+  Outlet,
+} from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
 import { Landing } from "./pages/Landing";
 import { Login } from "./pages/Login";
@@ -8,7 +13,12 @@ import { ConnectPlatforms } from "./pages/ConnectPlatforms";
 import { Dashboard } from "./pages/Dashboard";
 import { Platforms } from "./pages/Platforms";
 import { Analytics } from "./pages/Analytics";
-import { Settings } from "./pages/Settings";
+import {
+  Settings,
+  SettingsMain,
+  SettingsSectionPlaceholder,
+} from "./pages/Settings";
+import { WorkspaceManager } from "./components/settings/WorkspaceManager";
 import { Upload } from "./pages/Upload";
 import { Automation } from "./pages/Automation";
 import { ArchiveBlast } from "./pages/ArchiveBlast";
@@ -25,6 +35,10 @@ import { BackgroundEffect } from "./components/ui/BackgroundEffect";
 import { Toaster } from "./components/ui/Toaster";
 import "./index.css";
 
+import { MainLayout } from "./components/layout/MainLayout";
+import { AuthLayout } from "./components/layout/AuthLayout";
+import { PlatformCallback } from "./pages/PlatformCallback";
+
 // Create React Query client
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,232 +49,170 @@ const queryClient = new QueryClient({
   },
 });
 
-import { AnimatePresence } from "framer-motion";
-import { useLocation } from "react-router-dom";
-import { Sidebar } from "./components/layout/Sidebar";
-import { Header } from "./components/layout/Header";
-import { cn } from "./lib/utils";
-import { PlatformCallback } from "./pages/PlatformCallback";
-
-const AppRoutes = () => {
-  const location = useLocation();
-
-  // Define which pages show the sidebar
-  const protectedPaths = [
-    "/dashboard",
-    "/platforms",
-    "/platforms/connect",
-    "/analytics",
-    "/settings",
-    "/upload",
-    "/automation",
-    "/automation/new",
-    "/blast",
-    "/blast/new",
-    "/pricing",
-    "/onboarding",
-  ];
-  const isProtectedPath = protectedPaths.includes(location.pathname);
-
-  // Auth pages (Login, Register) - No sidebar but use layout styling
-  const authPaths = ["/login", "/register"];
-  const isAuthPath = authPaths.includes(location.pathname);
-
-  const showSidebar = isProtectedPath;
-  const useLayoutWrapper = isProtectedPath || isAuthPath;
-
-  const content = (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
-        {/* Landing Page */}
-        <Route
-          path="/"
-          element={
-            <PageTransition>
-              <Landing />
-            </PageTransition>
-          }
-        />
-        {/* Public Auth Routes */}
-        <Route
-          path="/login"
-          element={
-            <PageTransition>
-              <PublicRoute>
-                <Login />
-              </PublicRoute>
-            </PageTransition>
-          }
-        />
-        <Route
-          path="/register"
-          element={
-            <PageTransition>
-              <PublicRoute>
-                <Register />
-              </PublicRoute>
-            </PageTransition>
-          }
-        />
-        <Route
-          path="/onboarding"
-          element={
-            <ProtectedRoute>
+const router = createBrowserRouter([
+  {
+    element: (
+      <>
+        <BackgroundEffect />
+        <Toaster />
+        <Outlet />
+      </>
+    ),
+    children: [
+      {
+        path: "/",
+        element: (
+          <PageTransition>
+            <Landing />
+          </PageTransition>
+        ),
+      },
+      {
+        element: <AuthLayout />,
+        children: [
+          {
+            path: "login",
+            element: (
               <PageTransition>
-                <WorkspaceSetup />
+                <PublicRoute>
+                  <Login />
+                </PublicRoute>
               </PageTransition>
-            </ProtectedRoute>
-          }
-        />
-        {/* Protected Routes */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
+            ),
+          },
+          {
+            path: "register",
+            element: (
+              <PageTransition>
+                <PublicRoute>
+                  <Register />
+                </PublicRoute>
+              </PageTransition>
+            ),
+          },
+        ],
+      },
+      {
+        element: (
+          <ProtectedRoute>
+            <MainLayout />
+          </ProtectedRoute>
+        ),
+        children: [
+          {
+            path: "dashboard",
+            element: (
               <PageTransition>
                 <Dashboard />
               </PageTransition>
-            </ProtectedRoute>
-          }
-        />
-        {/* Platforms & Nested Connect */}
-
-        <Route
-          path="/platforms"
-          element={
-            <ProtectedRoute>
+            ),
+          },
+          {
+            path: "platforms",
+            element: (
               <PageTransition>
                 <Platforms />
               </PageTransition>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/platforms/connect"
-          element={
-            <ProtectedRoute>
+            ),
+          },
+          {
+            path: "platforms/connect",
+            element: (
               <PageTransition>
                 <ConnectPlatforms />
               </PageTransition>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/platforms/:platform/callback"
-          element={
-            <ProtectedRoute>
-              <PlatformCallback />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/analytics"
-          element={
-            <ProtectedRoute>
+            ),
+          },
+          {
+            path: "platforms/:platform/callback",
+            element: <PlatformCallback />,
+          },
+          {
+            path: "analytics",
+            element: (
               <PageTransition>
                 <Analytics />
               </PageTransition>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute>
+            ),
+          },
+          {
+            path: "settings",
+            element: (
               <PageTransition>
                 <Settings />
               </PageTransition>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/upload"
-          element={
-            <ProtectedRoute>
+            ),
+            children: [
+              { index: true, element: <SettingsMain /> },
+              { path: "workspaces", element: <WorkspaceManager /> },
+              { path: "*", element: <SettingsSectionPlaceholder /> },
+            ],
+          },
+          {
+            path: "upload",
+            element: (
               <PageTransition>
                 <Upload />
               </PageTransition>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/automation"
-          element={
-            <ProtectedRoute>
+            ),
+          },
+          {
+            path: "automation",
+            element: (
               <PageTransition>
                 <Automation />
               </PageTransition>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/blast"
-          element={
-            <ProtectedRoute>
-              <PageTransition>
-                <ArchiveBlast />
-              </PageTransition>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/automation/new"
-          element={
-            <ProtectedRoute>
+            ),
+          },
+          {
+            path: "automation/new",
+            element: (
               <PageTransition>
                 <RuleBuilder />
               </PageTransition>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/blast/new"
-          element={
-            <ProtectedRoute>
+            ),
+          },
+          {
+            path: "blast",
+            element: (
+              <PageTransition>
+                <ArchiveBlast />
+              </PageTransition>
+            ),
+          },
+          {
+            path: "blast/new",
+            element: (
               <PageTransition>
                 <BlastBuilder />
               </PageTransition>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/pricing"
-          element={
-            <ProtectedRoute>
+            ),
+          },
+          {
+            path: "pricing",
+            element: (
               <PageTransition>
                 <Pricing />
               </PageTransition>
-            </ProtectedRoute>
-          }
-        />
-        {/* Catch all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </AnimatePresence>
-  );
-
-  if (!useLayoutWrapper) {
-    return content;
-  }
-
-  return (
-    <div className="flex min-h-screen bg-background text-foreground overflow-x-hidden">
-      {showSidebar && <Sidebar />}
-
-      <div
-        className={cn(
-          "flex-1 flex flex-col min-h-screen transition-all duration-300",
-          showSidebar ? "ml-64" : "ml-0",
-        )}
-      >
-        {showSidebar && <Header />}
-        <main className="flex-1 p-8">
-          <div className="max-w-7xl mx-auto">{content}</div>
-        </main>
-      </div>
-    </div>
-  );
-};
+            ),
+          },
+          {
+            path: "onboarding",
+            element: (
+              <PageTransition>
+                <WorkspaceSetup />
+              </PageTransition>
+            ),
+          },
+        ],
+      },
+      {
+        path: "*",
+        element: <Navigate to="/" replace />,
+      },
+    ],
+  },
+]);
 
 function App() {
   return (
@@ -268,11 +220,7 @@ function App() {
       <AuthProvider>
         <UIProvider>
           <ClientProvider>
-            <BrowserRouter>
-              <BackgroundEffect />
-              <Toaster />
-              <AppRoutes />
-            </BrowserRouter>
+            <RouterProvider router={router} />
           </ClientProvider>
         </UIProvider>
       </AuthProvider>

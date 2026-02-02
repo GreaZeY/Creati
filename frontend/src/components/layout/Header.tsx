@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ChevronRight, Home, Briefcase, User, Plus } from "lucide-react";
+import { ChevronRight, Home, Briefcase, Plus } from "lucide-react";
 import { useClient } from "@/context/ClientContext";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -75,25 +75,6 @@ export function Header() {
             emptyMessage="No Workspaces Found"
             persistent={true}
             size="sm"
-            renderTrigger={(item, _, toggle) => (
-              <button
-                onClick={toggle}
-                className="w-full h-11 flex items-center justify-between px-4 rounded-xl bg-muted/50 hover:bg-muted border border-border transition-all group"
-              >
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
-                    {item ? (
-                      <Briefcase size={12} className="text-primary" />
-                    ) : (
-                      <User size={12} className="text-primary" />
-                    )}
-                  </div>
-                  <span className="text-xs font-bold tracking-tight truncate">
-                    {item?.label || "Select Workspace"}
-                  </span>
-                </div>
-              </button>
-            )}
             footerAction={{
               label: "Create Workspace",
               icon: <Plus size={14} />,
@@ -163,7 +144,7 @@ export function Header() {
               placeholder="e.g. Nike Marketing Campaign"
               value={newWorkspaceName}
               onChange={(e) => setNewWorkspaceName(e.target.value)}
-              className="h-14 bg-muted/50 border-border focus:ring-primary/20"
+              className="h-11 bg-muted/50 border-border focus:ring-primary/20"
               autoFocus
             />
           </div>
@@ -171,7 +152,7 @@ export function Header() {
           <Button
             onClick={handleCreate}
             disabled={isCreating || !newWorkspaceName.trim()}
-            className="w-full h-14 text-[11px] font-black tracking-[0.2em] uppercase"
+            className="w-full h-11 text-[11px] font-black tracking-[0.2em] uppercase"
           >
             {isCreating ? "Initializing..." : "Create Workspace"}
           </Button>

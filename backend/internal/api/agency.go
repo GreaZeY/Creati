@@ -2,6 +2,8 @@ package api
 
 import (
 	"database/sql"
+	"fmt"
+	"strings"
 	"time"
 
 	"creati.in/creati/backend/internal/middleware"
@@ -170,4 +172,136 @@ func (h *AgencyHandler) CreateClient(c *fiber.Ctx) error {
 
 	println("CreateClient: Successfully created client", clientID, "in org", orgID, "for user", userID)
 	return utils.SuccessResponse(c, fiber.Map{"id": clientID, "orgId": orgID}, "Client workspace created")
+}
+
+// UpdateClient updates a client's name and/or color
+func (h *AgencyHandler) UpdateClient(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	clientID := c.Params("id")
+
+	var payload struct {
+		Name  string `json:"name"`
+		Color string `json:"color"`
+	}
+
+	if err := c.BodyParser(&payload); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request")
+	}
+
+	// Verify user has access to this client
+	var exists bool
+	err := h.db.QueryRow(`
+		SELECT EXISTS(
+			SELECT 1 FROM clients c
+			JOIN organizations o ON c.org_id = o.id
+			JOIN team_members tm ON o.id = tm.org_id
+			WHERE c.id = $1 AND tm.user_id = $2 AND tm.status = 'active'
+		)
+	`, clientID, userID).Scan(&exists)
+
+	if err != nil || !exists {
+		return utils.ErrorResponse(c, fiber.StatusForbidden, "not authorized")
+	}
+
+	// Build update query dynamically
+	var updates []string
+	var args []interface{}
+	argIdx := 1
+
+	if payload.Name != "" {
+		updates = append(updates, fmt.Sprintf("name = $%d", argIdx))
+		args = append(args, payload.Name)
+		argIdx++
+	}
+	if payload.Color != "" {
+		updates = append(updates, fmt.Sprintf("color = $%d", argIdx))
+		args = append(args, payload.Color)
+		argIdx++
+	}
+
+	if len(updates) == 0 {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no fields to update")
+	}
+
+	args = append(args, clientID)
+	query := fmt.Sprintf("UPDATE clients SET %s WHERE id = $%d", strings.Join(updates, ", "), argIdx)
+
+	_, err = h.db.Exec(query, args...)
+	if err != nil {
+		println("UpdateClient: Failed to update:", err.Error())
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update client")
+	}
+
+	return utils.SuccessResponse(c, nil, "Client updated successfully")
+}
+
+// DeleteClient deletes a client workspace
+func (h *AgencyHandler) DeleteClient(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	clientID := c.Params("id")
+
+	// Verify user has owner/admin access
+	var role string
+	err := h.db.QueryRow(`
+		SELECT tm.role FROM clients c
+		JOIN organizations o ON c.org_id = o.id
+		JOIN team_members tm ON o.id = tm.org_id
+		WHERE c.id = $1 AND tm.user_id = $2 AND tm.status = 'active'
+	`, clientID, userID).Scan(&role)
+
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusForbidden, "not authorized")
+	}
+
+	if role != "owner" && role != "admin" {
+		return utils.ErrorResponse(c, fiber.StatusForbidden, "insufficient permissions")
+	}
+
+	// Delete client (cascades to platform_accounts, videos, etc.)
+	_, err = h.db.Exec("DELETE FROM clients WHERE id = $1", clientID)
+	if err != nil {
+		println("DeleteClient: Failed to delete:", err.Error())
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to delete client")
+	}
+
+	return utils.SuccessResponse(c, nil, "Client deleted successfully")
+}
+
+// ReorderClients updates the display order of clients
+func (h *AgencyHandler) ReorderClients(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	var payload struct {
+		Order []int `json:"order"` // Array of client IDs in desired order
+	}
+
+	if err := c.BodyParser(&payload); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request")
+	}
+
+	// Verify all clients belong to user's orgs
+	for i, clientID := range payload.Order {
+		var exists bool
+		err := h.db.QueryRow(`
+			SELECT EXISTS(
+				SELECT 1 FROM clients c
+				JOIN organizations o ON c.org_id = o.id
+				JOIN team_members tm ON o.id = tm.org_id
+				WHERE c.id = $1 AND tm.user_id = $2 AND tm.status = 'active'
+			)
+		`, clientID, userID).Scan(&exists)
+
+		if err != nil || !exists {
+			return utils.ErrorResponse(c, fiber.StatusForbidden, "invalid client in order")
+		}
+
+		// Update display_order
+		_, err = h.db.Exec("UPDATE clients SET display_order = $1 WHERE id = $2", i, clientID)
+		if err != nil {
+			println("ReorderClients: Failed to update order:", err.Error())
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to reorder")
+		}
+	}
+
+	return utils.SuccessResponse(c, nil, "Clients reordered successfully")
 }

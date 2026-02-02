@@ -232,6 +232,9 @@ func main() {
 		// Agency/Clients
 		protected.Get("/agency/clients", agencyHandler.ListClients)
 		protected.Post("/agency/clients", agencyHandler.CreateClient)
+		protected.Put("/agency/clients/reorder", agencyHandler.ReorderClients)
+		protected.Put("/agency/clients/:id", agencyHandler.UpdateClient)
+		protected.Delete("/agency/clients/:id", agencyHandler.DeleteClient)
 
 		// Start server
 		port := os.Getenv("PORT")
