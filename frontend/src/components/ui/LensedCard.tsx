@@ -25,11 +25,6 @@ export function LensedCard({ children, className, onClick }: LensedCardProps) {
       onMouseMove={handleMouseMove}
       onClick={onClick}
       className={cn("glass-card lens-effect rounded-3xl p-6 group", className)}
-      style={{
-        // @ts-ignore
-        "--mouse-x": `${mousePos.x}%`,
-        "--mouse-y": `${mousePos.y}%`,
-      }}
     >
       {/* Dynamic Glow Accent */}
       <div
@@ -39,9 +34,7 @@ export function LensedCard({ children, className, onClick }: LensedCardProps) {
         }}
       />
 
-      <div className="relative z-10 font-outfit w-full h-full flex flex-col">
         {children}
-      </div>
     </div>
   );
 }

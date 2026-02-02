@@ -16,6 +16,7 @@ import {
 import { automationAPI } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { LensedCard } from "@/components/ui/LensedCard";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Link } from "react-router-dom";
 import { toast } from "@/lib/events";
@@ -198,29 +199,13 @@ export function ArchiveBlast() {
       </PageHeader>
 
       {rules.length === 0 ? (
-        <LensedCard className="py-32 flex flex-col items-center justify-center text-center border-dashed border-2 border-border">
-          <div className="w-24 h-24 rounded-3xl bg-muted flex items-center justify-center mb-8 ring-1 ring-border group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700">
-            <Database
-              className="text-primary opacity-40 blur-[1px]"
-              size={48}
-            />
-          </div>
-          <h3 className="text-4xl font-black uppercase italic tracking-tighter mb-4">
-            VAULT_STANDBY
-          </h3>
-          <p className="text-muted-foreground font-medium max-w-md text-lg opacity-60">
-            No active broadcast history detected. Prime your vault for a
-            wide-sector blast.
-          </p>
-          <Link to="/blast/new" className="mt-12">
-            <Button
-              size="lg"
-              className="h-16 px-12 rounded-2xl bg-foreground text-background font-black text-lg hover:scale-105 active:scale-95 transition-all"
-            >
-              INITIALIZE FIRST BLAST
-            </Button>
-          </Link>
-        </LensedCard>
+        <EmptyState
+          icon={Database}
+          title="VAULT_STANDBY"
+          description="No active broadcast history detected. Prime your vault for a wide-sector blast."
+          actionLabel="INITIALIZE FIRST BLAST"
+          actionLink="/blast/new"
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <AnimatePresence mode="popLayout">

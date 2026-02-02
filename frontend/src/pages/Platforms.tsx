@@ -193,7 +193,7 @@ export const Platforms = () => {
                     )}
                   >
                     {/* Dropdown Menu - Absolute Top Right */}
-                    <div className="absolute -top-2 -right-2 z-20">
+                    <div className="absolute top-2 right-2 z-20">
                       <DropdownMenu
                         trigger={
                           <button className="p-2.5 rounded-full text-muted-foreground/80 hover:text-foreground hover:bg-secondary/80 transition-all">

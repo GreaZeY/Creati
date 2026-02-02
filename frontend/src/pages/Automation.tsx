@@ -13,6 +13,7 @@ import {
 import { automationAPI } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -153,24 +154,13 @@ export function Automation() {
       </PageHeader>
 
       {rules.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed bg-primary/5">
-          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-            <Zap className="text-primary" size={32} />
-          </div>
-          <h3 className="text-xl font-semibold italic">
-            A bit quiet in here...
-          </h3>
-          <p className="text-muted-foreground mt-2 max-w-sm">
-            Turn one upload into a viral spree. Sync your Insta heat to YT,
-            LinkedIn & more.
-          </p>
-          <Link to="/automation/new" className="mt-6">
-            <Button className="gap-2">
-              <Plus size={18} />
-              Let's Cook
-            </Button>
-          </Link>
-        </Card>
+        <EmptyState
+          icon={Zap}
+          title="A BIT QUIET IN HERE..."
+          description="Turn one upload into a viral spree. Sync your Insta heat to YT, LinkedIn & more."
+          actionLabel="LET'S COOK"
+          actionLink="/automation/new"
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4">
           <AnimatePresence mode="popLayout">
