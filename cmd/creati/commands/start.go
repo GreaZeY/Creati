@@ -70,29 +70,29 @@ func runStart(cmd *cobra.Command, args []string) {
 
 	// Start processes
 	if err := backendCmd.Start(); err != nil {
-		UIError("Failed to start backend: %v", err)
+		UIError("Failed to start server: %v", err)
 		return
 	}
 
 	if frontendCmd != nil {
 		if err := frontendCmd.Start(); err != nil {
-			UIError("Failed to start frontend: %v", err)
+			UIError("Failed to start client: %v", err)
 			backendCmd.Process.Kill()
 			return
 		}
 	}
 
 	// Colors
-	backendColor := color.New(color.FgCyan).SprintFunc()
-	frontendColor := color.New(color.FgGreen).SprintFunc()
+	backendColor := color.New(color.FgGreen).SprintFunc()
+	frontendColor := color.New(color.FgCyan).SprintFunc()
 
 	// Stream logs
-	go streamLogs(backendStdout, backendColor("[backend]"))
-	go streamLogs(backendStderr, backendColor("[backend]"))
+	go streamLogs(backendStdout, backendColor("[server]"))
+	go streamLogs(backendStderr, backendColor("[server]"))
 
 	if frontendCmd != nil {
-		go streamLogs(frontendStdout, frontendColor("[frontend]"))
-		go streamLogs(frontendStderr, frontendColor("[frontend]"))
+		go streamLogs(frontendStdout, frontendColor("[client]"))
+		go streamLogs(frontendStderr, frontendColor("[client]"))
 	}
 
 	// Handle graceful shutdown

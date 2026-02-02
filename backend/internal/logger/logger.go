@@ -44,10 +44,25 @@ func (f *CustomFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "time=\"%s\" level=%s msg=\"%s\"", timeStr, levelStr, entry.Message)
 
-	// Append all fields from entry.Data
+	// Priority keys in order
+	keys := []string{"status", "method", "path", "query", "error", "trace_id", "latency", "ip", "user_agent"}
+
+	// Helper to check if cleared (printed)
+	printed := make(map[string]bool)
+
+	// Print priority keys first
+	for _, k := range keys {
+		if v, ok := entry.Data[k]; ok {
+			fmt.Fprintf(&b, " %s=\"%v\"", k, v)
+			printed[k] = true
+		}
+	}
+
+	// Append remaining fields from entry.Data
 	for k, v := range entry.Data {
-		// Convert error to string if needed, or just standard formatting
-		fmt.Fprintf(&b, " %s=\"%v\"", k, v)
+		if !printed[k] {
+			fmt.Fprintf(&b, " %s=\"%v\"", k, v)
+		}
 	}
 
 	b.WriteByte('\n')

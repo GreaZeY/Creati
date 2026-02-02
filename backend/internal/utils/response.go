@@ -24,7 +24,11 @@ func SuccessResponse(c *fiber.Ctx, data interface{}, message string) error {
 }
 
 // ErrorResponse returns an error response
-func ErrorResponse(c *fiber.Ctx, statusCode int, message string) error {
+// Optionally accepts an internal error to log (not sent to client)
+func ErrorResponse(c *fiber.Ctx, statusCode int, message string, internalErr ...error) error {
+	if len(internalErr) > 0 && internalErr[0] != nil {
+		c.Locals("internal_error", internalErr[0])
+	}
 	return c.Status(statusCode).JSON(Response{
 		Success: false,
 		Error:   message,

@@ -91,7 +91,7 @@ func (h *PlatformHandler) GetPlatformCounts(c *fiber.Ctx) error {
 	}
 
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
 	}
 	defer rows.Close()
 
@@ -158,7 +158,7 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 	repo := repositories.NewPlatformRepository(h.db)
 	accounts, err := repo.ListAccounts(c.Context(), userID, clientID)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
 	}
 
 	results = make([]PlatformData, 0)

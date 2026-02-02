@@ -14,7 +14,7 @@ import (
 	"creati.in/creati/backend/internal/workers"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	fiberlog "github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -36,7 +36,8 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	})
 
 	// Middleware
-	app.Use(fiberlog.New())
+	app.Use(requestid.New())          // Generate X-Request-ID
+	app.Use(middleware.RequestLogger) // Log requests with Trace ID
 
 	// CORS - Allow credentials (required for SSE with auth)
 	app.Use(cors.New(cors.Config{

@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
 CREATE TABLE IF NOT EXISTS organizations (
     id SERIAL PRIMARY KEY,
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS clients (
     logo_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_clients_org ON clients(org_id);
+CREATE INDEX IF NOT EXISTS idx_clients_org ON clients(org_id);
 
 -- 3. Domain Tables
 CREATE TABLE IF NOT EXISTS platform_accounts (
@@ -67,10 +67,11 @@ CREATE TABLE IF NOT EXISTS platform_accounts (
     connected_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_platform_accounts_user ON platform_accounts(user_id);
-CREATE INDEX idx_platform_accounts_client ON platform_accounts(client_id);
-CREATE INDEX idx_platform_accounts_platform_user ON platform_accounts(platform, platform_user_id);
-CREATE INDEX idx_platform_accounts_external_id ON platform_accounts(platform, external_account_id);
+CREATE INDEX IF NOT EXISTS idx_platform_accounts_user ON platform_accounts(user_id);
+CREATE INDEX IF NOT EXISTS idx_platform_accounts_client ON platform_accounts(client_id);
+CREATE INDEX IF NOT EXISTS idx_platform_accounts_platform_user ON platform_accounts(platform, platform_user_id);
+CREATE INDEX IF NOT EXISTS idx_platform_accounts_external_id ON platform_accounts(platform, external_account_id);
+
 -- Unique constraint for client isolation (handles NULL client_id as unique bucket)
 CREATE UNIQUE INDEX IF NOT EXISTS platform_accounts_client_isolation_idx 
 ON platform_accounts (user_id, platform, platform_user_id, COALESCE(client_id, 0));
@@ -86,7 +87,7 @@ CREATE TABLE IF NOT EXISTS contents (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_contents_fingerprint ON contents(fingerprint);
+CREATE INDEX IF NOT EXISTS idx_contents_fingerprint ON contents(fingerprint);
 
 CREATE TABLE IF NOT EXISTS videos (
     id SERIAL PRIMARY KEY,
@@ -103,11 +104,11 @@ CREATE TABLE IF NOT EXISTS videos (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_videos_user ON videos(user_id);
-CREATE INDEX idx_videos_client ON videos(client_id);
-CREATE INDEX idx_videos_content ON videos(content_id);
-CREATE INDEX idx_videos_external_id ON videos(platform, external_id);
-CREATE INDEX idx_videos_user_platform_ext ON videos(user_id, platform, external_id);
+CREATE INDEX IF NOT EXISTS idx_videos_user ON videos(user_id);
+CREATE INDEX IF NOT EXISTS idx_videos_client ON videos(client_id);
+CREATE INDEX IF NOT EXISTS idx_videos_content ON videos(content_id);
+CREATE INDEX IF NOT EXISTS idx_videos_external_id ON videos(platform, external_id);
+CREATE INDEX IF NOT EXISTS idx_videos_user_platform_ext ON videos(user_id, platform, external_id);
 
 CREATE TABLE IF NOT EXISTS platform_contents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -138,9 +139,9 @@ CREATE TABLE IF NOT EXISTS platform_events (
     error TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_platform_events_account ON platform_events(account_id);
-CREATE INDEX idx_platform_events_status ON platform_events(status);
-CREATE INDEX idx_pending_platform_events ON platform_events(created_at DESC) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_platform_events_account ON platform_events(account_id);
+CREATE INDEX IF NOT EXISTS idx_platform_events_status ON platform_events(status);
+CREATE INDEX IF NOT EXISTS idx_pending_platform_events ON platform_events(created_at DESC) WHERE status = 'pending';
 
 CREATE TABLE IF NOT EXISTS webhook_subscriptions (
     id SERIAL PRIMARY KEY,
@@ -180,8 +181,8 @@ CREATE TABLE IF NOT EXISTS automation_rules (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_automation_rules_user ON automation_rules(user_id);
-CREATE INDEX idx_automation_rules_client ON automation_rules(client_id);
+CREATE INDEX IF NOT EXISTS idx_automation_rules_user ON automation_rules(user_id);
+CREATE INDEX IF NOT EXISTS idx_automation_rules_client ON automation_rules(client_id);
 
 CREATE TABLE IF NOT EXISTS automation_executions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -199,8 +200,8 @@ CREATE TABLE IF NOT EXISTS automation_executions (
     completed_at TIMESTAMP WITH TIME ZONE,
     UNIQUE(rule_id, content_id, target_platform)
 );
-CREATE INDEX idx_executions_status ON automation_executions(status);
-CREATE INDEX idx_executions_client ON automation_executions(client_id);
+CREATE INDEX IF NOT EXISTS idx_executions_status ON automation_executions(status);
+CREATE INDEX IF NOT EXISTS idx_executions_client ON automation_executions(client_id);
 
 CREATE TABLE IF NOT EXISTS automation_jobs (
     id SERIAL PRIMARY KEY,
@@ -214,7 +215,7 @@ CREATE TABLE IF NOT EXISTS automation_jobs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_automation_jobs_rule_status ON automation_jobs(rule_id, status);
+CREATE INDEX IF NOT EXISTS idx_automation_jobs_rule_status ON automation_jobs(rule_id, status);
 
 -- 5. Financial Tables
 CREATE TABLE IF NOT EXISTS subscriptions (
@@ -253,8 +254,8 @@ CREATE TABLE IF NOT EXISTS video_analytics (
     shares BIGINT DEFAULT 0,
     fetched_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_analytics_video ON video_analytics(video_id);
-CREATE INDEX idx_analytics_account ON video_analytics(account_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_video ON video_analytics(video_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_account ON video_analytics(account_id);
 
 -- 7. Triggers for updated_at
 CREATE TRIGGER update_platform_accounts_updated_at BEFORE UPDATE ON platform_accounts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

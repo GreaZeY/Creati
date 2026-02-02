@@ -34,8 +34,8 @@ ALTER TABLE platform_accounts ADD COLUMN IF NOT EXISTS client_id INT REFERENCES 
 ALTER TABLE videos ADD COLUMN IF NOT EXISTS client_id INT REFERENCES clients(id) ON DELETE SET NULL;
 
 -- 5. Indexes for Performance
-CREATE INDEX idx_clients_org ON clients(org_id);
-CREATE INDEX idx_team_members_org ON team_members(org_id);
-CREATE INDEX idx_team_members_user ON team_members(user_id);
-CREATE INDEX idx_platform_accounts_client ON platform_accounts(client_id);
-CREATE INDEX idx_videos_client ON videos(client_id);
+CREATE INDEX IF NOT EXISTS idx_clients_org ON clients(org_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_org ON team_members(org_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_platform_accounts_client ON platform_accounts(client_id);
+CREATE INDEX IF NOT EXISTS idx_videos_client ON videos(client_id);

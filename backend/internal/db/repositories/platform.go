@@ -80,9 +80,6 @@ func (r *PlatformRepository) ListAccounts(ctx context.Context, userID int, clien
 	if clientID != nil {
 		query += " AND client_id = $2"
 		args = append(args, *clientID)
-	} else {
-		// Personal Workspace = NULL client_id
-		query += " AND client_id IS NULL"
 	}
 
 	query += " ORDER BY platform ASC, profile_name ASC"
