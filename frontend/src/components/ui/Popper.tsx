@@ -17,7 +17,7 @@ export function Popper({
   open,
   onClickAway,
   placement = "bottom-start",
-  offset = { x: 0, y: 8 },
+  offset = { x: 0, y: 4 },
 }: PopperProps) {
   const popperRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });

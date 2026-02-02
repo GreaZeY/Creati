@@ -63,7 +63,7 @@ export function Header() {
       className={`sticky top-0 right-0 z-40 w-full bg-background/80 backdrop-blur-[30px] font-outfit h-${HEADER_HEIGHT}`}
     >
       {/* Primary Header Row */}
-      <div className="max-w-7xl mx-auto pr-8 flex items-center justify-between gap-4 h-full">
+      <div className="max-w-7xl pr-8 flex items-center justify-between gap-4 h-full">
         {/* Center: Client Switcher */}
         <div>
           <Dropdown
@@ -74,7 +74,8 @@ export function Header() {
             placeholder="Select Workspace"
             emptyMessage="No Workspaces Found"
             persistent={true}
-            renderTrigger={(item, isOpen, toggle) => (
+            size="sm"
+            renderTrigger={(item, _, toggle) => (
               <button
                 onClick={toggle}
                 className="w-full h-11 flex items-center justify-between px-4 rounded-xl bg-muted/50 hover:bg-muted border border-border transition-all group"

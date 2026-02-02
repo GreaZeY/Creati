@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronsUpDown, Check } from "lucide-react";
+import { ChevronsUpDown, Check, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Popper } from "./Popper";
+import { Button } from "./Button";
 
 export interface DropdownItem<T = any> {
   id: string | number;
@@ -53,6 +54,7 @@ export function Dropdown<T = any>({
   const [selectedItem, setSelectedItem] = useState<DropdownItem<T> | null>(
     null,
   );
+  const [searchQuery, setSearchQuery] = useState("");
   const triggerRef = useRef<HTMLDivElement>(null);
 
   const storageKey = `dropdown_${id}_selected`;
@@ -86,6 +88,7 @@ export function Dropdown<T = any>({
   const handleSelect = (item: DropdownItem<T>) => {
     setSelectedItem(item);
     setIsOpen(false);
+    setSearchQuery(""); // Reset search on select
 
     // Save to localStorage if persistent
     if (persistent) {
@@ -98,12 +101,12 @@ export function Dropdown<T = any>({
 
   const defaultTrigger = (
     item: DropdownItem<T> | null,
-    isOpen: boolean,
+    _: boolean,
     toggle: () => void,
   ) => (
     <button
       onClick={toggle}
-      className="w-full h-11 flex items-center justify-between px-4 rounded-xl bg-muted/50 hover:bg-muted border border-border transition-all group"
+      className="w-full h-11 flex items-center justify-between px-4 rounded-xl bg-muted/50 hover:bg-muted border border-border/50 transition-all group"
     >
       <div className="flex items-center gap-3 overflow-hidden">
         {item?.icon && (
@@ -134,12 +137,32 @@ export function Dropdown<T = any>({
     </>
   );
 
-  const toggleDropdown = () => setIsOpen(!isOpen);
+  const toggleDropdown = () => {
+    setIsOpen(!isOpen);
+    if (isOpen) {
+      setSearchQuery(""); // Reset search when closing
+    }
+  };
+
+  // Filter items based on search query
+  const filteredItems = searchQuery
+    ? items.filter((item) =>
+        item.label.toLowerCase().includes(searchQuery.toLowerCase()),
+      )
+    : items;
+
+  const showSearch = items.length > 5;
 
   const sizeClasses = {
     sm: "min-w-[160px] max-w-[240px]",
     md: "min-w-[240px] max-w-[320px]",
     lg: "min-w-[320px] max-w-[400px]",
+  };
+
+  const heightClasses = {
+    sm: "max-h-[180px]",
+    md: "max-h-[240px]",
+    lg: "max-h-[320px]",
   };
 
   return (
@@ -166,17 +189,41 @@ export function Dropdown<T = any>({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -8 }}
               style={{ minWidth: triggerRef.current?.offsetWidth || 240 }}
-              className="bg-popover border border-border rounded-xl shadow-2xl overflow-hidden py-1"
+              className="bg-background border border-border/50 rounded-xl shadow-2xl overflow-hidden"
             >
-              <div className="max-h-[240px] overflow-y-auto">
-                {items.length === 0 && (
+              {showSearch && (
+                <div className="p-2 border-b border-border/30">
+                  <div className="relative">
+                    <Search
+                      size={14}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search..."
+                      className="w-full bg-muted/50 border border-border/30 rounded-lg py-2 pl-9 pr-3 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                </div>
+              )}
+              <div
+                className={cn(
+                  "overflow-y-auto",
+                  heightClasses[size],
+                  showSearch ? "py-1" : "py-1",
+                )}
+              >
+                {filteredItems.length === 0 && (
                   <div className="px-4 py-8 text-center">
                     <p className="text-[10px] font-black uppercase tracking-widest opacity-40">
-                      {emptyMessage}
+                      {searchQuery ? "No matches found" : emptyMessage}
                     </p>
                   </div>
                 )}
-                {items.map((item) => {
+                {filteredItems.map((item) => {
                   const isSelected = selectedItem?.id === item.id;
                   return (
                     <button
@@ -193,17 +240,19 @@ export function Dropdown<T = any>({
               </div>
 
               {footerAction && (
-                <div className="p-2 border-t border-border">
-                  <button
+                <div className="p-1 border-t border-border/50">
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => {
                       footerAction.onClick();
                       setIsOpen(false);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 text-primary text-[10px] font-black tracking-widest uppercase hover:bg-primary/20 transition-all"
+                    className="w-full"
                   >
                     {footerAction.icon}
                     {footerAction.label}
-                  </button>
+                  </Button>
                 </div>
               )}
             </motion.div>
