@@ -20,6 +20,7 @@ export interface DropdownProps<T = any> {
   placeholder?: string;
   emptyMessage?: string;
   persistent?: boolean;
+  size?: "sm" | "md" | "lg";
   renderTrigger?: (
     item: DropdownItem<T> | null,
     isOpen: boolean,
@@ -42,6 +43,7 @@ export function Dropdown<T = any>({
   placeholder = "Select an item",
   emptyMessage = "No items found",
   persistent = false,
+  size = "md",
   renderTrigger,
   renderItem,
   footerAction,
@@ -134,11 +136,17 @@ export function Dropdown<T = any>({
 
   const toggleDropdown = () => setIsOpen(!isOpen);
 
+  const sizeClasses = {
+    sm: "min-w-[160px] max-w-[240px]",
+    md: "min-w-[240px] max-w-[320px]",
+    lg: "min-w-[320px] max-w-[400px]",
+  };
+
   return (
     <>
       <div
         ref={triggerRef}
-        className={cn("relative min-w-[240px] max-w-[320px] w-full", className)}
+        className={cn("relative w-full", sizeClasses[size], className)}
       >
         {renderTrigger
           ? renderTrigger(selectedItem, isOpen, toggleDropdown)

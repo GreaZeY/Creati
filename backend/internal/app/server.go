@@ -108,7 +108,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	})
 	protected.Post("/upload/init", uploadHandler.InitUpload)
 	protected.Post("/upload/confirm", uploadHandler.ConfirmUpload)
-	protected.Get("/platforms/count", platformHandler.GetPlatformCounts)
+	protected.Get("/platforms/counts", platformHandler.GetPlatformCounts)
 	protected.Get("/platforms", platformHandler.ListPlatforms)
 	protected.Get("/platforms/:platform/connect", platformHandler.InitiateConnection)
 	protected.Put("/platforms/:platform/disconnect", platformHandler.DeactivatePlatform)
