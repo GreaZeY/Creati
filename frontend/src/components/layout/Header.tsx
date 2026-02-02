@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { agencyAPI } from "@/lib/api";
 import { ThemeToggle } from "../ThemeToggle";
+import { HEADER_HEIGHT } from "@/lib/constants";
 
 export function Header() {
   const location = useLocation();
@@ -60,9 +61,9 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 right-0 z-40 w-full bg-background/80 backdrop-blur-[30px] font-outfit">
+    <header className={`sticky top-0 right-0 z-40 w-full bg-background/80 backdrop-blur-[30px] font-outfit h-[${HEADER_HEIGHT}]`}>
       {/* Primary Header Row */}
-      <div className="max-w-7xl mx-auto px-8 h-20 flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto pr-8 flex items-center justify-between gap-4 h-full">
         {/* Center: Client Switcher */}
         <div>
           <div className="relative min-w-[240px] max-w-[320px] w-full">

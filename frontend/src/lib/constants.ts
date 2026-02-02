@@ -116,3 +116,6 @@ export const UPLOAD = {
     acceptedFormats: ['video/mp4', 'video/quicktime', 'video/x-msvideo'],
     acceptedExtensions: ['.mp4', '.mov', '.avi'],
 } as const;
+
+
+export const HEADER_HEIGHT = '70px';
