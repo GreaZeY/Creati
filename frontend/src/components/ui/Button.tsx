@@ -7,7 +7,7 @@ import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "relative inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 overflow-hidden",
+  "text-white relative inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 overflow-hidden",
   {
     variants: {
       variant: {
@@ -18,7 +18,7 @@ const buttonVariants = cva(
           "text-primary border border-input bg-background hover:bg-accent hover:text-accent-foreground",
         secondary:
           "text-primary bg-transparent border border-border hover:bg-accent hover:border-primary/30 hover:text-slate-950",
-        ghost: "text-primary hover:bg-accent hover:text-accent-foreground",
+        ghost: "text-primary hover:bg-accent hover:text-white",
         link: "text-primary text-primary underline-offset-4 hover:underline",
       },
       size: {

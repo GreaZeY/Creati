@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { HEADER_HEIGHT } from "@/lib/constants";
+import WorkspaceSwitcher from "./WorkspaceSwitcher";
 
 const NAV_ITEMS = [
   { label: "COMMAND", icon: LayoutDashboard, href: "/dashboard" },
@@ -34,13 +35,14 @@ export function Sidebar() {
     <div className="fixed left-0 top-0 h-full w-64 bg-card/20 backdrop-blur-[30px] z-50 flex flex-col font-outfit">
       {/* Brand */}
       <div
-        className={`h-${HEADER_HEIGHT} flex items-center gap-2 px-8 shrink-0 box-border`}
+        className={`h-${HEADER_HEIGHT} flex items-center gap-2 pl-4 shrink-0 box-border`}
       >
-        <div className="h-10 w-10 bg-primary rounded-sm flex items-center justify-center">
+        <div className="h-10 w-10 aspect-square bg-primary rounded-sm flex items-center justify-center">
           C
         </div>
-        <h1 className="text-3xl font-black tracking-tighter italic uppercase text-foreground">
-          Creati<span className="text-primary blur-[0.5px]">.</span>
+        <h1 className="w-full text-3xl font-black tracking-tighter italic uppercase text-foreground">
+          {/* Center: Client Switcher */}
+          <WorkspaceSwitcher />
         </h1>
       </div>
 

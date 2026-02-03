@@ -5,6 +5,7 @@ import { ChevronsUpDown, Check, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Popper } from "./Popper";
 import { Button } from "./Button";
+import { TextTruncate } from "./Truncate";
 
 export interface DropdownItem<T = any> {
   id: string | number;
@@ -114,9 +115,10 @@ export function Dropdown<T = any>({
             {item.icon}
           </div>
         )}
-        <span className="text-xs font-bold tracking-tight truncate">
-          {item?.label || placeholder}
-        </span>
+        <TextTruncate
+          text={item?.label || placeholder}
+          className="text-xs font-bold tracking-tight"
+        />
       </div>
       <ChevronsUpDown
         size={14}
@@ -132,7 +134,7 @@ export function Dropdown<T = any>({
           {item.icon}
         </div>
       )}
-      <span className="flex-1 truncate">{item.label}</span>
+      <TextTruncate text={item.label} className="flex-1" disableInteractivity />
       {isSelected && <Check size={14} className="text-primary" />}
     </>
   );
@@ -154,9 +156,9 @@ export function Dropdown<T = any>({
   const showSearch = items.length > 5;
 
   const sizeClasses = {
-    sm: "min-w-[160px] max-w-[240px]",
-    md: "min-w-[240px] max-w-[320px]",
-    lg: "min-w-[320px] max-w-[400px]",
+    sm: "w-[160px]",
+    md: "w-[240px]",
+    lg: "w-[320px]",
   };
 
   const heightClasses = {
@@ -188,7 +190,10 @@ export function Dropdown<T = any>({
               initial={{ opacity: 0, scale: 0.95, y: -8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -8 }}
-              style={{ minWidth: triggerRef.current?.offsetWidth || 240 }}
+              style={{
+                width: triggerRef.current?.offsetWidth || 240,
+                maxWidth: "min(320px, 90vw)",
+              }}
               className="bg-background border border-border/50 rounded-xl shadow-2xl overflow-hidden"
             >
               {showSearch && (
