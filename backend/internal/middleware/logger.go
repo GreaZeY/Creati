@@ -75,18 +75,20 @@ func RequestLogger(c *fiber.Ctx) error {
 		logEntry = logEntry.WithField("user_id", userID)
 	}
 
-	// Check for internal error first (set by utils.ErrorResponse)
+	// Check for internal error (highly prioritized)
 	if internalErr := c.Locals("internal_error"); internalErr != nil {
-		if err, ok := internalErr.(error); ok {
-			logEntry.WithError(err).Error("Server error (captured)")
+		err, ok := internalErr.(error)
+		if ok {
+			logEntry.WithError(err).Error("Request failed (internal error)")
 		} else {
-			logEntry.WithField("error", internalErr).Error("Server error (captured)")
+			logEntry.WithField("error", internalErr).Error("Request failed (captured error)")
 		}
 	} else if err != nil {
-		// Fiber returned an error during processing
-		logEntry.WithError(err).Error("Request failed")
+		// Error returned by Fiber handler or middleware
+		logEntry.WithError(err).Error("Request failed (handler error)")
 	} else if status >= 500 {
-		logEntry.Error("Server error")
+		// 500 error but NO internal error was set - this is what the user is complaining about
+		logEntry.Error("Server error (DETAILS MISSING - check handler implementation)")
 	} else if status >= 400 {
 		logEntry.Warn("Client error")
 	} else {

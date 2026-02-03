@@ -33,6 +33,25 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
+		// Custom ErrorHandler to capture and log every error systemically
+		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			// Status code defaults to 500
+			code := fiber.StatusInternalServerError
+
+			// Retrieve custom status code if it's a *fiber.Error
+			if e, ok := err.(*fiber.Error); ok {
+				code = e.Code
+			}
+
+			// Store the actual error in Locals so the Logger middleware can see it
+			c.Locals("internal_error", err)
+
+			// Return standardized JSON error response
+			return c.Status(code).JSON(fiber.Map{
+				"success": false,
+				"error":   err.Error(),
+			})
+		},
 	})
 
 	// Middleware

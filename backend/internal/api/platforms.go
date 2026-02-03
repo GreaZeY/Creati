@@ -258,7 +258,7 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 	}
 
 	if authURL == "" {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate auth URL")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate auth URL", fmt.Errorf("authURL is empty"))
 	}
 
 	return utils.SuccessResponse(c, map[string]string{
@@ -317,7 +317,7 @@ func (h *PlatformHandler) HandleCallback(c *fiber.Ctx) error {
 	// Authenticate using platform service
 	err = platformService.Authenticate(code, userID, clientID)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "authentication failed: "+err.Error())
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "authentication failed", err)
 	}
 
 	// Invalidate Cache
@@ -360,7 +360,7 @@ func (h *PlatformHandler) DeactivatePlatform(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
 	if err := h.disconnectPlatformInternal(userID, platform); err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to disconnect platform")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to disconnect platform", err)
 	}
 
 	// Invalidate Cache
@@ -401,7 +401,7 @@ func (h *PlatformHandler) RemovePlatform(c *fiber.Ctx) error {
 	}
 
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to remove platform")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to remove platform", err)
 	}
 
 	// Invalidate Cache
@@ -436,7 +436,7 @@ func (h *PlatformHandler) GetRecentVideos(c *fiber.Ctx) error {
 
 	videos, err := svc.FetchRecentVideos(accountID)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, err.Error())
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to fetch recent videos", err)
 	}
 
 	return utils.SuccessResponse(c, videos, "Videos fetched successfully")

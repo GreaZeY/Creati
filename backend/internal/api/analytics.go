@@ -40,7 +40,7 @@ func (h *AnalyticsHandler) GetOverview(c *fiber.Ctx) error {
 	// 1. Get Instant Stats from DB (Fast)
 	stats, err := h.service.GetUserStats(userID, clientID)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to fetch analytics")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to fetch analytics", err)
 	}
 
 	// 2. Trigger Async Refresh (Non-blocking)
@@ -53,7 +53,7 @@ func (h *AnalyticsHandler) GetOverview(c *fiber.Ctx) error {
 func (h *AnalyticsHandler) GetQueueStatus(c *fiber.Ctx) error {
 	depth, err := h.queue.GetQueueDepth(c.Context(), services.QueueUpload)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to fetch queue depth")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to fetch queue depth", err)
 	}
 
 	return c.JSON(fiber.Map{

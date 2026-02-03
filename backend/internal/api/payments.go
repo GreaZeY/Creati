@@ -102,7 +102,7 @@ func (h *PaymentHandler) CreateSubscription(c *fiber.Ctx) error {
 
 	body, err := h.client.Subscription.Create(data, nil)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create razorpay subscription")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create razorpay subscription", err)
 	}
 
 	subID, _ := body["id"].(string)
@@ -134,7 +134,7 @@ func (h *PaymentHandler) VerifySubscription(c *fiber.Ctx) error {
 	// Start Transaction
 	tx, err := h.db.Begin()
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
 	}
 	defer tx.Rollback()
 
@@ -173,7 +173,7 @@ func (h *PaymentHandler) VerifySubscription(c *fiber.Ctx) error {
 	}
 
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update subscription")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update subscription", err)
 	}
 
 	// 3. Log Payment (Optional but good for history)
@@ -185,7 +185,7 @@ func (h *PaymentHandler) VerifySubscription(c *fiber.Ctx) error {
 	// or we could lookup plan price. For now, just logging the ID is sufficient proof.
 
 	if err := tx.Commit(); err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "transaction failed")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "transaction failed", err)
 	}
 
 	return utils.SuccessResponse(c, nil, "subscription verified and updated")
@@ -231,7 +231,7 @@ func (h *PaymentHandler) UpdateSubscription(c *fiber.Ctx) error {
 		`, userID)
 
 		if err != nil {
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update subscription status")
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update subscription status", err)
 		}
 
 		return utils.SuccessResponse(c, fiber.Map{
@@ -308,7 +308,7 @@ func (h *PaymentHandler) CancelSubscription(c *fiber.Ctx) error {
 
 	_, err = h.client.Subscription.Cancel(currentSubID, data, nil)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to cancel subscription with razorpay")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to cancel subscription with razorpay", err)
 	}
 
 	// Update local DB - mark as cancelled but keep plan active until period ends
@@ -320,7 +320,7 @@ func (h *PaymentHandler) CancelSubscription(c *fiber.Ctx) error {
 	`, userID)
 
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update subscription status")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update subscription status", err)
 	}
 
 	return utils.SuccessResponse(c, fiber.Map{
@@ -420,7 +420,7 @@ func (h *PaymentHandler) GetSubscription(c *fiber.Ctx) error {
 			Status:       "active",
 		}
 	} else if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
 	}
 
 	if currentPeriodEnd.Valid {

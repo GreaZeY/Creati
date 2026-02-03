@@ -47,7 +47,7 @@ func (h *AgencyHandler) ListClients(c *fiber.Ctx) error {
 
 	rows, err := h.db.Query(query, userID)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to fetch clients")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to fetch clients", err)
 	}
 	defer rows.Close()
 
@@ -98,7 +98,7 @@ func (h *AgencyHandler) CreateClient(c *fiber.Ctx) error {
 		var role string
 		err := h.db.QueryRow("SELECT role FROM team_members WHERE user_id = $1 AND org_id = $2", userID, orgID).Scan(&role)
 		if err != nil {
-			return utils.ErrorResponse(c, fiber.StatusForbidden, "not a member of this organization")
+			return utils.ErrorResponse(c, fiber.StatusForbidden, "not a member of this organization", err)
 		}
 		if role != "owner" && role != "admin" {
 			return utils.ErrorResponse(c, fiber.StatusForbidden, "insufficient permissions")
@@ -118,7 +118,7 @@ func (h *AgencyHandler) CreateClient(c *fiber.Ctx) error {
 			`, "My Agency", userID).Scan(&newOrgID)
 			if err != nil {
 				println("CreateClient: Failed to create org:", err.Error())
-				return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create organization")
+				return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create organization", err)
 			}
 			orgID = newOrgID
 			println("CreateClient: Created new org with ID:", orgID)
@@ -134,7 +134,7 @@ func (h *AgencyHandler) CreateClient(c *fiber.Ctx) error {
 			}
 		} else if err != nil {
 			println("CreateClient: Database error looking for org:", err.Error())
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
 		} else {
 			println("CreateClient: Found existing org with ID:", orgID, "for user:", userID)
 			// Org exists - ensure team_members entry exists
@@ -167,7 +167,7 @@ func (h *AgencyHandler) CreateClient(c *fiber.Ctx) error {
 
 	if err != nil {
 		println("CreateClient: Failed to create client:", err.Error())
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create client")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create client", err)
 	}
 
 	println("CreateClient: Successfully created client", clientID, "in org", orgID, "for user", userID)
@@ -229,7 +229,7 @@ func (h *AgencyHandler) UpdateClient(c *fiber.Ctx) error {
 	_, err = h.db.Exec(query, args...)
 	if err != nil {
 		println("UpdateClient: Failed to update:", err.Error())
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update client")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update client", err)
 	}
 
 	return utils.SuccessResponse(c, nil, "Client updated successfully")
@@ -261,7 +261,7 @@ func (h *AgencyHandler) DeleteClient(c *fiber.Ctx) error {
 	_, err = h.db.Exec("DELETE FROM clients WHERE id = $1", clientID)
 	if err != nil {
 		println("DeleteClient: Failed to delete:", err.Error())
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to delete client")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to delete client", err)
 	}
 
 	return utils.SuccessResponse(c, nil, "Client deleted successfully")
@@ -299,7 +299,7 @@ func (h *AgencyHandler) ReorderClients(c *fiber.Ctx) error {
 		_, err = h.db.Exec("UPDATE clients SET display_order = $1 WHERE id = $2", i, clientID)
 		if err != nil {
 			println("ReorderClients: Failed to update order:", err.Error())
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to reorder")
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to reorder", err)
 		}
 	}
 
@@ -330,7 +330,7 @@ func (h *AgencyHandler) BatchUpdateClients(c *fiber.Ctx) error {
 	// Start Transaction
 	tx, err := h.db.Begin()
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to start transaction")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to start transaction", err)
 	}
 	defer tx.Rollback()
 
@@ -364,7 +364,7 @@ func (h *AgencyHandler) BatchUpdateClients(c *fiber.Ctx) error {
 	}
 
 	if err := tx.Commit(); err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to commit changes")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to commit changes", err)
 	}
 
 	return utils.SuccessResponse(c, nil, "All changes saved successfully")

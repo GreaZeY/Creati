@@ -52,13 +52,13 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to hash password")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to hash password", err)
 	}
 
 	// Start transaction
 	tx, err := h.db.Begin()
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
 	}
 	defer tx.Rollback()
 
@@ -71,9 +71,9 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 
 	if err != nil {
 		if err.Error() == "pq: duplicate key value violates unique constraint \"users_email_key\"" {
-			return utils.ErrorResponse(c, fiber.StatusConflict, "email already exists")
+			return utils.ErrorResponse(c, fiber.StatusConflict, "email already exists", err)
 		}
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create user")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create user", err)
 	}
 
 	// Create free subscription
@@ -84,18 +84,18 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	`, userID, features.PlanFree)
 
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to initialize subscription")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to initialize subscription", err)
 	}
 
 	// Commit transaction
 	if err := tx.Commit(); err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "transaction commit failed")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "transaction commit failed", err)
 	}
 
 	// Generate JWT token
 	token, err := generateToken(userID)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate token")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate token", err)
 	}
 
 	// Set Cookies
@@ -127,7 +127,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "invalid credentials")
 	}
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
 	}
 
 	// Verify password
@@ -139,7 +139,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	// Generate JWT token
 	token, err := generateToken(user.ID)
 	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate token")
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate token", err)
 	}
 
 	// Set Cookies
