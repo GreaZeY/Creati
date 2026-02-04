@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useBlocker } from "react-router-dom";
 import {
-  ArrowLeft,
-  ArrowRight,
   Check,
   Zap,
   Bell,
   Layout,
   MessageSquare,
-  Info,
   Filter,
+  Sparkles,
+  Info,
+  ArrowRight,
+  ArrowLeft,
   X,
 } from "lucide-react";
 import { automationAPI, platformsAPI } from "@/lib/api";
@@ -24,15 +25,25 @@ import { PlatformLogo } from "@/components/platforms/PlatformLogo";
 import { useClient } from "@/context/ClientContext";
 import { TemplateEditor } from "@/components/automation/TemplateEditor";
 import { PLATFORMS } from "@/lib/constants";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface UnifiedBuilderProps {
-  type: "sync" | "announcement";
+  initialType?: "sync" | "notify" | null;
 }
 
-export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
+export function UnifiedBuilder({ initialType }: UnifiedBuilderProps) {
   const navigate = useNavigate();
   const { selectedClient } = useClient();
   const [currentStep, setCurrentStep] = useState(0);
+
+  // Mutations
+  const createSyncMutation = useMutation({
+    mutationFn: (data: any) => automationAPI.create(data, selectedClient?.id),
+    onSuccess: () => {
+      toast.success("Workflow is now active! ✨");
+      navigate("/automations");
+    },
+  });
 
   // Form State - Shared
   const [ruleName, setRuleName] = useState("");
@@ -52,9 +63,13 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
     Record<number, { title: string; body: string }>
   >({});
 
+  const [type, setType] = useState<"sync" | "notify" | null>(
+    initialType || null,
+  );
   const isSync = type === "sync";
 
   const STEPS = [
+    { id: "type", title: "Type", icon: Sparkles },
     { id: "source", title: "Trigger", icon: Zap },
     { id: "targets", title: "Targets", icon: Layout },
     {
@@ -65,21 +80,35 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
     { id: "review", title: "Finalize", icon: Check },
   ];
 
+  // Dirty State for Navigation Lock
+  const isDirty =
+    currentStep > 0 &&
+    currentStep < STEPS.length - 1 &&
+    !createSyncMutation.isSuccess;
+
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      isDirty && currentLocation.pathname !== nextLocation.pathname,
+  );
+
+  const confirmNavigation = () => {
+    if (blocker.state === "blocked") {
+      blocker.proceed();
+    }
+  };
+
+  const cancelNavigation = () => {
+    if (blocker.state === "blocked") {
+      blocker.reset();
+    }
+  };
+
   // Fetch connected accounts
   const { data: accounts = [] } = useQuery({
     queryKey: ["connected-accounts", selectedClient?.id],
     queryFn: async () => {
       const resp = await platformsAPI.list(selectedClient?.id);
       return (resp.data.data || []).filter((a: any) => a.connected);
-    },
-  });
-
-  // Mutations
-  const createSyncMutation = useMutation({
-    mutationFn: (data: any) => automationAPI.create(data, selectedClient?.id),
-    onSuccess: () => {
-      toast.success("Workflow is now active! ✨");
-      navigate("/automations/syncs");
     },
   });
 
@@ -154,7 +183,7 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
           accountId: Number(id),
           captionTemplate: template.body,
           titleTemplate: template.title, // Extra info for notify
-          targetPlatform: targetAccount.platform,
+          targetPlatform: targetAccount?.platform || "",
           targetIdentifier: id.toString(),
         };
       }),
@@ -179,11 +208,22 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
 
   // Filter accounts based on platform capabilities
   const sourceAccounts = accounts.filter((a: any) => {
+    if (!a?.platform) return false;
     const platformConfig = PLATFORMS[a.platform as keyof typeof PLATFORMS];
     return platformConfig && platformConfig.hasEvents;
   });
 
-  const targetAccounts = accounts.filter((a: any) => a.id !== sourceAccountId);
+  const targetAccounts = accounts.filter((a: any) => {
+    const isSourceMatched = a.id === sourceAccountId;
+    if (isSync) {
+      // For sync, source account AND its platform should be excluded
+      // (Wait, user says source should not appear in targets, but in notify it can)
+      // Actually if it's sync, we can't sync to the same account.
+      return !isSourceMatched;
+    }
+    // For notify, source can be a target (e.g. notify discord about youtube upload)
+    return true;
+  });
 
   return (
     <div className="max-w-4xl mx-auto py-8 space-y-8">
@@ -242,8 +282,74 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
       </div>
 
       <Card className="p-8 mt-4 min-h-[440px] flex flex-col bg-card/40 backdrop-blur-md border-primary/20 relative overflow-hidden">
-        {/* Step 0: Source */}
+        {/* Step 0: Type Selection */}
         {currentStep === 0 && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 flex-1 flex flex-col justify-center">
+            <div className="text-center space-y-2">
+              <h2 className="text-2xl font-black uppercase italic tracking-tighter">
+                Choose Your Path ⚡
+              </h2>
+              <p className="text-muted-foreground text-sm">
+                How do you want to automate your reach?
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto w-full">
+              <button
+                onClick={() => {
+                  setType("sync");
+                  setCurrentStep(1);
+                }}
+                className={cn(
+                  "flex flex-col items-center gap-4 p-8 rounded-[2rem] border-2 transition-all group relative overflow-hidden",
+                  type === "sync"
+                    ? "border-primary bg-primary/5 ring-4 ring-primary/10"
+                    : "border-border/50 hover:border-primary/50 hover:bg-muted/10",
+                )}
+              >
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                  <Zap size={32} fill="currentColor" />
+                </div>
+                <div className="text-center">
+                  <div className="font-black uppercase tracking-tighter text-lg">
+                    Magic Sync
+                  </div>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">
+                    Cross-platform Uploads
+                  </p>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setType("notify");
+                  setCurrentStep(1);
+                }}
+                className={cn(
+                  "flex flex-col items-center gap-4 p-8 rounded-[2rem] border-2 transition-all group relative overflow-hidden",
+                  type === "notify"
+                    ? "border-primary bg-primary/5 ring-4 ring-primary/10"
+                    : "border-border/50 hover:border-primary/50 hover:bg-muted/10",
+                )}
+              >
+                <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                  <Bell size={32} fill="currentColor" />
+                </div>
+                <div className="text-center">
+                  <div className="font-black uppercase tracking-tighter text-lg">
+                    Announcer
+                  </div>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1">
+                    Social Notifications
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 1: Source */}
+        {currentStep === 1 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="space-y-2">
               <Label className="text-xl font-bold italic tracking-tight uppercase">
@@ -271,14 +377,14 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
                     )}
                   >
                     <div className="w-12 h-12 rounded-xl bg-secondary/50 flex items-center justify-center p-2">
-                      <PlatformLogo platform={account.platform} size={24} />
+                      <PlatformLogo platform={account?.platform} size={24} />
                     </div>
                     <div className="text-left overflow-hidden">
                       <div className="font-bold truncate">
-                        {account.profileName || account.handle}
+                        {account?.profileName || account?.handle}
                       </div>
                       <div className="text-[10px] text-muted-foreground uppercase tracking-widest">
-                        {account.platform}
+                        {account?.platform}
                       </div>
                     </div>
                     {sourceAccountId === accId && (
@@ -293,8 +399,8 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
           </div>
         )}
 
-        {/* Step 1: Targets */}
-        {currentStep === 1 && (
+        {/* Step 2: Targets */}
+        {currentStep === 2 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="space-y-2">
               <Label className="text-xl font-bold italic tracking-tight uppercase">
@@ -327,13 +433,13 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
                         : "border-border/50 hover:border-primary/30",
                     )}
                   >
-                    <PlatformLogo platform={account.platform} size={18} />
+                    <PlatformLogo platform={account?.platform} size={18} />
                     <div className="overflow-hidden">
                       <div className="text-xs font-bold truncate">
-                        {account.profileName || account.handle}
+                        {account?.profileName || account?.handle}
                       </div>
                       <div className="text-[8px] text-muted-foreground uppercase tracking-widest">
-                        {account.platform}
+                        {account?.platform}
                       </div>
                     </div>
                     {isSelected && (
@@ -348,8 +454,8 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
           </div>
         )}
 
-        {/* Step 2: Configuration (Sync: Filters & Captions | Announce: Templates) */}
-        {currentStep === 2 && (
+        {/* Step 3: Configuration (Sync: Filters & Captions | Announce: Templates) */}
+        {currentStep === 3 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {isSync ? (
               <>
@@ -441,22 +547,23 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
                     >
                       <div className="flex items-center gap-3 mb-4">
                         <PlatformLogo
-                          platform={account.platform}
+                          platform={account?.platform}
                           size={16}
                           className="text-primary"
                         />
                         <h4 className="text-xs font-black uppercase tracking-[0.2em]">
-                          {account.profileName || account.handle} Template
+                          {account?.profileName || account?.handle || "Account"}{" "}
+                          Template
                         </h4>
                       </div>
                       <TemplateEditor
-                        platform={account.platform}
+                        platform={account?.platform}
                         onSave={(template) => {
                           setAnnouncementTemplates({
                             ...announcementTemplates,
                             [id]: template,
                           });
-                          toast.success(`Saved for ${account.platform}`);
+                          toast.success(`Saved for ${account?.platform}`);
                         }}
                       />
                     </div>
@@ -467,8 +574,8 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
           </div>
         )}
 
-        {/* Step 3: Review */}
-        {currentStep === 3 && (
+        {/* Step 4: Review */}
+        {currentStep === 4 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="space-y-2">
               <Label className="text-xl font-bold italic tracking-tight uppercase">
@@ -534,20 +641,27 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
         <div className="mt-auto flex items-center justify-between pt-8 border-t border-border/20">
           <Button
             variant="ghost"
-            onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
+            onClick={() => {
+              if (currentStep === 1) {
+                setType(null);
+                setCurrentStep(0);
+              } else {
+                setCurrentStep(Math.max(0, currentStep - 1));
+              }
+            }}
             disabled={currentStep === 0}
             className="text-xs font-bold uppercase tracking-widest"
           >
             Go Back
           </Button>
 
-          {currentStep === 0 && (
+          {currentStep === 1 && (
             <Button
-              onClick={() => setCurrentStep(1)}
+              onClick={() => setCurrentStep(2)}
               disabled={!sourceAccountId}
               className="group"
             >
-              Next Step
+              Next: Select Targets
               <ArrowRight
                 size={18}
                 className="ml-2 transition-transform group-hover:translate-x-1"
@@ -555,33 +669,28 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
             </Button>
           )}
 
-          {currentStep === 1 && (
+          {currentStep === 2 && (
             <Button
-              onClick={() => setCurrentStep(2)}
+              onClick={() => setCurrentStep(3)}
               disabled={
-                (isSync
+                isSync
                   ? selectedTargetsSync.length === 0
-                  : selectedTargetAccountsAnnounce.length === 0) ||
-                createSyncMutation.isPending
+                  : selectedTargetAccountsAnnounce.length === 0
               }
             >
-              {createSyncMutation.isPending
-                ? "Configuring..."
-                : isSync
-                  ? "Add Filters"
-                  : "Configure Templates"}
-              <ArrowRight size={18} className="ml-2" />
-            </Button>
-          )}
-
-          {currentStep === 2 && (
-            <Button onClick={() => setCurrentStep(3)}>
-              Final Review
+              Next: Configure
               <ArrowRight size={18} className="ml-2" />
             </Button>
           )}
 
           {currentStep === 3 && (
+            <Button onClick={() => setCurrentStep(4)}>
+              Final Review
+              <ArrowRight size={18} className="ml-2" />
+            </Button>
+          )}
+
+          {currentStep === 4 && (
             <Button
               onClick={isSync ? handleSaveSync : handleSaveAnnouncement}
               disabled={createSyncMutation.isPending}
@@ -599,6 +708,18 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
           )}
         </div>
       </Card>
+
+      {/* Navigation Blocker Dialog */}
+      <ConfirmDialog
+        isOpen={blocker.state === "blocked"}
+        onClose={cancelNavigation}
+        onConfirm={confirmNavigation}
+        title="Unsaved Changes"
+        description="You're in the middle of creating an automation. If you leave now, your progress will be lost. Are you sure?"
+        confirmText="Leave Page"
+        cancelText="Stay Here"
+        variant="danger"
+      />
     </div>
   );
 }

@@ -21,8 +21,6 @@ import {
 import { WorkspaceManager } from "./components/settings/WorkspaceManager";
 import { Upload } from "./pages/Upload";
 import { Automations } from "./pages/automations/Automations";
-import { SyncsList } from "./pages/automations/SyncsList";
-import { AnnouncementsList } from "./pages/automations/AnnouncementsList";
 import { UnifiedBuilder } from "./pages/automations/UnifiedBuilder";
 import { ArchiveBlast } from "./pages/ArchiveBlast";
 import { BlastBuilder } from "./pages/BlastBuilder";
@@ -173,36 +171,30 @@ const router = createBrowserRouter([
                 <Automations />
               </PageTransition>
             ),
-            children: [
-              {
-                index: true,
-                element: <Navigate to="syncs" replace />,
-              },
-              {
-                path: "syncs",
-                element: <SyncsList />,
-              },
-              {
-                path: "announcements",
-                element: <AnnouncementsList />,
-              },
-            ],
+          },
+          {
+            path: "automations/new",
+            element: (
+              <PageTransition>
+                <UnifiedBuilder />
+              </PageTransition>
+            ),
+          },
+          {
+            path: "automations/syncs",
+            element: <Navigate to="/automations" replace />,
+          },
+          {
+            path: "automations/announcements",
+            element: <Navigate to="/automations" replace />,
           },
           {
             path: "automations/syncs/new",
-            element: (
-              <PageTransition>
-                <UnifiedBuilder type="sync" />
-              </PageTransition>
-            ),
+            element: <Navigate to="/automations/new" replace />,
           },
           {
             path: "automations/announcements/new",
-            element: (
-              <PageTransition>
-                <UnifiedBuilder type="announcement" />
-              </PageTransition>
-            ),
+            element: <Navigate to="/automations/new" replace />,
           },
           {
             path: "blast",
