@@ -70,6 +70,19 @@ func RequestLogger(c *fiber.Ctx) error {
 		"user_agent": c.Get("User-Agent"),
 	})
 
+	// Capture body for debugging non-GET requests that fail
+	if c.Method() != "GET" && status >= 400 {
+		body := c.Body()
+		if len(body) > 0 {
+			// Limit body log size
+			if len(body) > 1024 {
+				logEntry = logEntry.WithField("body", string(body[:1024])+"...")
+			} else {
+				logEntry = logEntry.WithField("body", string(body))
+			}
+		}
+	}
+
 	// Add User ID if present (from AuthMiddleware)
 	if userID := c.Locals("userID"); userID != nil {
 		logEntry = logEntry.WithField("user_id", userID)

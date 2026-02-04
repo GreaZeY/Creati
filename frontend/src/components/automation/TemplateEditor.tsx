@@ -1,60 +1,30 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/Card";
 import { Label } from "@/components/ui/Label";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
-import { audienceAPI } from "@/lib/api";
 
 interface TemplateEditorProps {
   platform: string;
-  ruleId?: string;
+  initialTitle?: string;
+  initialBody?: string;
   onSave: (template: { title: string; body: string }) => void;
 }
 
 export const TemplateEditor: React.FC<TemplateEditorProps> = ({
   platform,
-  ruleId,
+  initialTitle = "",
+  initialBody = "🔥 New video dropped!\n\n{{title}}\n\nWatch here 👇\n{{url}}",
   onSave,
 }) => {
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState(
-    "🔥 New video dropped!\n\n{{title}}\n\nWatch here 👇\n{{url}}",
-  );
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (ruleId && platform) {
-      const fetchTemplate = async () => {
-        try {
-          setLoading(true);
-          const response = await audienceAPI.getTemplate(ruleId, platform);
-          if (response.data.data) {
-            setTitle(response.data.data.title_template || "");
-            setBody(response.data.data.body_template || "");
-          }
-        } catch (error) {
-          console.error("Failed to fetch template:", error);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchTemplate();
-    }
-  }, [ruleId, platform]);
+  const [title, setTitle] = useState(initialTitle);
+  const [body, setBody] = useState(initialBody);
 
   const insertVariable = (v: string) => {
     setBody((prev) => prev + ` {{${v}}} `);
   };
 
   const variables = ["title", "url", "platform", "published_at", "emoji"];
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full">

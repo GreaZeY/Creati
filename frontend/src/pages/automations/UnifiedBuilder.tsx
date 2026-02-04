@@ -13,7 +13,7 @@ import {
   Filter,
   X,
 } from "lucide-react";
-import { audienceAPI, automationAPI, platformsAPI } from "@/lib/api";
+import { automationAPI, platformsAPI } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
@@ -37,7 +37,6 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
   // Form State - Shared
   const [ruleName, setRuleName] = useState("");
   const [sourceAccountId, setSourceAccountId] = useState<number | null>(null);
-  const [createdRuleId, setCreatedRuleId] = useState<string | null>(null);
 
   // Form State - Sync Specific
   const [selectedTargetsSync, setSelectedTargetsSync] = useState<
@@ -49,6 +48,9 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
   // Form State - Announcement Specific
   const [selectedTargetAccountsAnnounce, setSelectedTargetAccountsAnnounce] =
     useState<number[]>([]);
+  const [announcementTemplates, setAnnouncementTemplates] = useState<
+    Record<number, { title: string; body: string }>
+  >({});
 
   const isSync = type === "sync";
 
@@ -81,14 +83,6 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
     },
   });
 
-  const createAnnounceMutation = useMutation({
-    mutationFn: (data: any) => audienceAPI.createRule(data, selectedClient?.id),
-    onSuccess: (resp: any) => {
-      setCreatedRuleId(resp.data.id);
-      setCurrentStep(2); // Move to template step
-    },
-  });
-
   // Handlers - Sync
   const handleAddKeyword = () => {
     if (currentKeyword && !keywords.includes(currentKeyword)) {
@@ -110,7 +104,7 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
     } else {
       setSelectedTargetsSync([
         ...selectedTargetsSync,
-        { accountId, captionTemplate: "{title}" },
+        { accountId: Number(accountId), captionTemplate: "{title}" },
       ]);
     }
   };
@@ -125,37 +119,43 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
 
   // Handlers - Announcement
   const toggleTargetAnnounce = (accountId: number) => {
-    if (selectedTargetAccountsAnnounce.includes(accountId)) {
+    const id = Number(accountId);
+    if (selectedTargetAccountsAnnounce.includes(id)) {
       setSelectedTargetAccountsAnnounce(
-        selectedTargetAccountsAnnounce.filter((id) => id !== accountId),
+        selectedTargetAccountsAnnounce.filter((aId) => aId !== id),
       );
     } else {
       setSelectedTargetAccountsAnnounce([
         ...selectedTargetAccountsAnnounce,
-        accountId,
+        id,
       ]);
     }
   };
 
-  const handleCreateBaseAnnounce = () => {
-    const sourceAccount = accounts.find(
-      (a: any) => a.id === sourceAccountId || a.accountId === sourceAccountId,
-    );
+  const handleSaveAnnouncement = () => {
+    const sourceAccount = accounts.find((a: any) => a.id === sourceAccountId);
     if (!sourceAccount) return;
 
-    createAnnounceMutation.mutate({
+    createSyncMutation.mutate({
+      action: "notify",
       name:
         ruleName ||
         `Announcement from ${sourceAccount.profileName || sourceAccount.handle}`,
-      sourcePlatform: sourceAccount.platform,
-      eventType: "content_uploaded",
+      sourceAccountId: Number(sourceAccountId),
+      triggerType: "new_upload",
+      filters: {},
       targets: selectedTargetAccountsAnnounce.map((id) => {
-        const targetAccount = accounts.find(
-          (a: any) => a.id === id || a.accountId === id,
-        );
+        const targetAccount = accounts.find((a: any) => a.id === id);
+        const template = announcementTemplates[id] || {
+          title: "",
+          body: "🔥 New video dropped!\n\n{{title}}\n\nWatch here 👇\n{{url}}",
+        };
         return {
-          target_platform: targetAccount.platform,
-          target_identifier: id.toString(),
+          accountId: Number(id),
+          captionTemplate: template.body,
+          titleTemplate: template.title, // Extra info for notify
+          targetPlatform: targetAccount.platform,
+          targetIdentifier: id.toString(),
         };
       }),
     });
@@ -163,17 +163,19 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
 
   const handleSaveSync = () => {
     createSyncMutation.mutate({
+      action: "sync",
       name: ruleName,
-      sourceAccountId,
+      sourceAccountId: Number(sourceAccountId),
       triggerType: "new_upload",
       filters: { keywords },
-      targets: selectedTargetsSync,
+      targets: selectedTargetsSync.map((t) => ({
+        ...t,
+        accountId: Number(t.accountId),
+      })),
     });
   };
 
-  const sourceAccount = accounts.find(
-    (a: any) => a.id === sourceAccountId || a.accountId === sourceAccountId,
-  );
+  const sourceAccount = accounts.find((a: any) => a.id === sourceAccountId);
 
   // Filter accounts based on platform capabilities
   const sourceAccounts = accounts.filter((a: any) => {
@@ -181,9 +183,7 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
     return platformConfig && platformConfig.hasEvents;
   });
 
-  const targetAccounts = accounts.filter(
-    (a: any) => (a.id || a.accountId) !== sourceAccountId,
-  );
+  const targetAccounts = accounts.filter((a: any) => a.id !== sourceAccountId);
 
   return (
     <div className="max-w-4xl mx-auto py-8 space-y-8">
@@ -258,7 +258,7 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
               {sourceAccounts.map((account: any) => {
-                const accId = account.id || account.accountId;
+                const accId = Number(account.id);
                 return (
                   <button
                     key={accId}
@@ -307,7 +307,7 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
               {targetAccounts.map((account: any) => {
-                const accId = account.id || account.accountId;
+                const accId = Number(account.id);
                 const isSelected = isSync
                   ? !!selectedTargetsSync.find((t) => t.accountId === accId)
                   : selectedTargetAccountsAnnounce.includes(accId);
@@ -400,7 +400,7 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
                   <div className="space-y-4 max-h-[240px] overflow-y-auto pr-2 custom-scrollbar">
                     {selectedTargetsSync.map((t) => {
                       const account = accounts.find(
-                        (a) => (a.id || a.accountId) === t.accountId,
+                        (a) => a.id === t.accountId,
                       );
                       return (
                         <div
@@ -431,49 +431,38 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
                 </div>
               </>
             ) : (
-              createdRuleId && (
-                <>
-                  <div className="space-y-2">
-                    <Label className="text-xl font-bold italic tracking-tight uppercase">
-                      Craft the Message ✍️
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Set up how your announcement will look on each platform.
-                    </p>
-                  </div>
-                  <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                    {selectedTargetAccountsAnnounce.map((id) => {
-                      const account = accounts.find(
-                        (a: any) => (a.id || a.accountId) === id,
-                      );
-                      return (
-                        <div
-                          key={id}
-                          className="border border-border/50 rounded-2xl overflow-hidden bg-background/30 px-6 py-4"
-                        >
-                          <div className="flex items-center gap-3 mb-4">
-                            <PlatformLogo
-                              platform={account.platform}
-                              size={16}
-                              className="text-primary"
-                            />
-                            <h4 className="text-xs font-black uppercase tracking-[0.2em]">
-                              {account.profileName || account.handle} Template
-                            </h4>
-                          </div>
-                          <TemplateEditor
-                            ruleId={createdRuleId}
-                            platform={account.platform}
-                            onSave={() =>
-                              toast.success(`Saved for ${account.platform}`)
-                            }
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )
+              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                {selectedTargetAccountsAnnounce.map((id) => {
+                  const account = accounts.find((a: any) => a.id === id);
+                  return (
+                    <div
+                      key={id}
+                      className="border border-border/50 rounded-2xl overflow-hidden bg-background/30 px-6 py-4"
+                    >
+                      <div className="flex items-center gap-3 mb-4">
+                        <PlatformLogo
+                          platform={account.platform}
+                          size={16}
+                          className="text-primary"
+                        />
+                        <h4 className="text-xs font-black uppercase tracking-[0.2em]">
+                          {account.profileName || account.handle} Template
+                        </h4>
+                      </div>
+                      <TemplateEditor
+                        platform={account.platform}
+                        onSave={(template) => {
+                          setAnnouncementTemplates({
+                            ...announcementTemplates,
+                            [id]: template,
+                          });
+                          toast.success(`Saved for ${account.platform}`);
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}
@@ -546,10 +535,7 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
           <Button
             variant="ghost"
             onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
-            disabled={
-              currentStep === 0 ||
-              (!isSync && currentStep === 2 && createdRuleId !== null)
-            }
+            disabled={currentStep === 0}
             className="text-xs font-bold uppercase tracking-widest"
           >
             Go Back
@@ -571,17 +557,15 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
 
           {currentStep === 1 && (
             <Button
-              onClick={() =>
-                isSync ? setCurrentStep(2) : handleCreateBaseAnnounce()
-              }
+              onClick={() => setCurrentStep(2)}
               disabled={
                 (isSync
                   ? selectedTargetsSync.length === 0
                   : selectedTargetAccountsAnnounce.length === 0) ||
-                createAnnounceMutation.isPending
+                createSyncMutation.isPending
               }
             >
-              {createAnnounceMutation.isPending
+              {createSyncMutation.isPending
                 ? "Configuring..."
                 : isSync
                   ? "Add Filters"
@@ -599,14 +583,7 @@ export function UnifiedBuilder({ type }: UnifiedBuilderProps) {
 
           {currentStep === 3 && (
             <Button
-              onClick={
-                isSync
-                  ? handleSaveSync
-                  : () => {
-                      toast.success("Announcer is live! 🚀");
-                      navigate("/automations/announcements");
-                    }
-              }
+              onClick={isSync ? handleSaveSync : handleSaveAnnouncement}
               disabled={createSyncMutation.isPending}
               className="bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 px-8"
             >

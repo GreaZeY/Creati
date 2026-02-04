@@ -3,25 +3,33 @@ import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Plus, Trash2, Edit2, Play, AlertCircle } from "lucide-react";
 import { toast } from "@/lib/events";
-import { audienceAPI } from "@/lib/api";
+import { automationAPI } from "@/lib/api";
 import { useClient } from "@/context/ClientContext";
 import { TemplateEditor } from "./TemplateEditor";
 import { NewRuleModal } from "./NewRuleModal";
 import { Modal } from "@/components/ui/Modal";
 
 interface NotificationRule {
-  id: string;
+  id: number;
   name: string;
-  source_platform: string;
-  event_type: string;
-  enabled: boolean;
+  action: string;
+  sourceAccount: {
+    platform: string;
+    profileName: string;
+    handle: string;
+  };
+  isActive: boolean;
   targets: NotificationTarget[];
 }
 
 interface NotificationTarget {
-  id: string;
-  target_platform: string;
-  target_identifier: string;
+  accountId: number;
+  platform: string;
+  profileName: string;
+  handle: string;
+  titleTemplate?: string;
+  bodyTemplate?: string;
+  captionTemplate?: string;
 }
 
 export const AudienceRules: React.FC = () => {
@@ -29,8 +37,8 @@ export const AudienceRules: React.FC = () => {
   const [rules, setRules] = useState<NotificationRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingTemplate, setEditingTemplate] = useState<{
-    ruleId: string;
-    platform: string;
+    rule: NotificationRule;
+    target: NotificationTarget;
   } | null>(null);
   const [showNewRule, setShowNewRule] = useState(false);
 
@@ -41,27 +49,29 @@ export const AudienceRules: React.FC = () => {
   const fetchRules = async () => {
     try {
       setLoading(true);
-      const response = await audienceAPI.listRules(selectedClient?.id);
-      setRules(response.data.data || []);
+      const response = await automationAPI.list(selectedClient?.id);
+      const allRules = response.data.data || [];
+      // Filter for notify rules
+      setRules(allRules.filter((r: any) => r.action === "notify"));
     } catch (error) {
-      console.error("Failed to fetch audience notification rules:", error);
+      console.error("Failed to fetch notification rules:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: number) => {
     try {
-      await audienceAPI.deleteRule(id);
+      await automationAPI.delete(id);
       toast.success("Rule deleted");
       fetchRules();
     } catch (error) {}
   };
 
-  const handleToggle = async (id: string, enabled: boolean) => {
+  const handleToggle = async (id: number, isActive: boolean) => {
     try {
-      await audienceAPI.toggleRule(id, !enabled);
-      toast.success(enabled ? "Rule disabled" : "Rule enabled");
+      await automationAPI.toggle(id, !isActive);
+      toast.success(isActive ? "Rule disabled" : "Rule enabled");
       fetchRules();
     } catch (error) {}
   };
@@ -72,14 +82,22 @@ export const AudienceRules: React.FC = () => {
   }) => {
     if (!editingTemplate) return;
     try {
-      await audienceAPI.saveTemplate({
-        rule_id: editingTemplate.ruleId,
-        platform: editingTemplate.platform,
-        title_template: template.title,
-        body_template: template.body,
+      const updatedRule = { ...editingTemplate.rule };
+      updatedRule.targets = updatedRule.targets.map((t) => {
+        if (t.accountId === editingTemplate.target.accountId) {
+          return {
+            ...t,
+            titleTemplate: template.title,
+            bodyTemplate: template.body,
+          };
+        }
+        return t;
       });
+
+      await automationAPI.update(updatedRule.id, updatedRule);
       toast.success("Template saved ✨");
       setEditingTemplate(null);
+      fetchRules();
     } catch (error) {}
   };
 
@@ -126,9 +144,9 @@ export const AudienceRules: React.FC = () => {
               <CardContent className="p-6 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div
-                    className={`p-3 rounded-xl ${rule.enabled ? "bg-primary/10 text-primary border border-primary/20" : "bg-muted text-muted-foreground border border-border"}`}
+                    className={`p-3 rounded-xl ${rule.isActive ? "bg-primary/10 text-primary border border-primary/20" : "bg-muted text-muted-foreground border border-border"}`}
                   >
-                    {rule.enabled ? (
+                    {rule.isActive ? (
                       <Play className="w-5 h-5" />
                     ) : (
                       <AlertCircle className="w-5 h-5" />
@@ -138,25 +156,25 @@ export const AudienceRules: React.FC = () => {
                     <h3 className="font-medium text-lg">{rule.name}</h3>
                     <div className="flex gap-2 mt-1">
                       <span className="text-xs uppercase px-2 py-0.5 rounded-full border border-border bg-background/50">
-                        {rule.source_platform}
+                        {rule.sourceAccount?.platform || "youtube"}
                       </span>
                       <span className="text-muted-foreground text-xs flex items-center">
                         →
                       </span>
                       {rule.targets.map((t) => (
                         <Button
-                          key={t.id}
+                          key={t.accountId}
                           variant="secondary"
                           size="sm"
                           className="h-6 text-[10px] px-2 rounded-full font-bold uppercase tracking-wider"
                           onClick={() =>
                             setEditingTemplate({
-                              ruleId: rule.id,
-                              platform: t.target_platform,
+                              rule: rule,
+                              target: t,
                             })
                           }
                         >
-                          {t.target_platform}
+                          {t.platform}
                           <Edit2 className="w-2 h-2 ml-1 opacity-50" />
                         </Button>
                       ))}
@@ -166,12 +184,12 @@ export const AudienceRules: React.FC = () => {
 
                 <div className="flex items-center gap-3">
                   <Button
-                    variant={rule.enabled ? "outline" : "default"}
+                    variant={rule.isActive ? "outline" : "default"}
                     size="sm"
                     className="h-9 px-4"
-                    onClick={() => handleToggle(rule.id, rule.enabled)}
+                    onClick={() => handleToggle(rule.id, rule.isActive)}
                   >
-                    {rule.enabled ? "Disable" : "Enable"}
+                    {rule.isActive ? "Disable" : "Enable"}
                   </Button>
                   <Button
                     variant="ghost"
@@ -192,13 +210,17 @@ export const AudienceRules: React.FC = () => {
       <Modal
         isOpen={!!editingTemplate}
         onClose={() => setEditingTemplate(null)}
-        title={`Edit Notification Template (${editingTemplate?.platform})`}
+        title={`Edit Notification Template (${editingTemplate?.target.platform})`}
       >
         {editingTemplate && (
           <div className="py-2">
             <TemplateEditor
-              ruleId={editingTemplate.ruleId}
-              platform={editingTemplate.platform}
+              platform={editingTemplate.target.platform}
+              initialTitle={editingTemplate.target.titleTemplate}
+              initialBody={
+                editingTemplate.target.bodyTemplate ||
+                editingTemplate.target.captionTemplate
+              }
               onSave={handleSaveTemplate}
             />
           </div>

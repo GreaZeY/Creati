@@ -3,7 +3,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
-import { platformsAPI, audienceAPI } from "@/lib/api";
+import { platformsAPI, automationAPI } from "@/lib/api";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
 import { toast } from "@/lib/events";
 import { useClient } from "@/context/ClientContext";
@@ -24,6 +24,7 @@ export const NewRuleModal: React.FC<NewRuleModalProps> = ({
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [sourcePlatform, setSourcePlatform] = useState("");
+  const [sourceAccountId, setSourceAccountId] = useState<number | null>(null);
   const [targetPlatforms, setTargetPlatforms] = useState<string[]>([]);
   const [platforms, setPlatforms] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -63,15 +64,21 @@ export const NewRuleModal: React.FC<NewRuleModalProps> = ({
 
     setLoading(true);
     try {
-      await audienceAPI.createRule(
+      await automationAPI.create(
         {
+          action: "notify",
           name,
-          source_platform: sourcePlatform,
-          event_type: "new_upload",
-          targets: targetPlatforms.map((p) => ({
-            target_platform: p,
-            target_identifier: "channel", // Default for now
-          })),
+          sourceAccountId,
+          triggerType: "new_upload",
+          targets: targetPlatforms.map((p) => {
+            const targetAcc = platforms.find((acc) => acc.platform === p);
+            return {
+              accountId: targetAcc?.id,
+              targetPlatform: p,
+              titleTemplate: "New video: {{title}}",
+              bodyTemplate: "Check out my new video! {{url}}",
+            };
+          }),
         },
         selectedClient?.id,
       );
@@ -108,10 +115,13 @@ export const NewRuleModal: React.FC<NewRuleModalProps> = ({
                   )
                   .map((p) => (
                     <button
-                      key={p.platform}
-                      onClick={() => setSourcePlatform(p.platform)}
+                      key={p.platform + p.id}
+                      onClick={() => {
+                        setSourcePlatform(p.platform);
+                        setSourceAccountId(Number(p.id));
+                      }}
                       className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
-                        sourcePlatform === p.platform
+                        sourceAccountId === Number(p.id)
                           ? "border-primary bg-primary/10"
                           : "border-border hover:border-border/80 bg-background"
                       }`}
@@ -120,7 +130,7 @@ export const NewRuleModal: React.FC<NewRuleModalProps> = ({
                       <span className="font-medium capitalize">
                         {p.platform}
                       </span>
-                      {sourcePlatform === p.platform && (
+                      {sourceAccountId === Number(p.id) && (
                         <Check className="ml-auto w-4 h-4 text-primary" />
                       )}
                     </button>

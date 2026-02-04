@@ -33,15 +33,20 @@ type BlastSummary struct {
 
 type RuleTarget struct {
 	AccountID       int    `json:"accountId"`
-	CaptionTemplate string `json:"captionTemplate"`
+	TargetPlatform  string `json:"targetPlatform"`
+	CaptionTemplate string `json:"captionTemplate"` // For sync (media caption)
+	TitleTemplate   string `json:"titleTemplate"`   // For notify (announcement title)
+	BodyTemplate    string `json:"bodyTemplate"`    // For notify (announcement body)
 }
 
 type AutomationRuleRequest struct {
+	Action          string       `json:"action"` // "sync" or "notify"
 	Name            string       `json:"name"`
 	SourceAccountID int          `json:"sourceAccountId"`
 	TriggerType     string       `json:"triggerType"`
 	Filters         fiber.Map    `json:"filters"`
 	Targets         []RuleTarget `json:"targets"`
+	Metadata        fiber.Map    `json:"metadata"`
 }
 
 func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
@@ -57,6 +62,7 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 	query := `
 		SELECT 
 			ar.id, ar.name, ar.source_account_id, ar.trigger_type, ar.filters, ar.targets, ar.is_active, ar.last_run_at, ar.created_at,
+			ar.action, ar.metadata,
 			pa.profile_name, pa.handle, pa.platform
 		FROM automation_rules ar
 		LEFT JOIN platform_accounts pa ON ar.source_account_id = pa.id
@@ -94,11 +100,13 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 
 	type RuleResponse struct {
 		ID            int              `json:"id"`
+		Action        string           `json:"action"`
 		Name          string           `json:"name"`
 		SourceAccount AccountInfo      `json:"sourceAccount"`
 		TriggerType   string           `json:"triggerType"`
 		Filters       json.RawMessage  `json:"filters"`
 		Targets       []TargetWithInfo `json:"targets"`
+		Metadata      json.RawMessage  `json:"metadata"`
 		IsActive      bool             `json:"isActive"`
 		LastRunAt     *string          `json:"lastRunAt"`
 		CreatedAt     string           `json:"createdAt"`
@@ -108,6 +116,8 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 	rules := make([]RuleResponse, 0)
 	for rows.Next() {
 		var r RuleResponse
+		var action string
+		var metadata []byte
 		var filters, targets []byte
 		var lastRunAt sql.NullString
 		var sourceProfileName, sourceHandle, sourcePlatform sql.NullString
@@ -115,10 +125,13 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 
 		if err := rows.Scan(
 			&r.ID, &r.Name, &sourceAccountID, &r.TriggerType, &filters, &targets, &r.IsActive, &lastRunAt, &r.CreatedAt,
+			&action, &metadata,
 			&sourceProfileName, &sourceHandle, &sourcePlatform,
 		); err != nil {
 			continue
 		}
+		r.Action = action
+		r.Metadata = json.RawMessage(metadata)
 
 		r.SourceAccount = AccountInfo{
 			AccountID:   sourceAccountID,
@@ -198,11 +211,15 @@ func (h *AutomationHandler) CreateRule(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	var req AutomationRuleRequest
 	if err := c.BodyParser(&req); err != nil {
-		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request")
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request", err)
 	}
 
 	filters, _ := json.Marshal(req.Filters)
 	targets, _ := json.Marshal(req.Targets)
+	metadata, _ := json.Marshal(req.Metadata)
+	if metadata == nil {
+		metadata = []byte("{}")
+	}
 
 	clientIDStr := c.Query("clientId")
 	var clientID *int
@@ -212,18 +229,48 @@ func (h *AutomationHandler) CreateRule(c *fiber.Ctx) error {
 		}
 	}
 
+	if req.Action == "" {
+		req.Action = "sync"
+	}
+
 	var id int
 	err := h.db.QueryRow(`
-		INSERT INTO automation_rules (user_id, client_id, name, source_account_id, trigger_type, filters, targets)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO automation_rules (user_id, client_id, name, source_account_id, trigger_type, filters, targets, action, metadata)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id
-	`, userID, clientID, req.Name, req.SourceAccountID, req.TriggerType, filters, targets).Scan(&id)
+	`, userID, clientID, req.Name, req.SourceAccountID, req.TriggerType, filters, targets, req.Action, metadata).Scan(&id)
 
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create rule", err)
 	}
 
 	return utils.SuccessResponse(c, fiber.Map{"id": id}, "automation rule created")
+}
+
+func (h *AutomationHandler) UpdateRule(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	id := c.Params("id")
+
+	var req AutomationRuleRequest
+	if err := c.BodyParser(&req); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request", err)
+	}
+
+	filters, _ := json.Marshal(req.Filters)
+	targets, _ := json.Marshal(req.Targets)
+	metadata, _ := json.Marshal(req.Metadata)
+
+	_, err := h.db.Exec(`
+		UPDATE automation_rules 
+		SET name = $1, filters = $2, targets = $3, metadata = $4, updated_at = NOW()
+		WHERE id = $5 AND user_id = $6
+	`, req.Name, filters, targets, metadata, id, userID)
+
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update rule", err)
+	}
+
+	return utils.SuccessResponse(c, nil, "rule updated")
 }
 
 func (h *AutomationHandler) ToggleRule(c *fiber.Ctx) error {

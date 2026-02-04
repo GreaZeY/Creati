@@ -73,7 +73,7 @@ func (s *AutomationService) ProcessYouTubeEvent(payload []byte) error {
 	}
 
 	rows, err := s.db.Query(`
-		SELECT id, filters, targets 
+		SELECT id, action, filters, targets 
 		FROM automation_rules 
 		WHERE source_account_id = $1 AND is_active = true
 	`, sourceAccountID)
@@ -84,8 +84,9 @@ func (s *AutomationService) ProcessYouTubeEvent(payload []byte) error {
 
 	for rows.Next() {
 		var ruleID int
+		var action string
 		var filtersRaw, targetsRaw []byte
-		if err := rows.Scan(&ruleID, &filtersRaw, &targetsRaw); err != nil {
+		if err := rows.Scan(&ruleID, &action, &filtersRaw, &targetsRaw); err != nil {
 			continue
 		}
 
@@ -98,15 +99,24 @@ func (s *AutomationService) ProcessYouTubeEvent(payload []byte) error {
 			continue
 		}
 
-		// 3. Create Jobs for each target
+		// 3. Dispatch based on action
 		var targets []struct {
 			AccountID       int    `json:"accountId"`
 			CaptionTemplate string `json:"captionTemplate"`
+			Platform        string `json:"targetPlatform"`   // For notify
+			Identifier      string `json:"targetIdentifier"` // For notify
 		}
 		json.Unmarshal(targetsRaw, &targets)
 
-		for _, target := range targets {
-			s.createAutomationJob(ruleID, videoID, target.AccountID, title)
+		if action == "notify" {
+			for _, target := range targets {
+				s.createNotificationJob(ruleID, videoID, target.AccountID, target.Platform, target.Identifier, title)
+			}
+		} else {
+			// Default to sync
+			for _, target := range targets {
+				s.createAutomationJob(ruleID, videoID, target.AccountID, title)
+			}
 		}
 
 		// Update last run
@@ -313,4 +323,67 @@ func (s *AutomationService) RetryRule(ctx context.Context, ruleID int) error {
 	}
 
 	return nil
+}
+
+func (s *AutomationService) createNotificationJob(ruleID int, sourceVideoID string, targetAccountID int, targetPlatform, targetIdentifier, title string) {
+	ctx := context.Background()
+
+	// 1. Fetch source details
+	var sourcePlatform string
+	var sourceAccountID int
+	err := s.db.QueryRow(`
+		SELECT pa.platform, pa.id 
+		FROM automation_rules ar
+		JOIN platform_accounts pa ON ar.source_account_id = pa.id
+		WHERE ar.id = $1
+	`, ruleID).Scan(&sourcePlatform, &sourceAccountID)
+	if err != nil {
+		log.Printf("Failed to fetch source details for notification: %v", err)
+		return
+	}
+
+	// 2. Create Automation Execution for tracking (using existing table)
+	var executionID string
+	err = s.db.QueryRow(`
+		INSERT INTO automation_executions 
+		(rule_id, source_platform, target_platform, target_account_id, status, trace_id)
+		VALUES ($1, $2, $3, $4, 'queued', gen_random_uuid())
+		RETURNING id
+	`, ruleID, sourcePlatform, targetPlatform, targetAccountID).Scan(&executionID)
+
+	if err != nil {
+		log.Printf("Failed to create notification execution record: %v", err)
+		return
+	}
+
+	// 3. Normalize Content
+	normalizer := NewContentNormalizer(s.db)
+	normalized, err := normalizer.NormalizeContent(ctx, sourcePlatform, sourceVideoID, sourceAccountID, title, "", 0, "")
+	if err != nil {
+		log.Printf("Failed to normalize content for notification %s: %v", executionID, err)
+		s.db.Exec("UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", err.Error(), executionID)
+		return
+	}
+
+	// 4. Update Execution
+	s.db.ExecContext(ctx, "UPDATE automation_executions SET content_id = $1 WHERE id = $2", normalized.ContentID, executionID)
+
+	// 5. Enqueue for Notification Worker
+	// We'll reuse the audience_notification queue but with our execution_id
+	payload, _ := json.Marshal(map[string]interface{}{
+		"content_id":        normalized.ContentID,
+		"rule_id":           ruleID,
+		"execution_id":      executionID,
+		"target_platform":   targetPlatform,
+		"target_identifier": targetIdentifier,
+		"is_unified":        true,
+	})
+
+	err = s.queue.Client.LPush(ctx, "audience_notification", payload).Err()
+	if err != nil {
+		log.Printf("Failed to enqueue notification job %s: %v", executionID, err)
+		s.db.Exec("UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", "failed to enqueue", executionID)
+	}
+
+	log.Printf("Unified Notification %s enqueued for %s", executionID, targetPlatform)
 }

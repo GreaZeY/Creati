@@ -190,6 +190,9 @@ export const automationAPI = {
   toggle: (id: number, isActive: boolean) =>
     api.put<ApiResponse>(`/automation/${id}`, { isActive }),
 
+  update: (id: number, data: any) =>
+    api.put<ApiResponse>(`/automation/${id}/full`, data),
+
   delete: (id: number) => api.delete<ApiResponse>(`/automation/${id}`),
 
   blast: (
@@ -215,30 +218,6 @@ export const automationAPI = {
     api.post<ApiResponse>(`/automation/rules/${id}/retry`),
 };
 
-export const audienceAPI = {
-  listRules: (clientId?: number) =>
-    api.get<ApiResponse<any[]>>(
-      "/audience/rules" + (clientId ? `?clientId=${clientId}` : ""),
-    ),
-
-  createRule: (data: any, clientId?: number) =>
-    api.post<ApiResponse>(
-      "/audience/rules" + (clientId ? `?clientId=${clientId}` : ""),
-      data,
-    ),
-
-  deleteRule: (id: string) => api.delete<ApiResponse>(`/audience/rules/${id}`),
-
-  toggleRule: (id: string, enabled: boolean) =>
-    api.put<ApiResponse>(`/audience/rules/${id}/toggle`, { enabled }),
-
-  getTemplate: (ruleId: string, platform: string) =>
-    api.get<ApiResponse>(
-      `/audience/templates?ruleId=${ruleId}&platform=${platform}`,
-    ),
-
-  saveTemplate: (data: any) => api.post<ApiResponse>("/audience/templates", data),
-};
 
 export const agencyAPI = {
   listClients: () => api.get<ApiResponse<Client[]>>('/agency/clients'),

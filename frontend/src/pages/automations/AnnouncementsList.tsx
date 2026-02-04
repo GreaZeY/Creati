@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Pause, Play, Trash2, Settings2 } from "lucide-react";
-import { audienceAPI } from "@/lib/api";
+import { automationAPI } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { cn } from "@/lib/utils";
@@ -18,36 +18,37 @@ export function AnnouncementsList() {
   const queryClient = useQueryClient();
   const { selectedClient } = useClient();
 
-  const [ruleToDelete, setRuleToDelete] = useState<string | null>(null);
+  const [ruleToDelete, setRuleToDelete] = useState<number | null>(null);
   const [editingTemplate, setEditingTemplate] = useState<{
-    ruleId: string;
-    platform: string;
+    rule: any;
+    target: any;
   } | null>(null);
 
   const { data: rules = [], isLoading } = useQuery({
-    queryKey: ["audience-rules", selectedClient?.id],
+    queryKey: ["automation-rules", "notify", selectedClient?.id],
     queryFn: async () => {
-      const resp = await audienceAPI.listRules(selectedClient?.id);
-      return resp.data.data || [];
+      const resp = await automationAPI.list(selectedClient?.id);
+      const allRules = resp.data.data || [];
+      return allRules.filter((r: any) => r.action === "notify");
     },
   });
 
   const toggleMutation = useMutation({
-    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
-      audienceAPI.toggleRule(id, !enabled),
+    mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
+      automationAPI.toggle(id, !isActive),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["audience-rules", selectedClient?.id],
+        queryKey: ["automation-rules", "notify", selectedClient?.id],
       });
       toast.success("Status updated. ✨");
     },
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => audienceAPI.deleteRule(id),
+    mutationFn: (id: number) => automationAPI.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["audience-rules", selectedClient?.id],
+        queryKey: ["automation-rules", "notify", selectedClient?.id],
       });
       toast.success("Announcement rule removed.");
     },
@@ -59,14 +60,24 @@ export function AnnouncementsList() {
   }) => {
     if (!editingTemplate) return;
     try {
-      await audienceAPI.saveTemplate({
-        rule_id: editingTemplate.ruleId,
-        platform: editingTemplate.platform,
-        title_template: template.title,
-        body_template: template.body,
+      const updatedRule = { ...editingTemplate.rule };
+      updatedRule.targets = updatedRule.targets.map((t: any) => {
+        if (t.accountId === editingTemplate.target.accountId) {
+          return {
+            ...t,
+            titleTemplate: template.title,
+            bodyTemplate: template.body,
+          };
+        }
+        return t;
       });
+
+      await automationAPI.update(updatedRule.id, updatedRule);
       toast.success("Template updated. ✨");
       setEditingTemplate(null);
+      queryClient.invalidateQueries({
+        queryKey: ["automation-rules", "notify", selectedClient?.id],
+      });
     } catch (error) {}
   };
 
@@ -104,7 +115,7 @@ export function AnnouncementsList() {
             <Card
               className={cn(
                 "group relative p-6 transition-all duration-300 overflow-hidden",
-                !rule.enabled && "opacity-60 grayscale-[0.4]",
+                !rule.isActive && "opacity-60 grayscale-[0.4]",
               )}
             >
               <div className="flex flex-col md:flex-row md:items-center gap-6">
@@ -112,17 +123,17 @@ export function AnnouncementsList() {
                   <div
                     className={cn(
                       "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-                      rule.enabled
+                      rule.isActive
                         ? "bg-primary/10 text-primary"
                         : "bg-muted text-muted-foreground",
                     )}
                   >
                     <Bell
                       size={24}
-                      fill={rule.enabled ? "currentColor" : "none"}
+                      fill={rule.isActive ? "currentColor" : "none"}
                     />
                   </div>
-                  {rule.enabled && (
+                  {rule.isActive && (
                     <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full ring-2 ring-background animate-pulse" />
                   )}
                 </div>
@@ -135,24 +146,24 @@ export function AnnouncementsList() {
                     <span
                       className={cn(
                         "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                        rule.enabled
+                        rule.isActive
                           ? "bg-emerald-500/10 text-emerald-500"
                           : "bg-muted text-muted-foreground",
                       )}
                     >
-                      {rule.enabled ? "Active" : "Paused"}
+                      {rule.isActive ? "Active" : "Paused"}
                     </span>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-y-2 gap-x-3 mt-3 text-sm">
                     <div className="flex items-center gap-2 bg-secondary/50 px-3 py-1 rounded-lg">
                       <PlatformLogo
-                        platform={rule.source_platform}
+                        platform={rule.sourceAccount?.platform || "youtube"}
                         size={14}
                         className="text-primary"
                       />
                       <span className="text-xs font-semibold uppercase tracking-wider">
-                        {rule.source_platform}
+                        {rule.sourceAccount?.platform || "youtube"}
                       </span>
                     </div>
 
@@ -164,19 +175,19 @@ export function AnnouncementsList() {
                           key={target.id}
                           onClick={() =>
                             setEditingTemplate({
-                              ruleId: rule.id,
-                              platform: target.target_platform,
+                              rule: rule,
+                              target: target,
                             })
                           }
                           className="flex items-center gap-1.5 bg-primary/5 hover:bg-primary/10 border border-primary/20 px-3 py-1 rounded-xl transition-colors group/target"
                         >
                           <PlatformLogo
-                            platform={target.target_platform}
+                            platform={target.platform}
                             size={12}
                             className="text-primary"
                           />
                           <span className="text-[10px] font-bold uppercase tracking-widest text-primary/80">
-                            {target.target_platform}
+                            {target.platform}
                           </span>
                           <Settings2
                             size={10}
@@ -196,11 +207,11 @@ export function AnnouncementsList() {
                     onClick={() =>
                       toggleMutation.mutate({
                         id: rule.id,
-                        enabled: rule.enabled,
+                        isActive: rule.isActive,
                       })
                     }
                   >
-                    {rule.enabled ? (
+                    {rule.isActive ? (
                       <>
                         <Pause size={16} className="mr-2" /> Pause
                       </>
@@ -232,8 +243,12 @@ export function AnnouncementsList() {
         {editingTemplate && (
           <div className="py-2">
             <TemplateEditor
-              ruleId={editingTemplate.ruleId}
-              platform={editingTemplate.platform}
+              platform={editingTemplate.target.platform}
+              initialTitle={editingTemplate.target.titleTemplate}
+              initialBody={
+                editingTemplate.target.bodyTemplate ||
+                editingTemplate.target.captionTemplate
+              }
               onSave={handleSaveTemplate}
             />
           </div>
