@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   DndContext,
   closestCenter,
@@ -32,6 +32,8 @@ import { Input } from "@/components/ui/Input";
 import { agencyAPI, type Client } from "@/lib/api";
 import { toast } from "@/lib/events";
 import { cn } from "@/lib/utils";
+import { SaveChangesBar } from "@/components/ui/SaveChangesBar";
+import { useNavigationLock } from "@/hooks/useNavigationLock";
 
 interface SortableItemProps {
   client: Client;
@@ -59,6 +61,20 @@ const SortableWorkspaceItem = ({
   const [editName, setEditName] = useState(client.name);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [localColor, setLocalColor] = useState(client.color || "#000000");
+  const confirmRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (showDeleteConfirm) {
+      // Wait for animation frame to ensure element is rendering
+      const timer = setTimeout(() => {
+        confirmRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [showDeleteConfirm]);
 
   // Sync back to parent with debounce
   useEffect(() => {
@@ -96,7 +112,7 @@ const SortableWorkspaceItem = ({
     >
       <Card
         className={cn(
-          "p-3 border-0 bg-card/40 backdrop-blur-xl ring-1 ring-border/50 transition-all group flex items-center gap-3",
+          "p-2 border-0 bg-card/40 backdrop-blur-xl ring-1 ring-border/50 transition-all group flex items-center gap-3",
           isDragging && "shadow-2xl ring-primary/50",
         )}
       >
@@ -105,13 +121,13 @@ const SortableWorkspaceItem = ({
           {...listeners}
           className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded-md transition-colors"
         >
-          <GripVertical className="w-4 h-4 text-muted-foreground" />
+          <GripVertical className="w-3.5 h-3.5 text-muted-foreground" />
         </div>
 
         {/* Circular Color Picker */}
         <div className="relative group/color">
           <div
-            className="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-white font-black text-xs shadow-inner cursor-pointer hover:scale-110 transition-transform relative overflow-hidden ring-2 ring-background ring-offset-2 ring-offset-transparent"
+            className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-white font-black text-[10px] shadow-inner cursor-pointer hover:scale-110 transition-transform relative overflow-hidden ring-2 ring-background ring-offset-2 ring-offset-transparent"
             style={{ backgroundColor: localColor }}
           >
             <span className="relative z-10">
@@ -128,40 +144,40 @@ const SortableWorkspaceItem = ({
 
         <div className="flex-1 min-w-0">
           {isEditing ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <Input
                 autoFocus
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleSave()}
-                className="h-8 py-0 text-sm font-bold bg-muted/50 border-0 ring-1 ring-primary/30"
+                className="h-6 py-0 text-xs font-bold bg-muted/50 border-0 ring-1 ring-primary/30"
               />
               <Button
                 size="icon"
                 variant="ghost"
-                className="shrink-0"
+                className="h-6 w-6 shrink-0"
                 onClick={handleSave}
               >
-                <Check className="w-4 h-4 text-emerald-500" />
+                <Check className="w-3 h-3 text-emerald-500" />
               </Button>
               <Button
                 size="icon"
                 variant="ghost"
-                className="shrink-0"
+                className="h-6 w-6 shrink-0"
                 onClick={() => {
                   setIsEditing(false);
                   setEditName(client.name);
                 }}
               >
-                <X className="w-4 h-4 text-destructive" />
+                <X className="w-3 h-3 text-destructive" />
               </Button>
             </div>
           ) : (
             <div className="flex items-center gap-2 overflow-hidden">
-              <h4 className="font-bold text-sm truncate">{client.name}</h4>
+              <h4 className="font-bold text-xs truncate">{client.name}</h4>
               <button
                 onClick={() => setIsEditing(true)}
-                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded transition-all"
+                className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-muted rounded transition-all"
               >
                 <Pencil className="w-3 h-3 text-muted-foreground" />
               </button>
@@ -174,9 +190,9 @@ const SortableWorkspaceItem = ({
             size="icon"
             variant="ghost"
             onClick={() => setShowDeleteConfirm(true)}
-            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-3.5 h-3.5" />
           </Button>
         </div>
       </Card>
@@ -189,7 +205,10 @@ const SortableWorkspaceItem = ({
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <Card className="mt-2 p-4 border-destructive/20 bg-destructive/5 ring-1 ring-destructive/30">
+            <Card
+              ref={confirmRef}
+              className="mt-2 p-4 border-destructive/20 bg-destructive/5 ring-1 ring-destructive/30 scroll-mt-20"
+            >
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
                 <div className="space-y-3">
@@ -241,6 +260,9 @@ export const WorkspaceManager = () => {
   const isDirty =
     JSON.stringify(workspaces) !== JSON.stringify(draftWorkspaces);
 
+  // Hook handles blocking and shake trigger
+  const shouldShake = useNavigationLock(isDirty);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -256,11 +278,15 @@ export const WorkspaceManager = () => {
     try {
       const resp = await agencyAPI.listClients();
       if (resp.data.success) {
-        const sorted = [...(resp.data.data || [])].sort(
-          (a, b) => (a.displayOrder || 0) - (b.displayOrder || 0),
-        );
-        setWorkspaces(sorted);
-        setDraftWorkspaces(sorted);
+        // Sort by displayOrder and normalize colors
+        const normalized = (resp.data.data || [])
+          .map((w) => ({
+            ...w,
+            color: w.color || "#000000",
+          }))
+          .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+        setWorkspaces(normalized);
+        setDraftWorkspaces(normalized);
       }
     } catch (err) {
       toast.error("Failed to load workspaces");
@@ -319,7 +345,8 @@ export const WorkspaceManager = () => {
       await agencyAPI.createClient(newName.trim(), "#6366f1");
       setNewName("");
       setIsAdding(false);
-      fetchWorkspaces();
+      // We must fetch to ensure we get the ID and correct state sync
+      await fetchWorkspaces();
       toast.success("Workspace created");
     } catch (err) {
       toast.error("Failed to create workspace");
@@ -449,46 +476,13 @@ export const WorkspaceManager = () => {
       </DndContext>
 
       {/* Floating Save Bar */}
-      <AnimatePresence>
-        {isDirty && (
-          <motion.div
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md px-4"
-          >
-            <Card className="p-2.5 bg-background/60 backdrop-blur-2xl border-primary/20 shadow-2xl ring-1 ring-primary/20 flex items-center justify-between gap-4 rounded-2xl">
-              <div className="pl-3">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-                  Unsaved Changes
-                </p>
-                <p className="text-[9px] font-bold text-muted-foreground uppercase">
-                  Careful, don't lose your progress
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleDiscard}
-                  disabled={isSaving}
-                  className="h-10 px-4 rounded-xl font-bold uppercase tracking-widest text-[10px]"
-                >
-                  Discard
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleCommit}
-                  disabled={isSaving}
-                  className="h-10 px-6 rounded-xl font-bold uppercase tracking-widest text-[10px] bg-primary shadow-lg shadow-primary/25"
-                >
-                  {isSaving ? "Saving..." : "Save Changes"}
-                </Button>
-              </div>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <SaveChangesBar
+        isDirty={isDirty}
+        isSaving={isSaving}
+        onSave={handleCommit}
+        onDiscard={handleDiscard}
+        shake={shouldShake}
+      />
     </div>
   );
 };
