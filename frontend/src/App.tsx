@@ -23,9 +23,8 @@ import { Upload } from "./pages/Upload";
 import { Automations } from "./pages/automations/Automations";
 import { SyncsList } from "./pages/automations/SyncsList";
 import { AnnouncementsList } from "./pages/automations/AnnouncementsList";
-import { AnnouncementsBuilder } from "./pages/automations/AnnouncementsBuilder";
+import { UnifiedBuilder } from "./pages/automations/UnifiedBuilder";
 import { ArchiveBlast } from "./pages/ArchiveBlast";
-import { RuleBuilder } from "./pages/RuleBuilder";
 import { BlastBuilder } from "./pages/BlastBuilder";
 import { Pricing } from "./pages/Pricing";
 import { WorkspaceSetup } from "./pages/WorkspaceSetup";
@@ -193,7 +192,7 @@ const router = createBrowserRouter([
             path: "automations/syncs/new",
             element: (
               <PageTransition>
-                <RuleBuilder />
+                <UnifiedBuilder type="sync" />
               </PageTransition>
             ),
           },
@@ -201,7 +200,7 @@ const router = createBrowserRouter([
             path: "automations/announcements/new",
             element: (
               <PageTransition>
-                <AnnouncementsBuilder />
+                <UnifiedBuilder type="announcement" />
               </PageTransition>
             ),
           },
