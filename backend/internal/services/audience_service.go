@@ -20,85 +20,71 @@ func NewAudienceService(db *sql.DB, queueSvc *QueueService) *AudienceService {
 
 // NotificationContext aggregates all data needed to send a notification
 type NotificationContext struct {
-	Content  models.Video
-	Rule     models.NotificationRule
-	Target   models.NotificationTarget
-	Template models.NotificationTemplate
+	Content models.Video
+	Rule    models.AutomationRule
+	Target  models.UnifiedTarget
 }
 
-func (s *AudienceService) GetNotificationContext(ctx context.Context, contentID, targetID string) (*NotificationContext, error) {
-	// 1. Fetch Target and Rule info
+func (s *AudienceService) GetNotificationContext(ctx context.Context, contentID string, ruleID int, targetPlatform string) (*NotificationContext, error) {
+	// 1. Fetch Rule
+	var rule models.AutomationRule
 	query := `
-		SELECT 
-			t.id, t.rule_id, t.target_platform, t.target_identifier,
-			r.id, r.user_id, r.client_id, r.name, r.source_platform, r.event_type
-		FROM audience_notification_targets t
-		JOIN audience_notification_rules r ON t.rule_id = r.id
-		WHERE t.id = $1
+		SELECT id, user_id, client_id, name, targets, metadata
+		FROM automation_rules
+		WHERE id = $1
 	`
-
-	row := s.DB.QueryRowContext(ctx, query, targetID)
-
-	var nc NotificationContext
-	if err := row.Scan(
-		&nc.Target.ID, &nc.Target.RuleID, &nc.Target.TargetPlatform, &nc.Target.TargetIdentifier,
-		&nc.Rule.ID, &nc.Rule.UserID, &nc.Rule.ClientID, &nc.Rule.Name, &nc.Rule.SourcePlatform, &nc.Rule.EventType,
+	var targetsRaw []byte
+	if err := s.DB.QueryRowContext(ctx, query, ruleID).Scan(
+		&rule.ID, &rule.UserID, &rule.ClientID, &rule.Name, &targetsRaw, &rule.Metadata,
 	); err != nil {
-		return nil, fmt.Errorf("failed to fetch target/rule: %w", err)
+		return nil, fmt.Errorf("failed to fetch rule: %w", err)
 	}
 
-	// 2. Fetch Content (Video)
-	// Assuming a 'videos' table based on previous steps.
+	// 2. Parse Targets to find the specific platform target
+	var targets []models.UnifiedTarget
+	json.Unmarshal(targetsRaw, &targets)
+
+	var foundTarget *models.UnifiedTarget
+	for _, t := range targets {
+		if t.TargetPlatform == targetPlatform {
+			foundTarget = &t
+			break
+		}
+	}
+
+	if foundTarget == nil {
+		return nil, fmt.Errorf("no target found for platform %s in rule %d", targetPlatform, ruleID)
+	}
+
+	// 3. Fetch Content (Video)
+	var content models.Video
 	contentQuery := `
 		SELECT id, user_id, title, description, s3_url, status, created_at
 		FROM videos
 		WHERE id = $1
 	`
-	// Note: Adjusted scanning to match available fields in Video struct (removed client_id, platform_id if they caused issues, but kept standard ones)
-	// Assuming Video struct fields match DB columns
 	if err := s.DB.QueryRowContext(ctx, contentQuery, contentID).Scan(
-		&nc.Content.ID, &nc.Content.UserID, &nc.Content.Title,
-		&nc.Content.Description, &nc.Content.S3URL, &nc.Content.Status, &nc.Content.CreatedAt,
+		&content.ID, &content.UserID, &content.Title,
+		&content.Description, &content.S3URL, &content.Status, &content.CreatedAt,
 	); err != nil {
 		return nil, fmt.Errorf("failed to fetch content: %w", err)
 	}
 
-	// 3. Fetch Template
-	templateQuery := `
-		SELECT id, title_template, body_template, media_policy
-		FROM notification_templates
-		WHERE rule_id = $1 AND platform = $2
-	`
-	if err := s.DB.QueryRowContext(ctx, templateQuery, nc.Rule.ID, nc.Target.TargetPlatform).Scan(
-		&nc.Template.ID, &nc.Template.TitleTemplate, &nc.Template.BodyTemplate, &nc.Template.MediaPolicy,
-	); err != nil {
-		if err == sql.ErrNoRows {
-			// Fallback placeholder logic could go here
-			return nil, fmt.Errorf("no template found for rule %s platform %s", nc.Rule.ID, nc.Target.TargetPlatform)
-		}
-		return nil, fmt.Errorf("failed to fetch template: %w", err)
-	}
-
-	return &nc, nil
-}
-
-func (s *AudienceService) LogNotification(ctx context.Context, contentID, ruleID, platform, status, errMsg string) error {
-	query := `
-		INSERT INTO audience_notification_logs (content_id, rule_id, target_platform, status, error_message)
-		VALUES ($1, $2, $3, $4, $5)
-	`
-	_, err := s.DB.ExecContext(ctx, query, contentID, ruleID, platform, status, errMsg)
-	return err
+	return &NotificationContext{
+		Content: content,
+		Rule:    rule,
+		Target:  *foundTarget,
+	}, nil
 }
 
 // EnqueueFromContent finds matching rules for a newly created content and enqueues notification jobs
 func (s *AudienceService) EnqueueFromContent(ctx context.Context, contentID string, sourcePlatform string, userID int) error {
-	// 1. Find matching enabled rules
-	// We check for rules where source_platform matches and user matches
+	// 1. Find matching enabled rules by platform
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT id, name 
-		FROM audience_notification_rules 
-		WHERE user_id = $1 AND source_platform = $2 AND enabled = true
+		SELECT ar.id, ar.name, ar.targets 
+		FROM automation_rules ar
+		JOIN platform_accounts pa ON ar.source_account_id = pa.id
+		WHERE ar.user_id = $1 AND pa.platform = $2 AND ar.is_active = true AND ar.action = 'notify'
 	`, userID, sourcePlatform)
 	if err != nil {
 		return fmt.Errorf("failed to query rules: %w", err)
@@ -106,47 +92,46 @@ func (s *AudienceService) EnqueueFromContent(ctx context.Context, contentID stri
 	defer rows.Close()
 
 	for rows.Next() {
-		var ruleID string
+		var ruleID int
 		var ruleName string
-		if err := rows.Scan(&ruleID, &ruleName); err != nil {
+		var targetsRaw []byte
+		if err := rows.Scan(&ruleID, &ruleName, &targetsRaw); err != nil {
 			continue
 		}
 
-		// 2. For each rule, get targets
-		targetRows, err := s.DB.QueryContext(ctx, `
-			SELECT id, target_platform 
-			FROM audience_notification_targets 
-			WHERE rule_id = $1
-		`, ruleID)
-		if err != nil {
-			continue
-		}
-		defer targetRows.Close() // defer inside loop is risky but low volume here
+		// 2. Parse targets
+		var targets []models.UnifiedTarget
+		json.Unmarshal(targetsRaw, &targets)
 
-		for targetRows.Next() {
-			var targetID string
-			var targetPlatform string
-			if err := targetRows.Scan(&targetID, &targetPlatform); err != nil {
-				continue
-			}
-
+		for _, target := range targets {
 			// 3. Enqueue Job
-			// payload matches AudienceJobPayload in worker
-			payload := map[string]string{
-				"content_id": contentID,
-				"rule_id":    ruleID,
-				"target_id":  targetID,
+			payload := map[string]interface{}{
+				"content_id":        contentID,
+				"rule_id":           ruleID,
+				"target_platform":   target.TargetPlatform,
+				"target_identifier": target.TargetIdentifier,
+				"is_unified":        true,
 			}
 			jsonPayload, _ := json.Marshal(payload)
 
 			if err := s.QueueSvc.Client.LPush(ctx, "audience_notification", jsonPayload).Err(); err != nil {
-				// Initialize log as pending/failed
-				s.LogNotification(ctx, contentID, ruleID, targetPlatform, "failed", "enqueue error: "+err.Error())
+				s.LogNotification(ctx, contentID, ruleID, target.TargetPlatform, "failed", "enqueue error: "+err.Error())
 			} else {
-				s.LogNotification(ctx, contentID, ruleID, targetPlatform, "pending", "")
+				s.LogNotification(ctx, contentID, ruleID, target.TargetPlatform, "pending", "")
 			}
 		}
-		targetRows.Close() // Explicit close
 	}
 	return nil
+}
+
+func (s *AudienceService) LogNotification(ctx context.Context, contentID string, ruleID int, platform, status, errMsg string) error {
+	var cID int
+	fmt.Sscanf(contentID, "%d", &cID)
+
+	query := `
+		INSERT INTO automation_logs (content_id, rule_id, target_platform, status, error_message)
+		VALUES ($1, $2, $3, $4, $5)
+	`
+	_, err := s.DB.ExecContext(ctx, query, cID, ruleID, platform, status, errMsg)
+	return err
 }

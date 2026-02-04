@@ -453,9 +453,9 @@ func (i *InstagramService) GetStream(ctx context.Context, platformVideoID string
 
 // Notify implements Platform interface - targets Instagram for announcements
 // Note: Instagram requires media (photo/video) for all posts.
-func (i *InstagramService) Notify(ctx context.Context, target models.NotificationTarget, template models.NotificationTemplate, content models.Video) error {
+func (i *InstagramService) Notify(ctx context.Context, target models.UnifiedTarget, content models.Video) error {
 	// Render content
-	message := utils.RenderNotificationTemplate(template.BodyTemplate, content, "YouTube")
+	message := utils.RenderNotificationTemplate(target.CaptionTemplate, content, "YouTube")
 
 	// Log for now as it requires media processing
 	fmt.Printf("📸 Instagram announcement requested for %s: %s\n", target.TargetIdentifier, message)

@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // User model
 type User struct {
@@ -108,33 +111,40 @@ type VideoAnalytics struct {
 	FetchedAt        time.Time `json:"fetchedAt" db:"fetched_at"`
 }
 
-// -- Audience Notification Models --
+// -- Unified Automation Models --
 
-type NotificationRule struct {
+type AutomationRule struct {
+	ID              int             `json:"id" db:"id"`
+	UserID          int             `json:"user_id" db:"user_id"`
+	ClientID        *int            `json:"client_id,omitempty" db:"client_id"`
+	Name            string          `json:"name" db:"name"`
+	SourceAccountID int             `json:"source_account_id" db:"source_account_id"`
+	Action          string          `json:"action" db:"action"` // 'sync' or 'notify'
+	TriggerType     string          `json:"trigger_type" db:"trigger_type"`
+	Filters         json.RawMessage `json:"filters" db:"filters"`
+	Targets         json.RawMessage `json:"targets" db:"targets"`
+	Metadata        json.RawMessage `json:"metadata" db:"metadata"`
+	IsActive        bool            `json:"is_active" db:"is_active"`
+	LastRunAt       *time.Time      `json:"last_run_at,omitempty" db:"last_run_at"`
+	CreatedAt       time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt       time.Time       `json:"updated_at" db:"updated_at"`
+}
+
+type AutomationLog struct {
 	ID             string    `json:"id" db:"id"`
-	UserID         int       `json:"user_id" db:"user_id"`
-	ClientID       *int      `json:"client_id,omitempty" db:"client_id"`
-	Name           string    `json:"name" db:"name"`
-	SourcePlatform string    `json:"source_platform" db:"source_platform"`
-	EventType      string    `json:"event_type" db:"event_type"`
-	Enabled        bool      `json:"enabled" db:"enabled"`
+	RuleID         int       `json:"rule_id" db:"rule_id"`
+	ContentID      int       `json:"content_id" db:"content_id"`
+	TargetPlatform string    `json:"target_platform" db:"target_platform"`
+	Status         string    `json:"status" db:"status"`
+	ErrorMessage   *string   `json:"error_message,omitempty" db:"error_message"`
+	RetryCount     int       `json:"retry_count" db:"retry_count"`
 	CreatedAt      time.Time `json:"created_at" db:"created_at"`
 }
 
-type NotificationTarget struct {
-	ID               string    `json:"id" db:"id"`
-	RuleID           string    `json:"rule_id" db:"rule_id"`
-	TargetPlatform   string    `json:"target_platform" db:"target_platform"`
-	TargetIdentifier string    `json:"target_identifier" db:"target_identifier"`
-	CreatedAt        time.Time `json:"created_at" db:"created_at"`
-}
-
-type NotificationTemplate struct {
-	ID            string    `json:"id" db:"id"`
-	RuleID        string    `json:"rule_id" db:"rule_id"`
-	Platform      string    `json:"platform" db:"platform"`
-	TitleTemplate string    `json:"title_template" db:"title_template"`
-	BodyTemplate  string    `json:"body_template" db:"body_template"`
-	MediaPolicy   string    `json:"media_policy" db:"media_policy"`
-	CreatedAt     time.Time `json:"created_at" db:"created_at"`
+type UnifiedTarget struct {
+	AccountID        int    `json:"accountId"`
+	CaptionTemplate  string `json:"captionTemplate"`
+	TitleTemplate    string `json:"titleTemplate"`
+	TargetPlatform   string `json:"targetPlatform"`
+	TargetIdentifier string `json:"targetIdentifier"`
 }

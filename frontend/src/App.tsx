@@ -157,44 +157,49 @@ const router = createBrowserRouter([
             ),
           },
           {
+            path: "automations",
+            children: [
+              {
+                index: true,
+                element: (
+                  <PageTransition>
+                    <Automations />
+                  </PageTransition>
+                ),
+              },
+              {
+                path: "new",
+                element: (
+                  <PageTransition>
+                    <UnifiedBuilder />
+                  </PageTransition>
+                ),
+              },
+              {
+                path: "syncs",
+                element: <Navigate to="/automations" replace />,
+              },
+              {
+                path: "announcements",
+                element: <Navigate to="/automations" replace />,
+              },
+              {
+                path: "syncs/new",
+                element: <Navigate to="/automations/new" replace />,
+              },
+              {
+                path: "announcements/new",
+                element: <Navigate to="/automations/new" replace />,
+              },
+            ],
+          },
+          {
             path: "automation",
-            element: <Navigate to="/automations/syncs" replace />,
+            element: <Navigate to="/automations" replace />,
           },
           {
             path: "workflows",
-            element: <Navigate to="/automations/syncs" replace />,
-          },
-          {
-            path: "automations",
-            element: (
-              <PageTransition>
-                <Automations />
-              </PageTransition>
-            ),
-          },
-          {
-            path: "automations/new",
-            element: (
-              <PageTransition>
-                <UnifiedBuilder />
-              </PageTransition>
-            ),
-          },
-          {
-            path: "automations/syncs",
             element: <Navigate to="/automations" replace />,
-          },
-          {
-            path: "automations/announcements",
-            element: <Navigate to="/automations" replace />,
-          },
-          {
-            path: "automations/syncs/new",
-            element: <Navigate to="/automations/new" replace />,
-          },
-          {
-            path: "automations/announcements/new",
-            element: <Navigate to="/automations/new" replace />,
           },
           {
             path: "blast",

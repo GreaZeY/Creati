@@ -465,7 +465,7 @@ func (l *LinkedInService) GetStream(ctx context.Context, platformVideoID string)
 }
 
 // Notify implements Platform interface - shares a post on LinkedIn
-func (l *LinkedInService) Notify(ctx context.Context, target models.NotificationTarget, template models.NotificationTemplate, content models.Video) error {
+func (l *LinkedInService) Notify(ctx context.Context, target models.UnifiedTarget, content models.Video) error {
 	// Retrieve access token and person URN
 	var encAccess, personURN string
 	err := l.db.QueryRow(
@@ -482,11 +482,11 @@ func (l *LinkedInService) Notify(ctx context.Context, target models.Notification
 	}
 
 	// Render content
-	title := utils.RenderNotificationTemplate(template.TitleTemplate, content, "YouTube")
+	title := utils.RenderNotificationTemplate(target.TitleTemplate, content, "YouTube")
 	if title == "" {
 		title = content.Title
 	}
-	body := utils.RenderNotificationTemplate(template.BodyTemplate, content, "YouTube")
+	body := utils.RenderNotificationTemplate(target.CaptionTemplate, content, "YouTube")
 
 	// LinkedIn UGC Post payload
 	payload := map[string]interface{}{

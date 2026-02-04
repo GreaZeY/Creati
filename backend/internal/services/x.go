@@ -541,11 +541,11 @@ func (t *TwitterService) GetStream(ctx context.Context, platformVideoID string) 
 }
 
 // Notify implements Platform interface - posts a tweet announcement
-func (x *TwitterService) Notify(ctx context.Context, target models.NotificationTarget, template models.NotificationTemplate, content models.Video) error {
+func (x *TwitterService) Notify(ctx context.Context, target models.UnifiedTarget, content models.Video) error {
 	// Retrieve access token
 	var encAccess string
 	err := x.db.QueryRow(
-		"SELECT access_token FROM platform_accounts WHERE platform = 'x' AND platform_user_id = $1",
+		"SELECT access_token FROM platform_accounts WHERE platform = 'twitter' AND platform_user_id = $1",
 		target.TargetIdentifier,
 	).Scan(&encAccess)
 	if err != nil {
@@ -558,7 +558,7 @@ func (x *TwitterService) Notify(ctx context.Context, target models.NotificationT
 	}
 
 	// Render content
-	message := utils.RenderNotificationTemplate(template.BodyTemplate, content, "YouTube")
+	message := utils.RenderNotificationTemplate(target.CaptionTemplate, content, "YouTube")
 	// X has a 280-char limit for basic accounts, but we'll let the API return error if exceeded
 
 	// Prepare payload

@@ -246,16 +246,16 @@ func (d *DiscordService) GetStream(ctx context.Context, platformVideoID string) 
 }
 
 // Notify implements Platform interface - sends audience notification to Discord
-func (d *DiscordService) Notify(ctx context.Context, target models.NotificationTarget, templateCfg models.NotificationTemplate, content models.Video) error {
+func (d *DiscordService) Notify(ctx context.Context, target models.UnifiedTarget, content models.Video) error {
 	botToken := os.Getenv("DISCORD_BOT_TOKEN")
 	if botToken == "" {
 		return fmt.Errorf("DISCORD_BOT_TOKEN not configured")
 	}
 
 	// Render content
-	message := utils.RenderNotificationTemplate(templateCfg.BodyTemplate, content, "YouTube")
-	if templateCfg.TitleTemplate != "" {
-		message = "**" + templateCfg.TitleTemplate + "**\n\n" + message
+	message := utils.RenderNotificationTemplate(target.CaptionTemplate, content, "YouTube")
+	if target.TitleTemplate != "" {
+		message = "**" + target.TitleTemplate + "**\n\n" + message
 	}
 
 	// Prepare payload

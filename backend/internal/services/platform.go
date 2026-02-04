@@ -45,7 +45,7 @@ type Platform interface {
 
 	// Notify sends an audience notification about new content
 	// Used for announcing uploads to communities (Discord, Twitter, Reddit, etc.)
-	Notify(ctx context.Context, target models.NotificationTarget, template models.NotificationTemplate, content models.Video) error
+	Notify(ctx context.Context, target models.UnifiedTarget, content models.Video) error
 }
 
 // ExternalVideo - standardized past video info

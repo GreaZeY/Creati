@@ -262,9 +262,9 @@ func (h *AutomationHandler) UpdateRule(c *fiber.Ctx) error {
 
 	_, err := h.db.Exec(`
 		UPDATE automation_rules 
-		SET name = $1, filters = $2, targets = $3, metadata = $4, updated_at = NOW()
-		WHERE id = $5 AND user_id = $6
-	`, req.Name, filters, targets, metadata, id, userID)
+		SET name = $1, filters = $2, targets = $3, metadata = $4, action = $5, updated_at = NOW()
+		WHERE id = $6 AND user_id = $7
+	`, req.Name, filters, targets, metadata, req.Action, id, userID)
 
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update rule", err)

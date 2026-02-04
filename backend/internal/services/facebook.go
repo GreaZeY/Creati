@@ -428,7 +428,7 @@ func (f *FacebookService) GetStream(ctx context.Context, platformVideoID string)
 }
 
 // Notify implements Platform interface - posts to a Facebook Page or Profile
-func (f *FacebookService) Notify(ctx context.Context, target models.NotificationTarget, template models.NotificationTemplate, content models.Video) error {
+func (f *FacebookService) Notify(ctx context.Context, target models.UnifiedTarget, content models.Video) error {
 	// Retrieve access token and page ID
 	var encAccess, pageID string
 	err := f.db.QueryRow(
@@ -445,7 +445,7 @@ func (f *FacebookService) Notify(ctx context.Context, target models.Notification
 	}
 
 	// Render content
-	message := utils.RenderNotificationTemplate(template.BodyTemplate, content, "YouTube")
+	message := utils.RenderNotificationTemplate(target.CaptionTemplate, content, "YouTube")
 
 	data := url.Values{}
 	data.Set("message", message)

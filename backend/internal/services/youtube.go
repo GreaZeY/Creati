@@ -531,12 +531,10 @@ func (y *YouTubeService) GetStream(ctx context.Context, vidID string) (io.ReadCl
 }
 
 // Notify implements Platform interface - targets YouTube Community Posts for announcements
-// Note: YouTube Community Post API is currently limited to specific partners.
-// We implement a "success with fallback" or log it.
-func (y *YouTubeService) Notify(ctx context.Context, target models.NotificationTarget, template models.NotificationTemplate, content models.Video) error {
+func (y *YouTubeService) Notify(ctx context.Context, target models.UnifiedTarget, content models.Video) error {
 	// Render content
-	title := utils.RenderNotificationTemplate(template.TitleTemplate, content, "YouTube")
-	body := utils.RenderNotificationTemplate(template.BodyTemplate, content, "YouTube")
+	title := utils.RenderNotificationTemplate(target.TitleTemplate, content, "YouTube")
+	body := utils.RenderNotificationTemplate(target.CaptionTemplate, content, "YouTube")
 
 	message := body
 	if title != "" {

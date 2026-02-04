@@ -430,7 +430,7 @@ func (r *RedditService) GetStream(ctx context.Context, platformVideoID string) (
 }
 
 // Notify implements Platform interface - submits a link post to Reddit
-func (r *RedditService) Notify(ctx context.Context, target models.NotificationTarget, template models.NotificationTemplate, content models.Video) error {
+func (r *RedditService) Notify(ctx context.Context, target models.UnifiedTarget, content models.Video) error {
 	// Retrieve access token
 	var encAccess string
 	err := r.db.QueryRow(
@@ -456,7 +456,7 @@ func (r *RedditService) Notify(ctx context.Context, target models.NotificationTa
 	}
 
 	// Render title and body
-	title := utils.RenderNotificationTemplate(template.TitleTemplate, content, "YouTube")
+	title := utils.RenderNotificationTemplate(target.TitleTemplate, content, "YouTube")
 	if title == "" {
 		title = content.Title
 	}
