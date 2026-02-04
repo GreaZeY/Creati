@@ -244,3 +244,50 @@ func (d *DiscordService) FetchRecentVideos(accountID int) ([]ExternalVideo, erro
 func (d *DiscordService) GetStream(ctx context.Context, platformVideoID string) (io.ReadCloser, string, error) {
 	return nil, "", fmt.Errorf("GetStream not implemented for Discord")
 }
+
+// Notify implements Platform interface - sends audience notification to Discord
+func (d *DiscordService) Notify(ctx context.Context, target models.NotificationTarget, templateCfg models.NotificationTemplate, content models.Video) error {
+	botToken := os.Getenv("DISCORD_BOT_TOKEN")
+	if botToken == "" {
+		return fmt.Errorf("DISCORD_BOT_TOKEN not configured")
+	}
+
+	// Render content
+	message := utils.RenderNotificationTemplate(templateCfg.BodyTemplate, content, "YouTube")
+	if templateCfg.TitleTemplate != "" {
+		message = "**" + templateCfg.TitleTemplate + "**\n\n" + message
+	}
+
+	// Prepare payload
+	payload := map[string]interface{}{
+		"content": message,
+	}
+
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("json marshal error: %w", err)
+	}
+
+	// Send to Discord channel
+	url := fmt.Sprintf("https://discord.com/api/v10/channels/%s/messages", target.TargetIdentifier)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return fmt.Errorf("request creation error: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bot "+botToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("http call failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("discord api error (%d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	return nil
+}

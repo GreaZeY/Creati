@@ -19,7 +19,7 @@ import WorkspaceSwitcher from "./WorkspaceSwitcher";
 const NAV_ITEMS = [
   { label: "COMMAND", icon: LayoutDashboard, href: "/dashboard" },
   { label: "DISPATCH", icon: UploadCloud, href: "/upload" },
-  { label: "WORKFLOWS", icon: Zap, href: "/automation" },
+  { label: "AUTOMATIONS", icon: Zap, href: "/automations" },
   { label: "QUICK BLAST", icon: Rocket, href: "/blast" },
   { label: "INTELLIGENCE", icon: BarChart2, href: "/analytics" },
   { label: "NODES", icon: Link2, href: "/platforms" },

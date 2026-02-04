@@ -19,13 +19,15 @@ type OrchestrationJob struct {
 
 type OrchestrationWorker struct {
 	BaseWorker
-	DB *sql.DB
+	DB          *sql.DB
+	AudienceSvc *services.AudienceService
 }
 
-func NewOrchestrationWorker(db *sql.DB, queueSvc *services.QueueService) *OrchestrationWorker {
+func NewOrchestrationWorker(db *sql.DB, queueSvc *services.QueueService, audienceSvc *services.AudienceService) *OrchestrationWorker {
 	return &OrchestrationWorker{
-		BaseWorker: BaseWorker{QueueSvc: queueSvc},
-		DB:         db,
+		BaseWorker:  BaseWorker{QueueSvc: queueSvc},
+		DB:          db,
+		AudienceSvc: audienceSvc,
 	}
 }
 
@@ -42,6 +44,23 @@ func (w *OrchestrationWorker) Process(ctx context.Context, payload []byte) error
 		"content_id":      job.ContentID,
 		"source_platform": job.SourcePlatform,
 	}).Info("Orchestrating distribution...")
+
+	// 0. Trigger Audience Notifications (Fire-and-forget)
+	// We need UserID. We can query it or derive it.
+	// Optimization: EnqueueFromContent could probably look up UserID from ContentID if not passed,
+	// but let's see if we have it. The job only has ContentID.
+	// We'll trust AudienceService to handle the lookup or update EnqueueFromContent to fetch UserID if needed.
+	// Actually, EnqueueFromContent(ctx, contentID, sourcePlatform, userID) requires userID.
+	// We need to fetch the UserID associated with this content.
+	var userID int
+	err := w.DB.QueryRowContext(ctx, "SELECT user_id FROM videos WHERE id = $1", job.ContentID).Scan(&userID)
+	if err == nil {
+		if err := w.AudienceSvc.EnqueueFromContent(ctx, job.ContentID, job.SourcePlatform, userID); err != nil {
+			logger.Get("worker").WithError(err).Error("Failed to enqueue audience notifications")
+		}
+	} else {
+		logger.Get("worker").WithError(err).Warn("Failed to fetch user_id for audience notification")
+	}
 
 	// 1. Fetch active rules for this source platform
 	rows, err := w.DB.QueryContext(ctx, `

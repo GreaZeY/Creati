@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"creati.in/creati/backend/internal/db/models"
@@ -461,4 +462,85 @@ func (l *LinkedInService) FetchRecentVideos(accountID int) ([]ExternalVideo, err
 // GetStream implements Platform interface
 func (l *LinkedInService) GetStream(ctx context.Context, platformVideoID string) (io.ReadCloser, string, error) {
 	return nil, "", fmt.Errorf("GetStream not implemented for LinkedIn")
+}
+
+// Notify implements Platform interface - shares a post on LinkedIn
+func (l *LinkedInService) Notify(ctx context.Context, target models.NotificationTarget, template models.NotificationTemplate, content models.Video) error {
+	// Retrieve access token and person URN
+	var encAccess, personURN string
+	err := l.db.QueryRow(
+		"SELECT access_token, platform_user_id FROM platform_accounts WHERE platform = 'linkedin' AND platform_user_id = $1",
+		target.TargetIdentifier,
+	).Scan(&encAccess, &personURN)
+	if err != nil {
+		return fmt.Errorf("LinkedIn account not found: %w", err)
+	}
+
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt tokens: %w", err)
+	}
+
+	// Render content
+	title := utils.RenderNotificationTemplate(template.TitleTemplate, content, "YouTube")
+	if title == "" {
+		title = content.Title
+	}
+	body := utils.RenderNotificationTemplate(template.BodyTemplate, content, "YouTube")
+
+	// LinkedIn UGC Post payload
+	payload := map[string]interface{}{
+		"author":         personURN,
+		"lifecycleState": "PUBLISHED",
+		"specificContent": map[string]interface{}{
+			"com.linkedin.ugc.ShareContent": map[string]interface{}{
+				"shareCommentary": map[string]interface{}{
+					"text": body,
+				},
+				"shareMediaCategory": "ARTICLE",
+				"media": []map[string]interface{}{
+					{
+						"status": "READY",
+						"description": map[string]interface{}{
+							"text": content.Description,
+						},
+						"originalUrl": content.S3URL, // Best to use final platform URL
+						"title": map[string]interface{}{
+							"text": title,
+						},
+					},
+				},
+			},
+		},
+		"visibility": map[string]interface{}{
+			"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC",
+		},
+	}
+
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.linkedin.com/v2/ugcPosts", strings.NewReader(string(jsonPayload)))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Restli-Protocol-Version", "2.0.0")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("LinkedIn API error (%d): %s", resp.StatusCode, string(respBody))
+	}
+
+	return nil
 }

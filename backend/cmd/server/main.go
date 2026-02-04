@@ -238,6 +238,16 @@ func main() {
 		agencyGroup.Put("/clients/:id", agencyHandler.UpdateClient)
 		agencyGroup.Delete("/clients/:id", agencyHandler.DeleteClient)
 
+		// Audience Notifications
+		audienceHandler := api.NewAudienceHandler(db)
+		audienceGroup := protected.Group("/audience")
+		audienceGroup.Get("/rules", audienceHandler.ListRules)
+		audienceGroup.Post("/rules", audienceHandler.CreateRule)
+		audienceGroup.Delete("/rules/:id", audienceHandler.DeleteRule)
+		audienceGroup.Put("/rules/:id/toggle", audienceHandler.ToggleRule)
+		audienceGroup.Get("/templates", audienceHandler.GetTemplate)
+		audienceGroup.Post("/templates", audienceHandler.SaveTemplate)
+
 		// Start server
 		port := os.Getenv("PORT")
 		if port == "" {

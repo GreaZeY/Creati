@@ -107,3 +107,34 @@ type VideoAnalytics struct {
 	WatchTimeMinutes int64     `json:"watchTimeMinutes" db:"watch_time_minutes"`
 	FetchedAt        time.Time `json:"fetchedAt" db:"fetched_at"`
 }
+
+// -- Audience Notification Models --
+
+type NotificationRule struct {
+	ID             string    `json:"id" db:"id"`
+	UserID         int       `json:"user_id" db:"user_id"`
+	ClientID       *int      `json:"client_id,omitempty" db:"client_id"`
+	Name           string    `json:"name" db:"name"`
+	SourcePlatform string    `json:"source_platform" db:"source_platform"`
+	EventType      string    `json:"event_type" db:"event_type"`
+	Enabled        bool      `json:"enabled" db:"enabled"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+}
+
+type NotificationTarget struct {
+	ID               string    `json:"id" db:"id"`
+	RuleID           string    `json:"rule_id" db:"rule_id"`
+	TargetPlatform   string    `json:"target_platform" db:"target_platform"`
+	TargetIdentifier string    `json:"target_identifier" db:"target_identifier"`
+	CreatedAt        time.Time `json:"created_at" db:"created_at"`
+}
+
+type NotificationTemplate struct {
+	ID            string    `json:"id" db:"id"`
+	RuleID        string    `json:"rule_id" db:"rule_id"`
+	Platform      string    `json:"platform" db:"platform"`
+	TitleTemplate string    `json:"title_template" db:"title_template"`
+	BodyTemplate  string    `json:"body_template" db:"body_template"`
+	MediaPolicy   string    `json:"media_policy" db:"media_policy"`
+	CreatedAt     time.Time `json:"created_at" db:"created_at"`
+}

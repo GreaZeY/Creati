@@ -426,3 +426,43 @@ func (f *FacebookService) FetchRecentVideos(accountID int) ([]ExternalVideo, err
 func (f *FacebookService) GetStream(ctx context.Context, platformVideoID string) (io.ReadCloser, string, error) {
 	return nil, "", fmt.Errorf("GetStream not implemented for Facebook")
 }
+
+// Notify implements Platform interface - posts to a Facebook Page or Profile
+func (f *FacebookService) Notify(ctx context.Context, target models.NotificationTarget, template models.NotificationTemplate, content models.Video) error {
+	// Retrieve access token and page ID
+	var encAccess, pageID string
+	err := f.db.QueryRow(
+		"SELECT access_token, platform_user_id FROM platform_accounts WHERE platform = 'facebook' AND platform_user_id = $1",
+		target.TargetIdentifier,
+	).Scan(&encAccess, &pageID)
+	if err != nil {
+		return fmt.Errorf("Facebook account not found: %w", err)
+	}
+
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt tokens: %w", err)
+	}
+
+	// Render content
+	message := utils.RenderNotificationTemplate(template.BodyTemplate, content, "YouTube")
+
+	data := url.Values{}
+	data.Set("message", message)
+	data.Set("link", content.S3URL) // Should be final platform URL preferably
+	data.Set("access_token", accessToken)
+
+	reqURL := fmt.Sprintf("https://graph.facebook.com/v19.0/%s/feed", pageID)
+	resp, err := http.PostForm(reqURL, data)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("Facebook API error (%d): %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}

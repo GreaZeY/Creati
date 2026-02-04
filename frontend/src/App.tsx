@@ -20,7 +20,10 @@ import {
 } from "./pages/Settings";
 import { WorkspaceManager } from "./components/settings/WorkspaceManager";
 import { Upload } from "./pages/Upload";
-import { Automation } from "./pages/Automation";
+import { Automations } from "./pages/automations/Automations";
+import { SyncsList } from "./pages/automations/SyncsList";
+import { AnnouncementsList } from "./pages/automations/AnnouncementsList";
+import { AnnouncementsBuilder } from "./pages/automations/AnnouncementsBuilder";
 import { ArchiveBlast } from "./pages/ArchiveBlast";
 import { RuleBuilder } from "./pages/RuleBuilder";
 import { BlastBuilder } from "./pages/BlastBuilder";
@@ -158,17 +161,47 @@ const router = createBrowserRouter([
           },
           {
             path: "automation",
+            element: <Navigate to="/automations/syncs" replace />,
+          },
+          {
+            path: "workflows",
+            element: <Navigate to="/automations/syncs" replace />,
+          },
+          {
+            path: "automations",
             element: (
               <PageTransition>
-                <Automation />
+                <Automations />
+              </PageTransition>
+            ),
+            children: [
+              {
+                index: true,
+                element: <Navigate to="syncs" replace />,
+              },
+              {
+                path: "syncs",
+                element: <SyncsList />,
+              },
+              {
+                path: "announcements",
+                element: <AnnouncementsList />,
+              },
+            ],
+          },
+          {
+            path: "automations/syncs/new",
+            element: (
+              <PageTransition>
+                <RuleBuilder />
               </PageTransition>
             ),
           },
           {
-            path: "automation/new",
+            path: "automations/announcements/new",
             element: (
               <PageTransition>
-                <RuleBuilder />
+                <AnnouncementsBuilder />
               </PageTransition>
             ),
           },

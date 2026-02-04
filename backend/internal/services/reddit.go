@@ -428,3 +428,72 @@ func (r *RedditService) FetchRecentVideos(accountID int) ([]ExternalVideo, error
 func (r *RedditService) GetStream(ctx context.Context, platformVideoID string) (io.ReadCloser, string, error) {
 	return nil, "", fmt.Errorf("GetStream not implemented for Reddit")
 }
+
+// Notify implements Platform interface - submits a link post to Reddit
+func (r *RedditService) Notify(ctx context.Context, target models.NotificationTarget, template models.NotificationTemplate, content models.Video) error {
+	// Retrieve access token
+	var encAccess string
+	err := r.db.QueryRow(
+		"SELECT access_token FROM platform_accounts WHERE platform = 'reddit' AND id = $1",
+		target.TargetIdentifier, // In Reddit, we might store the account ID or user_id here
+	).Scan(&encAccess)
+
+	// Fallback if target identifier is not numeric ID
+	if err != nil {
+		err = r.db.QueryRow(
+			"SELECT access_token FROM platform_accounts WHERE platform = 'reddit' AND platform_user_id = $1",
+			target.TargetIdentifier,
+		).Scan(&encAccess)
+	}
+
+	if err != nil {
+		return fmt.Errorf("Reddit account not found: %w", err)
+	}
+
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt tokens: %w", err)
+	}
+
+	// Render title and body
+	title := utils.RenderNotificationTemplate(template.TitleTemplate, content, "YouTube")
+	if title == "" {
+		title = content.Title
+	}
+
+	// Reddit link posts use 'url' for the content and 'sr' for subreddit
+	// Body template can be used for the title if TitleTemplate is missing
+	sr := "test" // Default or extract from target identifier if it's "sr:subredid"
+	if strings.HasPrefix(target.TargetIdentifier, "sr:") {
+		sr = strings.TrimPrefix(target.TargetIdentifier, "sr:")
+	}
+
+	data := url.Values{}
+	data.Set("sr", sr)
+	data.Set("kind", "link")
+	data.Set("title", title)
+	data.Set("url", content.S3URL) // Should be final platform URL preferably
+	data.Set("resubmit", "true")
+
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://oauth.reddit.com/api/submit", strings.NewReader(data.Encode()))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("User-Agent", "Creati/0.1 by GreaZeY")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("Reddit API error (%d): %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}

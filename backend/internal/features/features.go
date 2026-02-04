@@ -11,31 +11,35 @@ const (
 type Capability string
 
 const (
-	CanUseMagicSync         Capability = "can_use_magic_sync"
-	CanUseAdvancedAnalytics Capability = "can_use_advanced_analytics"
-	MaxUploadsPerMonth      Capability = "max_uploads_per_month"
-	MaxConnectedAccounts    Capability = "max_connected_accounts"
+	CanUseMagicSync             Capability = "can_use_magic_sync"
+	CanUseAudienceNotifications Capability = "can_use_audience_notifications"
+	CanUseAdvancedAnalytics     Capability = "can_use_advanced_analytics"
+	MaxUploadsPerMonth          Capability = "max_uploads_per_month"
+	MaxConnectedAccounts        Capability = "max_connected_accounts"
 )
 
 // Entitlements definition
 var planEntitlements = map[string]map[Capability]interface{}{
 	PlanFree: {
-		CanUseMagicSync:         false,
-		CanUseAdvancedAnalytics: false,
-		MaxUploadsPerMonth:      5,
-		MaxConnectedAccounts:    3,
+		CanUseMagicSync:             false,
+		CanUseAudienceNotifications: false,
+		CanUseAdvancedAnalytics:     false,
+		MaxUploadsPerMonth:          5,
+		MaxConnectedAccounts:        3,
 	},
 	PlanCreator: {
-		CanUseMagicSync:         true,
-		CanUseAdvancedAnalytics: false,
-		MaxUploadsPerMonth:      -1, // Unlimited
-		MaxConnectedAccounts:    10,
+		CanUseMagicSync:             true,
+		CanUseAudienceNotifications: true,
+		CanUseAdvancedAnalytics:     false,
+		MaxUploadsPerMonth:          -1, // Unlimited
+		MaxConnectedAccounts:        10,
 	},
 	PlanPro: {
-		CanUseMagicSync:         true,
-		CanUseAdvancedAnalytics: true,
-		MaxUploadsPerMonth:      -1, // Unlimited
-		MaxConnectedAccounts:    -1, // Unlimited
+		CanUseMagicSync:             true,
+		CanUseAudienceNotifications: true,
+		CanUseAdvancedAnalytics:     true,
+		MaxUploadsPerMonth:          -1, // Unlimited
+		MaxConnectedAccounts:        -1, // Unlimited
 	},
 }
 

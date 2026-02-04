@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"creati.in/creati/backend/internal/db/models"
@@ -537,4 +538,57 @@ func (t *TwitterService) FetchRecentVideos(accountID int) ([]ExternalVideo, erro
 // GetStream implements Platform interface
 func (t *TwitterService) GetStream(ctx context.Context, platformVideoID string) (io.ReadCloser, string, error) {
 	return nil, "", fmt.Errorf("GetStream not implemented for X/Twitter")
+}
+
+// Notify implements Platform interface - posts a tweet announcement
+func (x *TwitterService) Notify(ctx context.Context, target models.NotificationTarget, template models.NotificationTemplate, content models.Video) error {
+	// Retrieve access token
+	var encAccess string
+	err := x.db.QueryRow(
+		"SELECT access_token FROM platform_accounts WHERE platform = 'x' AND platform_user_id = $1",
+		target.TargetIdentifier,
+	).Scan(&encAccess)
+	if err != nil {
+		return fmt.Errorf("X account not found: %w", err)
+	}
+
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt tokens: %w", err)
+	}
+
+	// Render content
+	message := utils.RenderNotificationTemplate(template.BodyTemplate, content, "YouTube")
+	// X has a 280-char limit for basic accounts, but we'll let the API return error if exceeded
+
+	// Prepare payload
+	payload := map[string]string{
+		"text": message,
+	}
+
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.twitter.com/2/tweets", strings.NewReader(string(jsonPayload)))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("X API error (%d): %s", resp.StatusCode, string(body))
+	}
+
+	return nil
 }
