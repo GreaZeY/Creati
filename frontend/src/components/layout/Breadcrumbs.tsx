@@ -43,7 +43,7 @@ export const Breadcrumbs = () => {
 
           return (
             <div key={to} className="flex items-center gap-2">
-              <ChevronRight className="text-white w-3.5 h-3.5" />
+              <ChevronRight className="w-3.5 h-3.5" />
               {last ? (
                 <span className="text-foreground font-medium">{label}</span>
               ) : (

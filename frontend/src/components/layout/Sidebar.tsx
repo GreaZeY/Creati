@@ -17,14 +17,14 @@ import { HEADER_HEIGHT } from "@/lib/constants";
 import WorkspaceSwitcher from "./WorkspaceSwitcher";
 
 const NAV_ITEMS = [
-  { label: "COMMAND", icon: LayoutDashboard, href: "/dashboard" },
-  { label: "DISPATCH", icon: UploadCloud, href: "/upload" },
-  { label: "AUTOMATIONS", icon: Zap, href: "/automations" },
-  { label: "QUICK BLAST", icon: Rocket, href: "/blast" },
-  { label: "INTELLIGENCE", icon: BarChart2, href: "/analytics" },
-  { label: "NODES", icon: Link2, href: "/platforms" },
-  { label: "ASCEND", icon: Crown, href: "/pricing" },
-  { label: "CONFIG", icon: Settings, href: "/settings" },
+  { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
+  { label: "Dispatch", icon: UploadCloud, href: "/upload" },
+  { label: "Automations", icon: Zap, href: "/automations" },
+  { label: "Queued", icon: Rocket, href: "/blast" },
+  { label: "Analytics", icon: BarChart2, href: "/analytics" },
+  { label: "Platforms", icon: Link2, href: "/platforms" },
+  { label: "Upgrade", icon: Crown, href: "/pricing" },
+  { label: "Settings", icon: Settings, href: "/settings" },
 ];
 
 export function Sidebar() {
@@ -75,7 +75,7 @@ export function Sidebar() {
                       "transition-all duration-300",
                       isActive
                         ? "text-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.5)]"
-                        : "opacity-40 group-hover:opacity-100",
+                        : "group-hover:opacity-100",
                     )}
                   />
                   {item.label}

@@ -146,7 +146,6 @@
   }
 
   .lens-effect:hover {
-    transform: scale(1.01);
     box-shadow: var(--shadow-hover);
   }
 }

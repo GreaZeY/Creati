@@ -24,7 +24,7 @@ export function LensedCard({ children, className, onClick }: LensedCardProps) {
       ref={cardRef}
       onMouseMove={handleMouseMove}
       onClick={onClick}
-      className={cn("glass-card lens-effect rounded-3xl p-6 group", className)}
+      className={cn("glass-card lens-effect rounded-xl p-6 group", className)}
     >
       {/* Dynamic Glow Accent */}
       <div
@@ -34,7 +34,7 @@ export function LensedCard({ children, className, onClick }: LensedCardProps) {
         }}
       />
 
-        {children}
+      {children}
     </div>
   );
 }

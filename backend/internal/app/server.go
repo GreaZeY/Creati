@@ -95,7 +95,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	paymentHandler := api.NewPaymentHandler(db)
 	webhookHandler := api.NewWebhookHandler(db)
 	agencyHandler := api.NewAgencyHandler(db)
-	audienceHandler := api.NewAudienceHandler(db)
+	// audienceHandler := api.NewAudienceHandler(db)
 
 	// Events
 	dbURL := os.Getenv("DATABASE_URL")
@@ -156,13 +156,13 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	automationGroup.Put("/:id", automationHandler.ToggleRule)
 	automationGroup.Delete("/:id", automationHandler.DeleteRule)
 
-	audienceGroup := protected.Group("/audience", middleware.RequireFeature(db, cacheService, features.CanUseAudienceNotifications))
-	audienceGroup.Get("/rules", audienceHandler.ListRules)
-	audienceGroup.Post("/rules", audienceHandler.CreateRule)
-	audienceGroup.Put("/rules/:id/toggle", audienceHandler.ToggleRule)
-	audienceGroup.Delete("/rules/:id", audienceHandler.DeleteRule)
-	audienceGroup.Get("/templates", audienceHandler.GetTemplate)
-	audienceGroup.Post("/templates", audienceHandler.SaveTemplate)
+	// audienceGroup := protected.Group("/audience", middleware.RequireFeature(db, cacheService, features.CanUseAudienceNotifications))
+	// audienceGroup.Get("/rules", audienceHandler.ListRules)
+	// audienceGroup.Post("/rules", audienceHandler.CreateRule)
+	// audienceGroup.Put("/rules/:id/toggle", audienceHandler.ToggleRule)
+	// audienceGroup.Delete("/rules/:id", audienceHandler.DeleteRule)
+	// audienceGroup.Get("/templates", audienceHandler.GetTemplate)
+	// audienceGroup.Post("/templates", audienceHandler.SaveTemplate)
 
 	protected.Post("/payments/create-subscription", paymentHandler.CreateSubscription)
 	protected.Post("/payments/verify-subscription", paymentHandler.VerifySubscription)

@@ -176,12 +176,11 @@ export const Platforms = () => {
                 <motion.div
                   key={platform.id}
                   layout
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  // initial={{ opacity: 0, y: 20 }}
+                  // animate={{ opacity: 1, y: 0 }}
                   exit={{
                     opacity: 0,
-                    scale: 0.95,
-                    transition: { duration: 0.2 },
+                    // transition: { duration: 0.2 },
                   }}
                   transition={{ delay: i * 0.05 }}
                   className="w-full"
@@ -230,16 +229,16 @@ export const Platforms = () => {
                           }}
                         >
                           <Trash2 size={16} />
-                          Purge Node
+                          Delete
                         </DropdownItem>
                       </DropdownMenu>
                     </div>
 
                     {/* Watermark Logo Background */}
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 h-full aspect-square opacity-30 pointer-events-none select-none">
+                    <div className="absolute right-[20px] top-1/2 -translate-y-1/2 h-full aspect-square opacity-30 pointer-events-none select-none">
                       <div
                         className={cn(
-                          "w-full h-full flex items-center justify-center scale-150 relative -right-10",
+                          "w-full h-full flex items-center justify-center relative -right-10",
                           accentClass.split(" ")[0],
                         )}
                         style={{
@@ -251,7 +250,7 @@ export const Platforms = () => {
                       >
                         <PlatformLogo
                           platform={platform.platform}
-                          size={160}
+                          size={140}
                           className="text-current"
                         />
                       </div>
@@ -289,7 +288,7 @@ export const Platforms = () => {
                           connectMutation.isPending &&
                           connectMutation.variables === platform.id
                         }
-                        className="h-10 px-6 rounded-xl bg-primary text-primary-foreground font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                        className="h-10 px-6 rounded-xl bg-primary text-primary-foreground font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20 transition-all"
                       >
                         Reconnect
                       </Button>
@@ -302,7 +301,7 @@ export const Platforms = () => {
         </div>
       ) : (
         <LensedCard className="py-16 flex flex-col items-center justify-center text-center border-dashed border-2 border-border">
-          <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-6 ring-1 ring-border group-hover:scale-110 group-hover:-rotate-6 transition-all duration-700">
+          <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-6 ring-1 ring-border transition-all duration-700">
             <Link2 className="w-8 h-8 text-primary opacity-40" />
           </div>
 
@@ -317,7 +316,7 @@ export const Platforms = () => {
           <Button
             asChild
             size="lg"
-            className="mt-8 h-11 px-8 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:scale-105 active:scale-95 transition-all"
+            className="mt-8 h-11 px-8 rounded-xl bg-primary text-primary-foreground font-bold text-sm transition-all"
           >
             <Link to="/platforms/connect">AUTH FIRST NODE</Link>
           </Button>
