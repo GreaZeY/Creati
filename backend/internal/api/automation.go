@@ -426,92 +426,82 @@ func (h *AutomationHandler) HandleYouTubeWebhook(c *fiber.Ctx) error {
 		}
 
 		query := fmt.Sprintf(`
-			SELECT 
-				COALESCE(e.trace_id::text, e.id::text) as id, 
-				'sync' as job_type, 
-				MAX(e.rule_id) as rule_id, 
-				MAX(r.name) as name, 
+			WITH raw_jobs AS (
+				SELECT 
+					COALESCE(e.trace_id::text, e.id::text) as display_id,
+					'sync' as job_type, 
+					e.rule_id, 
+					r.name, 
+					e.status,
+					e.created_at,
+					COALESCE(spa.handle, spa.profile_name, e.source_platform) as source_handle,
+					e.source_platform as source_platform,
+					COALESCE(tpa.handle, tpa.profile_name, e.target_platform) as target_handle,
+					e.target_platform as target_platform,
+					COALESCE(e.error, '') as error,
+					COALESCE(c.title, 'Unknown') as content_title,
+					e.content_id::text as content_id,
+					r.action
+				FROM automation_executions e
+				JOIN automation_rules r ON e.rule_id = r.id
+				LEFT JOIN contents c ON e.content_id = c.id
+				LEFT JOIN platform_accounts spa ON r.source_account_id = spa.id 
+				LEFT JOIN platform_accounts tpa ON e.target_account_id = tpa.id
+				WHERE %s
 				
-				-- Aggregate Status Logic
+				UNION ALL
+				
+				SELECT 
+					COALESCE(l.trace_id::text, l.id::text) as display_id,
+					'notify' as job_type,
+					l.rule_id, 
+					r.name, 
+					l.status,
+					l.created_at,
+					COALESCE(spa.handle, spa.profile_name, spa.platform) as source_handle,
+					spa.platform as source_platform,
+					l.target_platform as target_handle,
+					l.target_platform as target_platform,
+					COALESCE(l.error_message, '') as error,
+					COALESCE(v.title, 'Unknown') as content_title,
+					l.content_id::text as content_id,
+					r.action
+				FROM automation_logs l
+				JOIN automation_rules r ON l.rule_id = r.id
+				JOIN platform_accounts spa ON r.source_account_id = spa.id
+				LEFT JOIN videos v ON l.content_id = v.id
+				WHERE %s
+			)
+			SELECT 
+				display_id,
+				CASE WHEN MAX(action) = 'sync' THEN 'sync' ELSE 'notify' END as job_type,
+				MAX(rule_id),
+				MAX(name),
 				CASE 
-					WHEN COUNT(*) = COUNT(*) FILTER (WHERE e.status = 'completed') THEN 'success'
-					WHEN COUNT(*) = COUNT(*) FILTER (WHERE e.status = 'failed') THEN 'failed'
-					WHEN COUNT(*) = COUNT(*) FILTER (WHERE e.status = 'queued') THEN 'queued'
-					WHEN COUNT(*) FILTER (WHERE e.status = 'failed') > 0 THEN 'partial'
+					WHEN COUNT(*) = COUNT(*) FILTER (WHERE status IN ('completed', 'success', 'sent')) THEN 'success'
+					WHEN COUNT(*) = COUNT(*) FILTER (WHERE status = 'failed') THEN 'failed'
+					WHEN COUNT(*) = COUNT(*) FILTER (WHERE status = 'queued') THEN 'queued'
+					WHEN COUNT(*) FILTER (WHERE status = 'failed') > 0 THEN 'partial'
 					ELSE 'processing'
 				END as status,
-
-				-- Progress
-				(COUNT(*) FILTER (WHERE e.status IN ('completed', 'failed')))::text || '/' || COUNT(*)::text as progress,
-
-				-- JSON Array of Sources (currently single, but extensible)
-				json_agg(DISTINCT jsonb_build_object(
-					'handle', COALESCE(spa.handle, spa.profile_name, e.source_platform),
-					'platform', e.source_platform,
-					'status', 'active' 
-				)) as sources,
-
-				-- JSON Array of Targets (Executions)
-				json_agg(json_build_object(
-					'handle', COALESCE(tpa.handle, tpa.profile_name, e.target_platform),
-					'platform', e.target_platform,
-					'status', e.status,
-					'error', COALESCE(e.error, ''),
-					'contentTitle', COALESCE(c.title, 'Unknown')
-				)) as targets,
-
-				-- JSON Array of Distinct Contents
-				json_agg(DISTINCT jsonb_build_object(
-					'id', e.content_id, 
-					'title', COALESCE(c.title, 'Unknown')
-				)) as contents,
-
-				MAX(e.created_at) as created_at
-
-			FROM automation_executions e
-			JOIN automation_rules r ON e.rule_id = r.id
-			LEFT JOIN contents c ON e.content_id = c.id
-			LEFT JOIN platform_accounts spa ON r.source_account_id = spa.id 
-			LEFT JOIN platform_accounts tpa ON e.target_account_id = tpa.id
-			WHERE %s
-			GROUP BY COALESCE(e.trace_id::text, e.id::text)
-			
-			UNION ALL
-			
-			-- Logs
-			SELECT 
-				COALESCE(l.trace_id::text, l.id::text), 'notify', MAX(l.rule_id), MAX(r.name), 
-				CASE 
-					WHEN COUNT(*) = COUNT(*) FILTER (WHERE l.status = 'completed') THEN 'success'
-					WHEN COUNT(*) = COUNT(*) FILTER (WHERE l.status = 'failed') THEN 'failed'
-					WHEN COUNT(*) FILTER (WHERE l.status = 'failed') > 0 THEN 'partial'
-					ELSE 'success' -- Default for single notifications
-				END, 
-				(COUNT(*) FILTER (WHERE l.status IN ('completed', 'failed')))::text || '/' || COUNT(*)::text as progress,
-				json_agg(DISTINCT jsonb_build_object(
-					'handle', COALESCE(spa.handle, spa.profile_name, spa.platform),
-					'platform', spa.platform,
+				(COUNT(*) FILTER (WHERE status IN ('completed', 'success', 'sent', 'failed')))::text || '/' || COUNT(*)::text as progress,
+				jsonb_agg(DISTINCT jsonb_build_object(
+					'handle', source_handle,
+					'platform', source_platform,
 					'status', 'active'
-				)),
-				json_agg(json_build_object(
-					'handle', l.target_platform,
-					'platform', l.target_platform,
-					'status', l.status,
-					'error', COALESCE(l.error_message, ''),
-					'contentTitle', COALESCE(v.title, 'Unknown')
-				)),
-				json_agg(DISTINCT jsonb_build_object(
-					'id', l.content_id, 
-					'title', COALESCE(v.title, 'Unknown')
-				)),
-				MAX(l.created_at)
-			FROM automation_logs l
-			JOIN automation_rules r ON l.rule_id = r.id
-			JOIN platform_accounts spa ON r.source_account_id = spa.id
-			LEFT JOIN videos v ON l.content_id = v.id
-			WHERE %s
-			GROUP BY COALESCE(l.trace_id::text, l.id::text)
-			
+				)) as sources,
+				jsonb_agg(DISTINCT jsonb_build_object(
+					'handle', target_handle,
+					'platform', target_platform,
+					'status', status
+				)) as targets,
+				jsonb_agg(DISTINCT jsonb_build_object(
+					'id', content_id,
+					'title', content_title
+				)) as contents,
+				MAX(created_at) as created_at
+			FROM raw_jobs
+			GROUP BY display_id
 			ORDER BY created_at DESC
 			LIMIT $%d OFFSET $%d
 		`, ruleFilter, ruleFilter, len(args)+1, len(args)+2)
@@ -555,4 +545,68 @@ func (h *AutomationHandler) HandleYouTubeWebhook(c *fiber.Ctx) error {
 		}
 
 		return utils.SuccessResponse(c, jobs, "")
+	}
+
+	func (h *AutomationHandler) GetJobDetails(c *fiber.Ctx) error {
+		userID := middleware.GetUserID(c)
+		id := c.Params("id")
+
+		// Query both executions and logs for this trace_id or singular id
+		query := `
+			WITH raw_details AS (
+				SELECT 
+					COALESCE(e.trace_id::text, e.id::text) as display_id,
+					COALESCE(tpa.handle, tpa.profile_name, e.target_platform) as handle,
+					e.target_platform as platform,
+					e.status,
+					COALESCE(e.error, '') as error,
+					COALESCE(c.title, 'Unknown') as content_title
+				FROM automation_executions e
+				JOIN automation_rules r ON e.rule_id = r.id
+				LEFT JOIN contents c ON e.content_id = c.id
+				LEFT JOIN platform_accounts tpa ON e.target_account_id = tpa.id
+				WHERE r.user_id = $1 AND (e.trace_id::text = $2 OR e.id::text = $2)
+				
+				UNION ALL
+				
+				SELECT 
+					COALESCE(l.trace_id::text, l.id::text) as display_id,
+					l.target_platform as handle,
+					l.target_platform as platform,
+					l.status,
+					COALESCE(l.error_message, '') as error,
+					COALESCE(v.title, 'Unknown') as content_title
+				FROM automation_logs l
+				JOIN automation_rules r ON l.rule_id = r.id
+				LEFT JOIN videos v ON l.content_id = v.id
+				WHERE r.user_id = $1 AND (l.trace_id::text = $2 OR l.id::text = $2)
+			)
+			SELECT handle, platform, status, error, content_title
+			FROM raw_details
+		`
+
+		rows, err := h.db.Query(query, userID, id)
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
+		}
+		defer rows.Close()
+
+		type DetailedTarget struct {
+			Handle       string `json:"handle"`
+			Platform     string `json:"platform"`
+			Status       string `json:"status"`
+			Error        string `json:"error"`
+			ContentTitle string `json:"contentTitle"`
+		}
+
+		details := make([]DetailedTarget, 0)
+		for rows.Next() {
+			var dt DetailedTarget
+			if err := rows.Scan(&dt.Handle, &dt.Platform, &dt.Status, &dt.Error, &dt.ContentTitle); err != nil {
+				continue
+			}
+			details = append(details, dt)
+		}
+
+		return utils.SuccessResponse(c, details, "")
 	}

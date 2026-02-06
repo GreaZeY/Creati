@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"creati.in/creati/backend/internal/db/models"
+	"github.com/google/uuid"
 )
 
 type AudienceService struct {
@@ -89,7 +90,7 @@ func (s *AudienceService) EnqueueFromContent(ctx context.Context, contentID stri
 	if err != nil {
 		return fmt.Errorf("failed to query rules: %w", err)
 	}
-	defer rows.Close()
+	traceID := uuid.New().String()
 
 	for rows.Next() {
 		var ruleID int
@@ -111,27 +112,28 @@ func (s *AudienceService) EnqueueFromContent(ctx context.Context, contentID stri
 				"target_platform":   target.TargetPlatform,
 				"target_identifier": target.TargetIdentifier,
 				"is_unified":        true,
+				"trace_id":          traceID,
 			}
 			jsonPayload, _ := json.Marshal(payload)
 
 			if err := s.QueueSvc.Client.LPush(ctx, "audience_notification", jsonPayload).Err(); err != nil {
-				s.LogNotification(ctx, contentID, ruleID, target.TargetPlatform, "failed", "enqueue error: "+err.Error())
+				s.LogNotification(ctx, contentID, ruleID, target.TargetPlatform, "failed", "enqueue error: "+err.Error(), traceID)
 			} else {
-				s.LogNotification(ctx, contentID, ruleID, target.TargetPlatform, "pending", "")
+				s.LogNotification(ctx, contentID, ruleID, target.TargetPlatform, "pending", "", traceID)
 			}
 		}
 	}
 	return nil
 }
 
-func (s *AudienceService) LogNotification(ctx context.Context, contentID string, ruleID int, platform, status, errMsg string) error {
+func (s *AudienceService) LogNotification(ctx context.Context, contentID string, ruleID int, platform, status, errMsg string, traceID string) error {
 	var cID int
 	fmt.Sscanf(contentID, "%d", &cID)
 
 	query := `
-		INSERT INTO automation_logs (content_id, rule_id, target_platform, status, error_message)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO automation_logs (content_id, rule_id, target_platform, status, error_message, trace_id)
+		VALUES ($1, $2, $3, $4, $5, NULLIF($6, ''))
 	`
-	_, err := s.DB.ExecContext(ctx, query, cID, ruleID, platform, status, errMsg)
+	_, err := s.DB.ExecContext(ctx, query, cID, ruleID, platform, status, errMsg, traceID)
 	return err
 }

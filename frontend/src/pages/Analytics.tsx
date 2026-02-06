@@ -65,7 +65,7 @@ export const Analytics = () => {
       : (totalViews * 0.002).toFixed(2); // Fallback to mock RPV
 
   return (
-    <div className="space-y-8 pb-12 max-w-7xl mx-auto px-4">
+    <div className="flex-1 overflow-y-auto space-y-8 pb-12 max-w-7xl mx-auto px-4 w-full">
       <PageHeader
         title="Analytics"
         description="Actionable intelligence across your entire creator footprint. Pure data, no noise."

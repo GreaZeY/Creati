@@ -84,6 +84,8 @@ func (s *AutomationService) ProcessYouTubeEvent(payload []byte) error {
 	}
 	defer rows.Close()
 
+	traceID := uuid.New().String()
+
 	for rows.Next() {
 		var ruleID int
 		var action string
@@ -109,9 +111,6 @@ func (s *AutomationService) ProcessYouTubeEvent(payload []byte) error {
 			Identifier      string `json:"targetIdentifier"` // For notify
 		}
 		json.Unmarshal(targetsRaw, &targets)
-
-		// Generate a single trace_id for this trigger event
-		traceID := uuid.New().String()
 
 		if action == "notify" {
 			for _, target := range targets {
@@ -244,6 +243,7 @@ func (s *AutomationService) BlastVideos(userID int, clientID *int, sourceAccount
 	}
 
 	// 2. Enqueue jobs for each video and each target
+	traceID := uuid.New().String()
 	for _, videoID := range videoIDs {
 		// Try to fetch the most descriptive title from our records
 		var title string
@@ -261,8 +261,7 @@ func (s *AutomationService) BlastVideos(userID int, clientID *int, sourceAccount
 			title = "Archive Blast Video"
 		}
 
-		// Each video in a blast gets its own trace_id for grouping in UI
-		traceID := uuid.New().String()
+		// Use the same trace_id for the entire blast
 		for _, target := range targets {
 			s.createAutomationJob(ruleID, videoID, target.AccountID, title, traceID)
 		}
@@ -272,12 +271,12 @@ func (s *AutomationService) BlastVideos(userID int, clientID *int, sourceAccount
 }
 func (s *AutomationService) RetryExecution(ctx context.Context, executionID string) error {
 	// 1. Fetch details for re-queueing
-	var contentID, targetPlatform string
+	var contentID, targetPlatform, traceID string
 	var targetAccountID int
 	err := s.db.QueryRow(`
-		SELECT content_id, target_platform, target_account_id
+		SELECT content_id, target_platform, target_account_id, trace_id
 		FROM automation_executions WHERE id = $1
-	`, executionID).Scan(&contentID, &targetPlatform, &targetAccountID)
+	`, executionID).Scan(&contentID, &targetPlatform, &targetAccountID, &traceID)
 
 	if err != nil {
 		return err
@@ -384,6 +383,7 @@ func (s *AutomationService) createNotificationJob(ruleID int, sourceVideoID stri
 		"target_platform":   targetPlatform,
 		"target_identifier": targetIdentifier,
 		"is_unified":        true,
+		"trace_id":          traceID,
 	})
 
 	err = s.queue.Client.LPush(ctx, "audience_notification", payload).Err()

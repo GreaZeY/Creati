@@ -128,7 +128,7 @@ export const Platforms = () => {
   };
 
   return (
-    <div className="space-y-8 pb-12 max-w-7xl mx-auto px-4 font-outfit">
+    <div className="flex-1 overflow-y-auto space-y-8 pb-12 max-w-7xl mx-auto px-4 font-outfit w-full">
       <PageHeader
         title="My Platforms"
         description="Your connected neural pathways across the digital workspace."

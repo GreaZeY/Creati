@@ -77,15 +77,15 @@ export function DataTable<T extends { id: string | number }>({
         className,
       )}
     >
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-border/40 bg-secondary/20">
+      <div className="overflow-auto flex-1 h-full min-h-0">
+        <table className="w-full text-left text-sm border-separate border-spacing-0">
+          <thead className="sticky top-0 z-10 bg-secondary/80 backdrop-blur-md">
+            <tr>
               {columns.map((col, i) => (
                 <th
                   key={i}
                   className={cn(
-                    "h-10 px-4 text-[10px] font-black uppercase text-muted-foreground tracking-widest select-none",
+                    "h-10 px-4 text-[10px] font-black uppercase text-muted-foreground tracking-widest select-none border-b border-border/40",
                     col.className,
                   )}
                 >
@@ -105,7 +105,13 @@ export function DataTable<T extends { id: string | number }>({
                 )}
               >
                 {columns.map((col, i) => (
-                  <td key={i} className={cn("p-2 align-middle", col.className)}>
+                  <td
+                    key={i}
+                    className={cn(
+                      "p-3 align-middle border-b border-border/10",
+                      col.className,
+                    )}
+                  >
                     {col.cell
                       ? col.cell(item)
                       : col.accessorKey
@@ -117,10 +123,9 @@ export function DataTable<T extends { id: string | number }>({
             ))}
           </tbody>
         </table>
+        {/* Infinite Scroll Trigger */}
+        <div ref={observerTarget} className="h-4 w-full" />
       </div>
-
-      {/* Infinite Scroll Trigger */}
-      <div ref={observerTarget} className="h-4 w-full" />
 
       {isFetchingNextPage && (
         <div className="flex justify-center p-4 border-t border-border/20">

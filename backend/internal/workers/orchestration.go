@@ -15,6 +15,7 @@ import (
 type OrchestrationJob struct {
 	ContentID      string `json:"content_id"`
 	SourcePlatform string `json:"source_platform"`
+	TraceID        string `json:"trace_id"`
 }
 
 type OrchestrationWorker struct {
@@ -108,10 +109,10 @@ func (w *OrchestrationWorker) Process(ctx context.Context, payload []byte) error
 			err = w.DB.QueryRowContext(ctx, `
 				INSERT INTO automation_executions 
 				(content_id, rule_id, source_platform, target_platform, target_account_id, status, trace_id)
-				VALUES ($1, $2, $3, $4, $5, 'queued', gen_random_uuid())
+				VALUES ($1, $2, $3, $4, 'queued', NULLIF($5, ''))
 				ON CONFLICT (content_id, target_platform) DO NOTHING
 				RETURNING id
-			`, job.ContentID, ruleID, job.SourcePlatform, targetPlatform, targetAccountID).Scan(&executionID)
+			`, job.ContentID, ruleID, job.SourcePlatform, targetPlatform, targetAccountID, job.TraceID).Scan(&executionID)
 
 			if err != nil {
 				if err == sql.ErrNoRows {

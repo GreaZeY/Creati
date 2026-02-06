@@ -256,6 +256,9 @@ export const automationAPI = {
       `/automation/jobs?limit=${limit}&offset=${offset}` + (clientId ? `&clientId=${clientId}` : "")
     ),
 
+  getJobDetails: (id: string) =>
+    api.get<ApiResponse<any[]>>(`/automation/jobs/${id}/details`),
+
   retryRule: (id: number) =>
     api.post<ApiResponse>(`/automation/rules/${id}/retry`),
 };

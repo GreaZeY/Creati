@@ -23,10 +23,11 @@ import {
 } from "lucide-react";
 import { TextTruncate } from "@/components/ui/Truncate";
 import {
-  Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  TooltipArrow,
+  Tooltip,
 } from "@/components/ui/Tooltip";
 
 import { Modal } from "@/components/ui/Modal";
@@ -164,6 +165,26 @@ export function QueuedJobs() {
     return () => eventSource.close();
   }, [queryClient, selectedClient?.id, selectedJob]);
 
+  // Fetch details on selection
+  const [jobDetails, setJobDetails] = useState<any[]>([]);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+
+  useEffect(() => {
+    if (selectedJob) {
+      setIsLoadingDetails(true);
+      automationAPI
+        .getJobDetails(selectedJob.id)
+        .then((resp) => {
+          setJobDetails(resp.data.data || []);
+        })
+        .finally(() => {
+          setIsLoadingDetails(false);
+        });
+    } else {
+      setJobDetails([]);
+    }
+  }, [selectedJob]);
+
   // Retry Handler
   const handleRetry = async (job: any) => {
     try {
@@ -204,26 +225,52 @@ export function QueuedJobs() {
     },
     {
       header: "Content",
-      cell: (job) => (
-        <div className="flex flex-col gap-1 max-w-[200px]">
-          {job.contents?.slice(0, 2).map((content: any, i: number) => (
-            <div key={i} className="flex flex-col gap-0.5">
+      cell: (job) => {
+        const primaryContent = job.contents?.[0];
+        if (!primaryContent) return null;
+        const remainder = job.contents.slice(1);
+
+        return (
+          <div className="flex items-center gap-2 max-w-[200px]">
+            <div className="flex flex-col gap-0.5 min-w-0">
               <TextTruncate
-                text={content.title}
+                text={primaryContent.title}
                 className="font-medium text-xs text-foreground"
               />
               <span className="text-[9px] text-muted-foreground truncate opacity-50">
-                ID: {content.id}
+                ID: {primaryContent.id}
               </span>
             </div>
-          ))}
-          {job.contents?.length > 2 && (
-            <span className="text-[9px] font-bold text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-md self-start">
-              +{job.contents.length - 2} more
-            </span>
-          )}
-        </div>
-      ),
+
+            {remainder.length > 0 && (
+              <TooltipProvider>
+                <Tooltip delayDuration={200}>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center justify-center h-5 px-1.5 rounded-full bg-secondary border border-border/50 text-[10px] font-bold text-muted-foreground hover:bg-secondary/80 cursor-default transition-colors shrink-0">
+                      +{remainder.length}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" align="center">
+                    <TooltipArrow className="fill-card" />
+                    <div className="flex flex-col gap-2 p-1 max-w-[250px]">
+                      {remainder.map((c: any, i: number) => (
+                        <div key={i} className="flex flex-col gap-0.5">
+                          <span className="text-xs font-semibold">
+                            {c.title}
+                          </span>
+                          <span className="text-[9px] opacity-50 uppercase font-mono">
+                            ID: {c.id}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+        );
+      },
     },
     {
       header: "Source",
@@ -245,10 +292,25 @@ export function QueuedJobs() {
     {
       header: "Target",
       cell: (job) => {
-        const primaryTarget = job.targets?.[0];
+        // Deduplicate targets by platform and handle for the column view
+        const uniqueTargets =
+          job.targets?.reduce((acc: any[], current: any) => {
+            const x = acc.find(
+              (item) =>
+                item.platform === current.platform &&
+                item.handle === current.handle,
+            );
+            if (!x) {
+              return acc.concat([current]);
+            } else {
+              return acc;
+            }
+          }, []) || [];
+
+        const primaryTarget = uniqueTargets[0];
         if (!primaryTarget) return null;
 
-        const remainingTargets = job.targets.slice(1);
+        const remainingTargets = uniqueTargets.slice(1);
 
         return (
           <div className="flex items-center gap-3">
@@ -269,23 +331,29 @@ export function QueuedJobs() {
 
             {remainingTargets.length > 0 && (
               <TooltipProvider>
-                <Tooltip delayDuration={300}>
+                <Tooltip delayDuration={200}>
                   <TooltipTrigger asChild>
                     <div className="flex items-center justify-center h-5 px-1.5 rounded-full bg-secondary border border-border/50 text-[10px] font-bold text-muted-foreground hover:bg-secondary/80 cursor-default transition-colors">
                       +{remainingTargets.length}
                     </div>
                   </TooltipTrigger>
-                  <TooltipContent side="left">
-                    <div className="flex flex-col gap-2 p-1">
+                  <TooltipContent side="bottom" align="center">
+                    <TooltipArrow className="fill-card" />
+                    <div className="flex flex-col gap-3 p-1">
                       {remainingTargets.map((t: any, i: number) => (
                         <div
                           key={i}
-                          className="flex items-center gap-2 min-w-[120px]"
+                          className="flex items-center gap-2 min-w-[140px]"
                         >
-                          <PlatformLogo platform={t.platform} size={14} />
-                          <span className="text-xs font-medium">
-                            {t.handle || t.platform}
-                          </span>
+                          <PlatformLogo platform={t.platform} size={16} />
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold leading-none">
+                              {t.handle || t.platform}
+                            </span>
+                            <span className="text-[9px] text-muted-foreground uppercase mt-0.5">
+                              {t.platform}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -360,7 +428,7 @@ export function QueuedJobs() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 font-outfit h-full flex flex-col">
+    <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 font-outfit flex flex-col overflow-hidden w-full flex-1 min-h-0">
       <PageHeader
         title="Mission Control"
         description="Live view of all automated executions and notification events."
@@ -445,7 +513,14 @@ export function QueuedJobs() {
                 </div>
                 <ArrowRight size={14} className="text-muted-foreground" />
                 <div className="flex flex-col gap-3 w-full">
-                  {selectedJob.targets.length === 1 ? (
+                  {isLoadingDetails ? (
+                    <div className="flex items-center justify-center p-4">
+                      <Loader2
+                        className="animate-spin text-muted-foreground"
+                        size={20}
+                      />
+                    </div>
+                  ) : jobDetails.length === 1 ? (
                     /* Single Target View */
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-background/50">
@@ -479,13 +554,10 @@ export function QueuedJobs() {
                         <div className="flex items-center gap-3 text-right">
                           <div>
                             <p className="font-bold text-xs">
-                              {selectedJob.targets[0].handle ||
-                                selectedJob.targets[0].platform}
+                              {jobDetails[0].handle || jobDetails[0].platform}
                             </p>
                             <div className="flex items-center justify-end gap-2">
-                              <StatusBadge
-                                status={selectedJob.targets[0].status}
-                              />
+                              <StatusBadge status={jobDetails[0].status} />
                             </div>
                           </div>
                           <PlatformLogo
@@ -496,12 +568,12 @@ export function QueuedJobs() {
                       </div>
 
                       {/* Error Reason */}
-                      {(selectedJob.targets[0].status === "failed" ||
-                        selectedJob.targets[0].status === "partial") &&
-                        selectedJob.targets[0].error && (
+                      {(jobDetails[0].status === "failed" ||
+                        jobDetails[0].status === "partial") &&
+                        jobDetails[0].error && (
                           <div className="flex flex-col gap-2">
                             <div className="text-[10px] font-mono text-red-500 bg-red-500/5 p-3 rounded-lg border border-red-500/10 break-all">
-                              {selectedJob.targets[0].error}
+                              {jobDetails[0].error}
                             </div>
                             <Button
                               onClick={() => handleRetry(selectedJob)}
@@ -519,24 +591,22 @@ export function QueuedJobs() {
                     <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 bg-background/50">
                       <div className="flex items-center gap-3">
                         <div className="flex -space-x-2">
-                          {selectedJob.targets
-                            .slice(0, 3)
-                            .map((t: any, i: number) => (
-                              <PlatformLogo
-                                key={i}
-                                platform={t.platform}
-                                size={24}
-                                className="ring-2 ring-background rounded-full"
-                              />
-                            ))}
-                          {selectedJob.targets.length > 3 && (
+                          {jobDetails.slice(0, 3).map((t: any, i: number) => (
+                            <PlatformLogo
+                              key={i}
+                              platform={t.platform}
+                              size={24}
+                              className="ring-2 ring-background rounded-full"
+                            />
+                          ))}
+                          {jobDetails.length > 3 && (
                             <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-[9px] font-bold ring-2 ring-background">
-                              +{selectedJob.targets.length - 3}
+                              +{jobDetails.length - 3}
                             </div>
                           )}
                         </div>
                         <span className="font-bold text-xs">
-                          {selectedJob.targets.length} Targets
+                          {jobDetails.length} Targets
                         </span>
                       </div>
                       <Button
@@ -582,54 +652,74 @@ export function QueuedJobs() {
         title="Execution Details"
       >
         <div className="space-y-4">
-          <div className="rounded-md border border-border overflow-hidden">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-secondary/50 text-muted-foreground font-bold uppercase text-[10px] tracking-wider">
-                <tr>
-                  <th className="p-3">Content</th>
-                  <th className="p-3">Target</th>
-                  <th className="p-3">Status</th>
-                  <th className="p-3">Info</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {selectedJob?.targets.map((target: any, i: number) => (
-                  <tr key={i} className="hover:bg-secondary/20">
-                    <td className="p-3 font-medium">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-xs">
-                          {target.contentTitle !== "Unknown"
-                            ? target.contentTitle
-                            : "Content"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <div className="flex items-center gap-1.5">
-                        <PlatformLogo platform={target.platform} size={16} />
-                        <span className="text-xs">
-                          {target.handle || target.platform}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <StatusBadge status={target.status} />
-                    </td>
-                    <td className="p-3">
-                      {target.error ? (
-                        <span className="text-[10px] font-mono text-red-500 break-all">
-                          {target.error}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground">
-                          -
-                        </span>
-                      )}
-                    </td>
+          <div className="rounded-md border border-border overflow-hidden flex flex-col max-h-[60vh]">
+            <div className="overflow-auto relative">
+              <table className="w-full text-sm text-left border-separate border-spacing-0">
+                <thead className="bg-secondary/80 backdrop-blur-md sticky top-0 z-10 text-muted-foreground font-bold uppercase text-[10px] tracking-wider">
+                  <tr>
+                    <th className="p-3 border-b border-border">Content</th>
+                    <th className="p-3 border-b border-border">Target</th>
+                    <th className="p-3 border-b border-border">Status</th>
+                    <th className="p-3 border-b border-border">Info</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {isLoadingDetails ? (
+                    <tr>
+                      <td
+                        colSpan={4}
+                        className="p-8 text-center text-muted-foreground"
+                      >
+                        <Loader2
+                          className="animate-spin mx-auto mb-2"
+                          size={24}
+                        />
+                        Downloading trace data...
+                      </td>
+                    </tr>
+                  ) : (
+                    jobDetails.map((target: any, i: number) => (
+                      <tr key={i} className="hover:bg-secondary/20">
+                        <td className="p-3 font-medium border-b border-border/5">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs">
+                              {target.contentTitle !== "Unknown"
+                                ? target.contentTitle
+                                : "Content"}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-3 border-b border-border/5">
+                          <div className="flex items-center gap-1.5">
+                            <PlatformLogo
+                              platform={target.platform}
+                              size={16}
+                            />
+                            <span className="text-xs">
+                              {target.handle || target.platform}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-3 border-b border-border/5">
+                          <StatusBadge status={target.status} />
+                        </td>
+                        <td className="p-3 border-b border-border/5">
+                          {target.error ? (
+                            <span className="text-[10px] font-mono text-red-500 break-all">
+                              {target.error}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground">
+                              -
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </Modal>

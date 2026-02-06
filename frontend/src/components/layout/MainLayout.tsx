@@ -12,12 +12,10 @@ export function MainLayout() {
 
       <div className="flex-1 flex flex-col h-screen transition-all duration-300 overflow-hidden ml-64">
         <Header />
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-7xl mx-auto p-8">
-            <AnimatePresence mode="wait">
-              <Outlet key={location.pathname} />
-            </AnimatePresence>
-          </div>
+        <main className="flex-1 flex flex-col overflow-hidden relative">
+          <AnimatePresence mode="wait">
+            <Outlet key={location.pathname} />
+          </AnimatePresence>
         </main>
       </div>
     </div>

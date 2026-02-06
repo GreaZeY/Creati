@@ -149,6 +149,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	automationGroup := protected.Group("/automation", middleware.RequireFeature(db, cacheService, features.CanUseMagicSync))
 	automationGroup.Get("", automationHandler.ListRules)
 	automationGroup.Get("/jobs", automationHandler.ListJobs)
+	automationGroup.Get("/jobs/:id/details", automationHandler.GetJobDetails)
 	automationGroup.Post("", automationHandler.CreateRule)
 	automationGroup.Post("/blast", automationHandler.HandleBlast)
 	automationGroup.Post("/executions/:id/retry", automationHandler.RetryExecution)

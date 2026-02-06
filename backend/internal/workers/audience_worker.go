@@ -32,6 +32,7 @@ type AudienceJobPayload struct {
 	TargetPlatform   string `json:"target_platform"`   // Unified
 	TargetIdentifier string `json:"target_identifier"` // Unified
 	IsUnified        bool   `json:"is_unified"`
+	TraceID          string `json:"trace_id"`
 }
 
 func (w *AudienceNotificationWorker) Name() string {
@@ -103,5 +104,5 @@ func (w *AudienceNotificationWorker) Process(ctx context.Context, payload []byte
 		w.db.Exec("UPDATE automation_executions SET status = 'completed', updated_at = NOW() WHERE id = $1", job.ExecutionID)
 	}
 
-	return w.AudienceService.LogNotification(ctx, job.ContentID, ruleID, targetPlatform, "sent", "")
+	return w.AudienceService.LogNotification(ctx, job.ContentID, ruleID, targetPlatform, "sent", "", job.TraceID)
 }

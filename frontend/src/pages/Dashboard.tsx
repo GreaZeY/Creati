@@ -60,7 +60,7 @@ export const Dashboard = () => {
   };
 
   return (
-    <div className="space-y-8 pb-12 max-w-7xl mx-auto px-4">
+    <div className="flex-1 overflow-y-auto space-y-8 pb-12 max-w-7xl mx-auto px-4 w-full">
       <PageHeader
         title="Dashboard"
         description="Your global distribution engine is primed. Total control across all nodes."
