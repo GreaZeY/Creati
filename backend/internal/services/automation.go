@@ -9,6 +9,8 @@ import (
 	"log"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type AutomationService struct {
@@ -108,14 +110,17 @@ func (s *AutomationService) ProcessYouTubeEvent(payload []byte) error {
 		}
 		json.Unmarshal(targetsRaw, &targets)
 
+		// Generate a single trace_id for this trigger event
+		traceID := uuid.New().String()
+
 		if action == "notify" {
 			for _, target := range targets {
-				s.createNotificationJob(ruleID, videoID, target.AccountID, target.Platform, target.Identifier, title)
+				s.createNotificationJob(ruleID, videoID, target.AccountID, target.Platform, target.Identifier, title, traceID)
 			}
 		} else {
 			// Default to sync
 			for _, target := range targets {
-				s.createAutomationJob(ruleID, videoID, target.AccountID, title)
+				s.createAutomationJob(ruleID, videoID, target.AccountID, title, traceID)
 			}
 		}
 
@@ -146,7 +151,7 @@ func (s *AutomationService) matchFilters(title string, filters map[string]interf
 	return true
 }
 
-func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string, targetAccountID int, title string) {
+func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string, targetAccountID int, title string, traceID string) {
 	ctx := context.Background()
 
 	// 1. Fetch source platform/account details for normalization
@@ -176,9 +181,9 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 	err = s.db.QueryRow(`
 		INSERT INTO automation_executions 
 		(rule_id, source_platform, target_platform, target_account_id, status, trace_id)
-		VALUES ($1, $2, $3, $4, 'queued', gen_random_uuid())
+		VALUES ($1, $2, $3, $4, 'queued', $5)
 		RETURNING id
-	`, ruleID, sourcePlatform, targetPlatform, targetAccountID).Scan(&executionID)
+	`, ruleID, sourcePlatform, targetPlatform, targetAccountID, traceID).Scan(&executionID)
 
 	if err != nil {
 		log.Printf("Failed to create automation execution skeleton: %v", err)
@@ -256,8 +261,10 @@ func (s *AutomationService) BlastVideos(userID int, clientID *int, sourceAccount
 			title = "Archive Blast Video"
 		}
 
+		// Each video in a blast gets its own trace_id for grouping in UI
+		traceID := uuid.New().String()
 		for _, target := range targets {
-			s.createAutomationJob(ruleID, videoID, target.AccountID, title)
+			s.createAutomationJob(ruleID, videoID, target.AccountID, title, traceID)
 		}
 	}
 
@@ -325,7 +332,7 @@ func (s *AutomationService) RetryRule(ctx context.Context, ruleID int) error {
 	return nil
 }
 
-func (s *AutomationService) createNotificationJob(ruleID int, sourceVideoID string, targetAccountID int, targetPlatform, targetIdentifier, title string) {
+func (s *AutomationService) createNotificationJob(ruleID int, sourceVideoID string, targetAccountID int, targetPlatform, targetIdentifier, title string, traceID string) {
 	ctx := context.Background()
 
 	// 1. Fetch source details
@@ -347,9 +354,9 @@ func (s *AutomationService) createNotificationJob(ruleID int, sourceVideoID stri
 	err = s.db.QueryRow(`
 		INSERT INTO automation_executions 
 		(rule_id, source_platform, target_platform, target_account_id, status, trace_id)
-		VALUES ($1, $2, $3, $4, 'queued', gen_random_uuid())
+		VALUES ($1, $2, $3, $4, 'queued', $5)
 		RETURNING id
-	`, ruleID, sourcePlatform, targetPlatform, targetAccountID).Scan(&executionID)
+	`, ruleID, sourcePlatform, targetPlatform, targetAccountID, traceID).Scan(&executionID)
 
 	if err != nil {
 		log.Printf("Failed to create notification execution record: %v", err)

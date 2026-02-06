@@ -40,7 +40,6 @@ var rootCmd = &cobra.Command{
 	Short: "Creati CLI",
 	Long:  `CLI for managing Creati workflow`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		ensureProjectRoot()
 		loadConfig()
 	},
 }
@@ -51,22 +50,6 @@ func Execute() error {
 }
 
 // Commands self-register via their own init() functions
-
-// ensureProjectRoot validates we're in the project root
-func ensureProjectRoot() {
-	sentinels := []string{
-		"frontend/vite.config.ts",
-		"backend/go.mod",
-		"creati.yaml",
-	}
-
-	for _, file := range sentinels {
-		if _, err := os.Stat(file); err != nil {
-			fmt.Printf("❌ creati must be run from project root (missing: %s)\n", file)
-			os.Exit(1)
-		}
-	}
-}
 
 // loadConfig reads creati.yaml
 func loadConfig() {

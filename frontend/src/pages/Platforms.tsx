@@ -328,7 +328,9 @@ export const Platforms = () => {
         onClose={() => setConfirmState((prev) => ({ ...prev, isOpen: false }))}
         onConfirm={handleConfirm}
         title={
-          confirmState.type === "disconnect" ? "TERMINATE LINK?" : "PURGE NODE?"
+          confirmState.type === "disconnect"
+            ? "Disconnect Connection?"
+            : "Delete Connection?"
         }
         description={
           confirmState.type === "disconnect"

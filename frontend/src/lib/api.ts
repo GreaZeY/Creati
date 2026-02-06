@@ -8,6 +8,33 @@ declare module "axios" {
     enableAlerts?: boolean;
   }
 }
+export interface UnifiedJob {
+  id: string;
+  jobType: string;
+  ruleId: number;
+  ruleName: string;
+  status: string;
+  progress: string;
+  sources: Array<{
+    handle: string;
+    platform: string;
+    status: string;
+    error?: string;
+  }>;
+  targets: Array<{
+    handle: string;
+    platform: string;
+    status: string;
+    error?: string;
+    contentTitle?: string;
+  }>;
+  contents: Array<{
+    id: string;
+    title: string;
+  }>;
+  errorMessage?: string;
+  createdAt: string;
+}
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -146,7 +173,13 @@ export const platformsAPI = {
 };
 
 export const uploadAPI = {
-  init: (data: { filename: string; contentType: string; size: number }) =>
+  init: (data: {
+    filename: string;
+    contentTitle: string;
+    sourceHandle?: string;
+    targetHandle?: string;
+    size: number;
+  }) =>
     api.post<ApiResponse<{ uploadUrl: string; key: string }>>(
       "/upload/init",
       data,
@@ -208,11 +241,20 @@ export const automationAPI = {
       data,
     ),
 
-  getBlastSummary: (id: number) =>
-    api.get<ApiResponse>(`/automation/rules/${id}/summary`),
 
   retryExecution: (id: string) =>
     api.post<ApiResponse>(`/automation/executions/${id}/retry`),
+
+  cancelExecution: (id: string) =>
+    api.post<ApiResponse>(`/automation/executions/${id}/cancel`),
+
+  pauseExecution: (id: string) =>
+    api.post<ApiResponse>(`/automation/executions/${id}/pause`),
+
+  listJobs: (limit: number = 20, offset: number = 0, clientId?: number) =>
+    api.get<ApiResponse<any[]>>(
+      `/automation/jobs?limit=${limit}&offset=${offset}` + (clientId ? `&clientId=${clientId}` : "")
+    ),
 
   retryRule: (id: number) =>
     api.post<ApiResponse>(`/automation/rules/${id}/retry`),

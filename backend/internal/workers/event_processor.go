@@ -64,6 +64,7 @@ func (p *EventProcessor) Start(ctx context.Context) {
 	listener := pq.NewListener(p.dsn, 10*time.Second, time.Minute, reportProblem)
 	_ = listener.Listen("platform_event_inserted")
 	_ = listener.Listen("automation_execution_updated") // Correct V2 channel
+	_ = listener.Listen("automation_log_updated")       // Notification channel
 	defer listener.UnlistenAll()
 
 	// 2. Ticker for fallback polling (heartbeat)
@@ -100,6 +101,8 @@ func (p *EventProcessor) Start(ctx context.Context) {
 				}
 			} else if n.Channel == "automation_execution_updated" {
 				p.handleExecutionNotification(ctx, n.Extra)
+			} else if n.Channel == "automation_log_updated" {
+				p.handleLogNotification(ctx, n.Extra)
 			}
 		}
 	}
@@ -108,12 +111,13 @@ func (p *EventProcessor) Start(ctx context.Context) {
 // handleExecutionNotification reacts to status changes by broadcasting to SSE
 func (p *EventProcessor) handleExecutionNotification(ctx context.Context, execIDStr string) {
 	var userID, ruleID int
+	var status string
 	err := p.db.QueryRowContext(ctx, `
-		SELECT ar.user_id, e.rule_id 
+		SELECT ar.user_id, e.rule_id, e.status
 		FROM automation_executions e
 		JOIN automation_rules ar ON e.rule_id = ar.id
 		WHERE e.id = $1
-	`, execIDStr).Scan(&userID, &ruleID)
+	`, execIDStr).Scan(&userID, &ruleID, &status)
 
 	if err != nil {
 		logger.Get("event_processor").WithField("error", err).Error("Failed to fetch user/rule for SSE broadcast")
@@ -122,8 +126,39 @@ func (p *EventProcessor) handleExecutionNotification(ctx context.Context, execID
 
 	// Payload for SSE
 	update := map[string]interface{}{
-		"type":   "blast_update",
+		"type":   "job_update",
+		"id":     execIDStr,
 		"ruleId": ruleID,
+		"status": status,
+		"kind":   "sync",
+	}
+	msg, _ := json.Marshal(update)
+	p.realtimeService.Broadcast(userID, string(msg))
+}
+
+// handleLogNotification reacts to notification status changes
+func (p *EventProcessor) handleLogNotification(ctx context.Context, logIDStr string) {
+	var userID, ruleID int
+	var status string
+	err := p.db.QueryRowContext(ctx, `
+		SELECT ar.user_id, l.rule_id, l.status
+		FROM automation_logs l
+		JOIN automation_rules ar ON l.rule_id = ar.id
+		WHERE l.id = $1
+	`, logIDStr).Scan(&userID, &ruleID, &status)
+
+	if err != nil {
+		logger.Get("event_processor").WithField("err", err).Error("Failed to fetch log details for SSE")
+		return
+	}
+
+	// Payload
+	update := map[string]interface{}{
+		"type":   "job_update",
+		"id":     logIDStr,
+		"ruleId": ruleID,
+		"status": status,
+		"kind":   "notify",
 	}
 	msg, _ := json.Marshal(update)
 	p.realtimeService.Broadcast(userID, string(msg))

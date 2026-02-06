@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"strconv"
+	"fmt"
 
 	"creati.in/creati/backend/internal/middleware"
 	"creati.in/creati/backend/internal/services"
@@ -22,14 +23,6 @@ func NewAutomationHandler(db *sql.DB, service *services.AutomationService) *Auto
 	return &AutomationHandler{db: db, service: service}
 }
 
-type BlastSummary struct {
-	Pending    int               `json:"pending"`
-	Processing int               `json:"processing"`
-	Completed  int               `json:"completed"`
-	Failed     int               `json:"failed"`
-	Total      int               `json:"total"`
-	Failures   map[string]string `json:"failures,omitempty"`
-}
 
 type RuleTarget struct {
 	AccountID       int    `json:"accountId"`
@@ -66,7 +59,7 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 			pa.profile_name, pa.handle, pa.platform
 		FROM automation_rules ar
 		LEFT JOIN platform_accounts pa ON ar.source_account_id = pa.id
-		WHERE ar.user_id = $1
+		WHERE ar.user_id = $1 AND ar.trigger_type != 'manual'
 	`
 	args := []interface{}{userID}
 	if clientID != nil {
@@ -110,7 +103,6 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 		IsActive      bool             `json:"isActive"`
 		LastRunAt     *string          `json:"lastRunAt"`
 		CreatedAt     string           `json:"createdAt"`
-		Summary       *BlastSummary    `json:"summary,omitempty"`
 	}
 
 	rules := make([]RuleResponse, 0)
@@ -163,42 +155,6 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 		if lastRunAt.Valid {
 			val := lastRunAt.String
 			r.LastRunAt = &val
-		}
-
-		// Fetch summary for manual blasts
-		if r.TriggerType == "manual" {
-			s := &BlastSummary{Failures: make(map[string]string)}
-			summaryRows, err := h.db.Query(`
-					SELECT status, target_platform, error, COUNT(*) 
-					FROM automation_executions 
-					WHERE rule_id = $1 
-					GROUP BY status, target_platform, error
-				`, r.ID)
-			if err == nil {
-				for summaryRows.Next() {
-					var status, platform string
-					var errMsg sql.NullString
-					var count int
-					if err := summaryRows.Scan(&status, &platform, &errMsg, &count); err == nil {
-						switch status {
-						case "queued", "pending":
-							s.Pending += count
-						case "processing":
-							s.Processing += count
-						case "completed":
-							s.Completed += count
-						case "failed":
-							s.Failed += count
-							if errMsg.Valid && errMsg.String != "" {
-								s.Failures[platform] = errMsg.String
-							}
-						}
-						s.Total += count
-					}
-				}
-				summaryRows.Close()
-				r.Summary = s
-			}
 		}
 
 		rules = append(rules, r)
@@ -397,53 +353,6 @@ func (h *AutomationHandler) RetryRule(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, nil, "Operational sectors re-primed for dispatch! ⚡")
 }
 
-func (h *AutomationHandler) GetRuleJobSummary(c *fiber.Ctx) error {
-	userID := middleware.GetUserID(c)
-	ruleID := c.Params("id")
-
-	// Verify rule belongs to user
-	var exists bool
-	err := h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM automation_rules WHERE id = $1 AND user_id = $2)", ruleID, userID).Scan(&exists)
-	if err != nil || !exists {
-		return utils.ErrorResponse(c, fiber.StatusNotFound, "blast not found")
-	}
-
-	rows, err := h.db.Query(`
-		SELECT status, target_platform, error, COUNT(*) 
-		FROM automation_executions 
-		WHERE rule_id = $1 
-		GROUP BY status, target_platform, error
-	`, ruleID)
-	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
-	}
-	defer rows.Close()
-
-	s := &BlastSummary{Failures: make(map[string]string)}
-	for rows.Next() {
-		var status, platform string
-		var errMsg sql.NullString
-		var count int
-		if err := rows.Scan(&status, &platform, &errMsg, &count); err == nil {
-			switch status {
-			case "queued", "pending":
-				s.Pending += count
-			case "processing":
-				s.Processing += count
-			case "completed":
-				s.Completed += count
-			case "failed":
-				s.Failed += count
-				if errMsg.Valid && errMsg.String != "" {
-					s.Failures[platform] = errMsg.String
-				}
-			}
-			s.Total += count
-		}
-	}
-
-	return utils.SuccessResponse(c, s, "Summary retrieved")
-}
 
 // HandleYouTubeWebhook handles PubSubHubbub verification and notifications
 func (h *AutomationHandler) HandleYouTubeWebhook(c *fiber.Ctx) error {
@@ -457,10 +366,6 @@ func (h *AutomationHandler) HandleYouTubeWebhook(c *fiber.Ctx) error {
 	}
 
 	// 2. New Content Notification (POST)
-	// Body is XML (Atom format)
-	// We'll parse this to get the video ID and channel ID
-	// Then match against automation_rules
-
 	payload := c.Body()
 	if err := h.service.ProcessYouTubeEvent(payload); err != nil {
 		log.Printf("Error processing YouTube webhook: %v", err)
@@ -468,3 +373,186 @@ func (h *AutomationHandler) HandleYouTubeWebhook(c *fiber.Ctx) error {
 
 	return c.SendStatus(fiber.StatusNoContent)
 }
+
+	type JobContent struct {
+		ID    string `json:"id"`
+		Title string `json:"title"`
+	}
+
+	type JobTarget struct {
+		Handle       string `json:"handle"`
+		Platform     string `json:"platform"`
+		Status       string `json:"status"`
+		Error        string `json:"error,omitempty"`
+		ContentTitle string `json:"contentTitle"` // Associated content for this specific execution
+	}
+
+	type UnifiedJob struct {
+		ID            string       `json:"id"`
+		JobType       string       `json:"jobType"`
+		RuleID        int          `json:"ruleId"`
+		RuleName      string       `json:"ruleName"`
+		Status        string       `json:"status"`
+		Progress      string       `json:"progress"`
+		Sources       []JobTarget  `json:"sources"` // Changed to array for extensibility
+		Targets       []JobTarget  `json:"targets"`
+		Contents      []JobContent `json:"contents"` // Changed from single fields to array
+		ErrorMessage  string       `json:"errorMessage,omitempty"`
+		CreatedAt     string       `json:"createdAt"`
+	}
+
+	func (h *AutomationHandler) ListJobs(c *fiber.Ctx) error {
+		userID := middleware.GetUserID(c)
+		limit := c.QueryInt("limit", 20)
+		offset := c.QueryInt("offset", 0)
+
+		// Determine if client-specific query
+		clientIDStr := c.Query("clientId")
+		var clientID *int
+		if clientIDStr != "" {
+			if cid, err := strconv.Atoi(clientIDStr); err == nil {
+				clientID = &cid
+			}
+		}
+
+		// Base filter
+		ruleFilter := "r.user_id = $1"
+		args := []interface{}{userID}
+		if clientID != nil {
+			ruleFilter += " AND r.client_id = $2"
+			args = append(args, *clientID)
+		} else {
+			ruleFilter += " AND r.client_id IS NULL"
+		}
+
+		query := fmt.Sprintf(`
+			SELECT 
+				COALESCE(e.trace_id::text, e.id::text) as id, 
+				'sync' as job_type, 
+				MAX(e.rule_id) as rule_id, 
+				MAX(r.name) as name, 
+				
+				-- Aggregate Status Logic
+				CASE 
+					WHEN COUNT(*) = COUNT(*) FILTER (WHERE e.status = 'completed') THEN 'success'
+					WHEN COUNT(*) = COUNT(*) FILTER (WHERE e.status = 'failed') THEN 'failed'
+					WHEN COUNT(*) = COUNT(*) FILTER (WHERE e.status = 'queued') THEN 'queued'
+					WHEN COUNT(*) FILTER (WHERE e.status = 'failed') > 0 THEN 'partial'
+					ELSE 'processing'
+				END as status,
+
+				-- Progress
+				(COUNT(*) FILTER (WHERE e.status IN ('completed', 'failed')))::text || '/' || COUNT(*)::text as progress,
+
+				-- JSON Array of Sources (currently single, but extensible)
+				json_agg(DISTINCT jsonb_build_object(
+					'handle', COALESCE(spa.handle, spa.profile_name, e.source_platform),
+					'platform', e.source_platform,
+					'status', 'active' 
+				)) as sources,
+
+				-- JSON Array of Targets (Executions)
+				json_agg(json_build_object(
+					'handle', COALESCE(tpa.handle, tpa.profile_name, e.target_platform),
+					'platform', e.target_platform,
+					'status', e.status,
+					'error', COALESCE(e.error, ''),
+					'contentTitle', COALESCE(c.title, 'Unknown')
+				)) as targets,
+
+				-- JSON Array of Distinct Contents
+				json_agg(DISTINCT jsonb_build_object(
+					'id', e.content_id, 
+					'title', COALESCE(c.title, 'Unknown')
+				)) as contents,
+
+				MAX(e.created_at) as created_at
+
+			FROM automation_executions e
+			JOIN automation_rules r ON e.rule_id = r.id
+			LEFT JOIN contents c ON e.content_id = c.id
+			LEFT JOIN platform_accounts spa ON r.source_account_id = spa.id 
+			LEFT JOIN platform_accounts tpa ON e.target_account_id = tpa.id
+			WHERE %s
+			GROUP BY COALESCE(e.trace_id::text, e.id::text)
+			
+			UNION ALL
+			
+			-- Logs
+			SELECT 
+				COALESCE(l.trace_id::text, l.id::text), 'notify', MAX(l.rule_id), MAX(r.name), 
+				CASE 
+					WHEN COUNT(*) = COUNT(*) FILTER (WHERE l.status = 'completed') THEN 'success'
+					WHEN COUNT(*) = COUNT(*) FILTER (WHERE l.status = 'failed') THEN 'failed'
+					WHEN COUNT(*) FILTER (WHERE l.status = 'failed') > 0 THEN 'partial'
+					ELSE 'success' -- Default for single notifications
+				END, 
+				(COUNT(*) FILTER (WHERE l.status IN ('completed', 'failed')))::text || '/' || COUNT(*)::text as progress,
+				json_agg(DISTINCT jsonb_build_object(
+					'handle', COALESCE(spa.handle, spa.profile_name, spa.platform),
+					'platform', spa.platform,
+					'status', 'active'
+				)),
+				json_agg(json_build_object(
+					'handle', l.target_platform,
+					'platform', l.target_platform,
+					'status', l.status,
+					'error', COALESCE(l.error_message, ''),
+					'contentTitle', COALESCE(v.title, 'Unknown')
+				)),
+				json_agg(DISTINCT jsonb_build_object(
+					'id', l.content_id, 
+					'title', COALESCE(v.title, 'Unknown')
+				)),
+				MAX(l.created_at)
+			FROM automation_logs l
+			JOIN automation_rules r ON l.rule_id = r.id
+			JOIN platform_accounts spa ON r.source_account_id = spa.id
+			LEFT JOIN videos v ON l.content_id = v.id
+			WHERE %s
+			GROUP BY COALESCE(l.trace_id::text, l.id::text)
+			
+			ORDER BY created_at DESC
+			LIMIT $%d OFFSET $%d
+		`, ruleFilter, ruleFilter, len(args)+1, len(args)+2)
+
+		// Add pagination args
+		args = append(args, limit, offset)
+
+		rows, err := h.db.Query(query, args...)
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
+		}
+		defer rows.Close()
+
+		jobs := make([]UnifiedJob, 0)
+		for rows.Next() {
+			var j UnifiedJob
+			var sourcesJSON, targetsJSON, contentsJSON []byte
+			
+			if err := rows.Scan(
+				&j.ID, &j.JobType, &j.RuleID, &j.RuleName, &j.Status,
+				&j.Progress,
+				&sourcesJSON,
+				&targetsJSON,
+				&contentsJSON,
+				&j.CreatedAt,
+			); err != nil {
+				continue
+			}
+
+			if err := json.Unmarshal(sourcesJSON, &j.Sources); err != nil {
+				j.Sources = []JobTarget{}
+			}
+			if err := json.Unmarshal(targetsJSON, &j.Targets); err != nil {
+				j.Targets = []JobTarget{}
+			}
+			if err := json.Unmarshal(contentsJSON, &j.Contents); err != nil {
+				j.Contents = []JobContent{}
+			}
+
+			jobs = append(jobs, j)
+		}
+
+		return utils.SuccessResponse(c, jobs, "")
+	}

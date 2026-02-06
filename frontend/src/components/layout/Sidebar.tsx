@@ -10,6 +10,7 @@ import {
   LogOut,
   Crown,
   Rocket,
+  List,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { label: "Dispatch", icon: UploadCloud, href: "/upload" },
   { label: "Automations", icon: Zap, href: "/automations" },
   { label: "Blast", icon: Rocket, href: "/blast" },
+  { label: "Queue", icon: List, href: "/queued" },
   { label: "Analytics", icon: BarChart2, href: "/analytics" },
   { label: "Platforms", icon: Link2, href: "/platforms" },
   { label: "Upgrade", icon: Crown, href: "/pricing" },

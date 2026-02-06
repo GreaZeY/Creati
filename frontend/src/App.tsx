@@ -22,7 +22,7 @@ import { WorkspaceManager } from "./components/settings/WorkspaceManager";
 import { Upload } from "./pages/Upload";
 import { Automations } from "./pages/automations/Automations";
 import { UnifiedBuilder } from "./pages/automations/UnifiedBuilder";
-import { ArchiveBlast } from "./pages/ArchiveBlast";
+import { QueuedJobs } from "@/pages/QueuedJobs";
 import { BlastBuilder } from "./pages/BlastBuilder";
 import { Pricing } from "./pages/Pricing";
 import { WorkspaceSetup } from "./pages/WorkspaceSetup";
@@ -205,17 +205,21 @@ const router = createBrowserRouter([
             path: "blast",
             element: (
               <PageTransition>
-                <ArchiveBlast />
+                <BlastBuilder />
+              </PageTransition>
+            ),
+          },
+          {
+            path: "queued",
+            element: (
+              <PageTransition>
+                <QueuedJobs />
               </PageTransition>
             ),
           },
           {
             path: "blast/new",
-            element: (
-              <PageTransition>
-                <BlastBuilder />
-              </PageTransition>
-            ),
+            element: <Navigate to="/blast" replace />,
           },
           {
             path: "pricing",

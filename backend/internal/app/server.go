@@ -148,12 +148,15 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 
 	automationGroup := protected.Group("/automation", middleware.RequireFeature(db, cacheService, features.CanUseMagicSync))
 	automationGroup.Get("", automationHandler.ListRules)
+	automationGroup.Get("/jobs", automationHandler.ListJobs)
 	automationGroup.Post("", automationHandler.CreateRule)
 	automationGroup.Post("/blast", automationHandler.HandleBlast)
 	automationGroup.Post("/executions/:id/retry", automationHandler.RetryExecution)
+	automationGroup.Post("/executions/:id/cancel", automationHandler.CancelExecution)
+	automationGroup.Post("/executions/:id/pause", automationHandler.PauseExecution)
 	automationGroup.Post("/rules/:id/retry", automationHandler.RetryRule)
-	automationGroup.Get("/rules/:id/summary", automationHandler.GetRuleJobSummary)
 	automationGroup.Put("/:id", automationHandler.ToggleRule)
+	automationGroup.Put("/:id/full", automationHandler.UpdateRule)
 	automationGroup.Delete("/:id", automationHandler.DeleteRule)
 
 	// audienceGroup := protected.Group("/audience", middleware.RequireFeature(db, cacheService, features.CanUseAudienceNotifications))
