@@ -124,14 +124,7 @@ func main() {
 				"database": "connected",
 			})
 		})
-
-		// Pre-flight check log
-		if os.Getenv("YOUTUBE_CLIENT_ID") == "" {
-			fmt.Println("  ⚠️  YouTube API: Credentials missing")
-		} else {
-			fmt.Println("  ✅ YouTube API: Credentials found")
-		}
-
+		
 		// Initialize handlers
 		authHandler := api.NewAuthHandler(db)
 		platformHandler := api.NewPlatformHandler(db, cacheService)

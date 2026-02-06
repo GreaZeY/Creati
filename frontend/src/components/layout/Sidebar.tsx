@@ -20,7 +20,7 @@ const NAV_ITEMS = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { label: "Dispatch", icon: UploadCloud, href: "/upload" },
   { label: "Automations", icon: Zap, href: "/automations" },
-  { label: "Queued", icon: Rocket, href: "/blast" },
+  { label: "Blast", icon: Rocket, href: "/blast" },
   { label: "Analytics", icon: BarChart2, href: "/analytics" },
   { label: "Platforms", icon: Link2, href: "/platforms" },
   { label: "Upgrade", icon: Crown, href: "/pricing" },
