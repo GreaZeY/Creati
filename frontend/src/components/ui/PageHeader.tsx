@@ -2,14 +2,14 @@ import React from "react";
 import { cn } from "@/lib/utils";
 
 interface PageHeaderProps {
-  title: string;
+  // title: string;
   description?: string;
   children?: React.ReactNode;
   className?: string;
 }
 
 export function PageHeader({
-  title,
+  // title,
   description,
   children,
   className,

@@ -2,21 +2,21 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { platformsAPI } from "@/lib/api";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { ComposerAccordion } from "@/components/composer/ComposerAccordion";
-import { PostTextEditor } from "@/components/composer/PostTextEditor";
-import { PlatformSelector } from "@/components/composer/PlatformSelector";
-import { Button } from "@/components/ui/Button";
-import { SchedulePicker } from "@/components/composer/SchedulePicker";
-import { Type, Image, Sparkles, Send } from "lucide-react";
 import { useClient } from "@/context/ClientContext";
+import { SocialTextArea } from "@/components/composer/Editor/SocialTextArea";
+import { PlatformChips } from "@/components/composer/Editor/PlatformChips";
+import { EditorFooter } from "@/components/composer/Editor/EditorFooter";
+import { PreviewPane } from "@/components/composer/Preview/PreviewPane";
+import { PublishDropdown } from "@/components/composer/PublishBar/PublishDropdown";
+import { ScheduleModal } from "@/components/composer/PublishBar/ScheduleModal";
+import { toast } from "@/lib/events";
+import { PageHeader } from "@/components/ui/PageHeader";
 
 // Normalized post state
 interface PostState {
   text: string;
   media: Array<{ id: string; url: string; type: "image" | "video" }>;
   platforms: string[];
-  canvaDesign?: { id: string; url: string };
 }
 
 const STORAGE_KEY = "draft_post";
@@ -25,15 +25,16 @@ export function PostComposer() {
   const { actor } = useParams<{ actor: string }>();
   const navigate = useNavigate();
   const { selectedClient } = useClient();
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
-  // If actor is not "post", redirect or show error
+  // Redirect if wrong actor
   useEffect(() => {
     if (actor !== "post") {
       navigate("/create/post");
     }
   }, [actor, navigate]);
 
-  // Load draft from localStorage on mount
+  // Load draft from localStorage
   const [post, setPost] = useState<PostState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -46,7 +47,7 @@ export function PostComposer() {
     return { text: "", media: [], platforms: [] };
   });
 
-  // Save to localStorage whenever post changes
+  // Auto-save draft
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(post));
   }, [post]);
@@ -69,121 +70,125 @@ export function PostComposer() {
       handle: p.handle,
     })) ?? [];
 
-  // Accordion state
-  const [openSections, setOpenSections] = useState<Set<string>>(
-    new Set(["text"]),
-  );
-
-  const toggleSection = (section: string) => {
-    setOpenSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(section)) {
-        next.delete(section);
-      } else {
-        next.add(section);
-      }
-      return next;
-    });
-  };
-
-  const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
-
-  const handlePublish = () => {
-    // TODO: Implement publish logic with scheduling
-    console.log("Publishing:", post, "Scheduled for:", scheduledAt);
-    // Clear draft after successful publish
+  const handlePublishNow = () => {
+    if (post.platforms.length === 0) {
+      toast.error("Select at least one platform");
+      return;
+    }
+    console.log("Publishing now:", post);
+    toast.success("Post published! 🚀");
     localStorage.removeItem(STORAGE_KEY);
     setPost({ text: "", media: [], platforms: [] });
-    setScheduledAt(null);
+  };
+
+  const handleSchedule = (scheduledDate: Date) => {
+    console.log("Scheduling for:", scheduledDate, post);
+    toast.success(`Scheduled for ${scheduledDate.toLocaleString()}! 📅`);
+    localStorage.removeItem(STORAGE_KEY);
+    setPost({ text: "", media: [], platforms: [] });
   };
 
   const hasDraft = post.text.length > 0 || post.media.length > 0;
 
   return (
-    <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-6 font-outfit flex flex-col overflow-y-auto flex-1 min-h-0 w-full">
-      <PageHeader
-        title="Create Post"
-        description="One draft, infinite reach. Craft your message and publish everywhere."
-      />
-
-      <div className="space-y-4">
-        {/* Text Editor */}
-        <ComposerAccordion
-          title="Write Your Post"
-          icon={Type}
-          isOpen={openSections.has("text")}
-          onToggle={() => toggleSection("text")}
-        >
-          <PostTextEditor
-            value={post.text}
-            onChange={(text) => setPost((prev) => ({ ...prev, text }))}
-            placeholder="What's your message? Share your story..."
-          />
-        </ComposerAccordion>
-
-        {/* Platform Selection */}
-        <ComposerAccordion
-          title="Target Platforms"
-          icon={Send}
-          isOpen={openSections.has("platforms")}
-          onToggle={() => toggleSection("platforms")}
-        >
-          <PlatformSelector
-            platforms={platforms}
-            selectedPlatforms={post.platforms}
-            onToggle={(platformId) =>
-              setPost((prev) => ({
-                ...prev,
-                platforms: prev.platforms.includes(platformId)
-                  ? prev.platforms.filter((p) => p !== platformId)
-                  : [...prev.platforms, platformId],
-              }))
-            }
-          />
-        </ComposerAccordion>
-
-        {/* Media (Placeholder) */}
-        <ComposerAccordion
-          title="Media & Design"
-          icon={Image}
-          isOpen={openSections.has("media")}
-          onToggle={() => toggleSection("media")}
-        >
-          <div className="text-sm text-muted-foreground text-center py-8">
-            <p className="font-bold uppercase tracking-wider">
-              Canva integration coming soon
-            </p>
-          </div>
-        </ComposerAccordion>
-
-        {/* AI Assistant (Placeholder) */}
-        <ComposerAccordion
-          title="AI Assistant"
-          icon={Sparkles}
-          isOpen={openSections.has("ai")}
-          onToggle={() => toggleSection("ai")}
-        >
-          <div className="text-sm text-muted-foreground text-center py-8">
-            <p className="font-bold uppercase tracking-wider">
-              AI generation coming next
-            </p>
-          </div>
-        </ComposerAccordion>
-      </div>
-
-      {/* Publish Section */}
-      <div className="sticky bottom-0 bg-background/80 backdrop-blur-md border-t border-border/40 -mx-4 -mb-4 md:-mx-8 md:-mb-8 p-4 md:p-6 space-y-4">
-        <SchedulePicker value={scheduledAt} onChange={setScheduledAt} />
-        <Button
-          onClick={handlePublish}
+    <div className="flex h-screen flex-col">
+      <PageHeader description="Create Post">
+        <PublishDropdown
+          onPublishNow={handlePublishNow}
+          onSchedule={() => setIsScheduleModalOpen(true)}
           disabled={!hasDraft || post.platforms.length === 0}
-          size="lg"
-          className="w-full"
-        >
-          <Send size={18} />
-          Publish to {post.platforms.length} Platform
-          {post.platforms.length !== 1 ? "s" : ""}
-        </Button>
+        />
+      </PageHeader>
+      <div className="flex mt-2 h-full">
+        {/* Left Pane: Editor (40%) */}
+        <div className="w-[40%] flex flex-col border-r border-border/40">
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Platforms */}
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">
+                Platforms
+              </label>
+              <PlatformChips
+                platforms={platforms}
+                selectedPlatforms={post.platforms}
+                onToggle={(platformId) =>
+                  setPost((prev) => ({
+                    ...prev,
+                    platforms: prev.platforms.includes(platformId)
+                      ? prev.platforms.filter((p) => p !== platformId)
+                      : [...prev.platforms, platformId],
+                  }))
+                }
+              />
+            </div>
+
+            {/* Text Editor */}
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">
+                Message
+              </label>
+              <div className="border border-border/40 rounded-lg p-3 bg-card/20">
+                <SocialTextArea
+                  value={post.text}
+                  onChange={(text) => setPost((prev) => ({ ...prev, text }))}
+                  placeholder="What's on your mind?"
+                />
+              </div>
+            </div>
+
+            {/* Media Previews */}
+            {post.media.length > 0 && (
+              <div className="space-y-2">
+                {post.media.map((m) => (
+                  <div key={m.id} className="relative group">
+                    <img
+                      src={m.url}
+                      alt=""
+                      className="w-full rounded-lg border border-border/40"
+                    />
+                    <button
+                      onClick={() =>
+                        setPost((prev) => ({
+                          ...prev,
+                          media: prev.media.filter(
+                            (media) => media.id !== m.id,
+                          ),
+                        }))
+                      }
+                      className="absolute top-2 right-2 h-6 w-6 bg-black/80 hover:bg-black text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <EditorFooter
+            onImageClick={() => toast.info("Image upload coming soon")}
+            onVideoClick={() => toast.info("Video upload coming soon")}
+            onAIClick={() => toast.info("AI writing coming soon")}
+            onCanvaClick={() => toast.info("Canva integration coming soon")}
+            onGiphyClick={() => toast.info("Giphy search coming soon")}
+          />
+        </div>
+
+        {/* Right Pane: Preview (60%) */}
+        <PreviewPane
+          selectedPlatforms={post.platforms}
+          postText={post.text}
+          media={post.media}
+        />
+
+        {/* Schedule Modal */}
+        <ScheduleModal
+          isOpen={isScheduleModalOpen}
+          onClose={() => setIsScheduleModalOpen(false)}
+          onSchedule={handleSchedule}
+        />
       </div>
     </div>
   );

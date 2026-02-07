@@ -100,13 +100,12 @@ func (s *DBTokenSource) Token() (*oauth2.Token, error) {
 			return t, nil
 		}
 
-		// Update DB
-		// Note: We only update if we have an ID (which we do)
+		// Update DB with new token AND expiry
 		_, err = s.db.Exec(`
 			UPDATE platform_accounts 
-			SET access_token = $1, refresh_token = $2, status = 'connected', connected_at = NOW() 
-			WHERE id = $3
-		`, encAccess, encRefresh, s.accountID)
+			SET access_token = $1, refresh_token = $2, expires_at = $3, status = 'connected', connected_at = NOW() 
+			WHERE id = $4
+		`, encAccess, encRefresh, t.Expiry, s.accountID)
 
 		if err != nil {
 			fmt.Printf("Failed to persist refreshed token: %v\n", err)
@@ -125,9 +124,10 @@ func (s *DBTokenSource) Token() (*oauth2.Token, error) {
 
 func (y *YouTubeService) getClient(ctx context.Context, accountID int) (*http.Client, error) {
 	var encAccess, encRefresh string
+	var expiresAt sql.NullTime
 	err := y.db.QueryRow(
-		"SELECT access_token, refresh_token FROM platform_accounts WHERE id = $1", accountID,
-	).Scan(&encAccess, &encRefresh)
+		"SELECT access_token, refresh_token, expires_at FROM platform_accounts WHERE id = $1", accountID,
+	).Scan(&encAccess, &encRefresh, &expiresAt)
 	if err != nil {
 		return nil, fmt.Errorf("account not found: %w", err)
 	}
@@ -179,7 +179,13 @@ func (y *YouTubeService) getClient(ctx context.Context, accountID int) (*http.Cl
 	// Maybe we just let it refresh once per request context?
 	// Ideally we add `expires_at` to DB.
 	// For now, I'll set Expiry to Now so it refreshes. It preserves correctness at cost of performance.
-	token.Expiry = time.Now().Add(-1 * time.Second)
+	// Use stored expiry if available, otherwise assume it needs refresh
+	if expiresAt.Valid {
+		token.Expiry = expiresAt.Time
+	} else {
+		// If no expiry stored, assume expired to trigger one refresh
+		token.Expiry = time.Now().Add(-1 * time.Second)
+	}
 
 	ts := y.oauthConfig.TokenSource(ctx, token)
 

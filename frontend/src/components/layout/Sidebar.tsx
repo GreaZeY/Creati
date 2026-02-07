@@ -9,8 +9,9 @@ import {
   Zap,
   LogOut,
   Crown,
-  Rocket,
   List,
+  MessageSquare,
+  Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,7 +22,8 @@ const NAV_ITEMS = [
   { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { label: "Dispatch", icon: UploadCloud, href: "/upload" },
   { label: "Automations", icon: Zap, href: "/automations" },
-  { label: "Blast", icon: Rocket, href: "/blast" },
+  { label: "Post", icon: MessageSquare, href: "/create/post" },
+  { label: "Push Video", icon: Video, href: "/push" },
   { label: "Queue", icon: List, href: "/queued" },
   { label: "Analytics", icon: BarChart2, href: "/analytics" },
   { label: "Platforms", icon: Link2, href: "/platforms" },

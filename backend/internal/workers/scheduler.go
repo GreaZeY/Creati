@@ -5,21 +5,17 @@ import (
 	"database/sql"
 	"log"
 	"time"
-
-	"creati.in/creati/backend/internal/services"
 )
 
 type Scheduler struct {
-	db           *sql.DB
-	queueService *services.QueueService
-	interval     time.Duration
+	db       *sql.DB
+	interval time.Duration
 }
 
-func NewScheduler(db *sql.DB, queueService *services.QueueService, interval time.Duration) *Scheduler {
+func NewScheduler(db *sql.DB, interval time.Duration) *Scheduler {
 	return &Scheduler{
-		db:           db,
-		queueService: queueService,
-		interval:     interval,
+		db:       db,
+		interval: interval,
 	}
 }
 
@@ -42,66 +38,23 @@ func (s *Scheduler) Start(ctx context.Context) {
 }
 
 func (s *Scheduler) processScheduledJobs(ctx context.Context) {
-	// Find jobs that are due
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, trace_id, job_data
-		FROM automation_jobs
+	// Transition scheduled jobs to pending when their time has arrived
+	// The existing automation workers will pick them up from there
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE automation_jobs
+		SET scheduled_status = 'executing',
+		    status = 'pending'
 		WHERE scheduled_status = 'scheduled'
 		AND scheduled_at <= NOW()
-		ORDER BY scheduled_at ASC
-		LIMIT 50
 	`)
+	
 	if err != nil {
-		log.Printf("[Scheduler] Error querying scheduled jobs: %v", err)
+		log.Printf("[Scheduler] Error processing scheduled jobs: %v", err)
 		return
 	}
-	defer rows.Close()
 
-	count := 0
-	for rows.Next() {
-		var jobID int
-		var traceID string
-		var jobData []byte
-
-		if err := rows.Scan(&jobID, &traceID, &jobData); err != nil {
-			log.Printf("[Scheduler] Error scanning job: %v", err)
-			continue
-		}
-
-		// Transition to executing (with lock to prevent duplicate execution)
-		result, err := s.db.ExecContext(ctx, `
-			UPDATE automation_jobs
-			SET scheduled_status = 'executing'
-			WHERE id = $1 AND scheduled_status = 'scheduled'
-		`, jobID)
-		if err != nil {
-			log.Printf("[Scheduler] Error updating job %d: %v", jobID, err)
-			continue
-		}
-
-		rowsAffected, _ := result.RowsAffected()
-		if rowsAffected == 0 {
-			// Another process already picked this up
-			continue
-		}
-
-		// Queue the job for execution
-		if s.queueService != nil {
-			queueData := map[string]interface{}{
-				"jobID":   jobID,
-				"traceID": traceID,
-				"data":    string(jobData),
-			}
-			if err := s.queueService.Enqueue("automation:execute", queueData); err != nil {
-				log.Printf("[Scheduler] Error enqueueing job %d: %v", jobID, err)
-			} else {
-				count++
-				log.Printf("[Scheduler] Triggered job %d (trace: %s)", jobID, traceID)
-			}
-		}
-	}
-
-	if count > 0 {
-		log.Printf("[Scheduler] Processed %d scheduled jobs", count)
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected > 0 {
+		log.Printf("[Scheduler] Triggered %d scheduled jobs", rowsAffected)
 	}
 }

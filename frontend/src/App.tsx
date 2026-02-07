@@ -211,7 +211,7 @@ const router = createBrowserRouter([
             element: <Navigate to="/automations" replace />,
           },
           {
-            path: "blast",
+            path: "push",
             element: (
               <PageTransition>
                 <BlastBuilder />

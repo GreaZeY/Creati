@@ -60,9 +60,10 @@ type PlatformAccount struct {
 	ProfileName    string    `json:"profile_name" db:"profile_name"`
 	Email          string    `json:"email" db:"email"`
 	WebhookURL     string    `json:"webhook_url,omitempty" db:"webhook_url"`
-	PlatformUserID string    `json:"platform_user_id,omitempty" db:"platform_user_id"`
-	Handle         string    `json:"handle" db:"handle"`
-	ConnectedAt    time.Time `json:"connected_at" db:"connected_at"`
+	PlatformUserID string     `json:"platform_user_id,omitempty" db:"platform_user_id"`
+	Handle         string     `json:"handle" db:"handle"`
+	ExpiresAt      *time.Time `json:"expires_at,omitempty" db:"expires_at"`
+	ConnectedAt    time.Time  `json:"connected_at" db:"connected_at"`
 }
 
 // Video model

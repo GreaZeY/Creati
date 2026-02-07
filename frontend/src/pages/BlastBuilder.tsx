@@ -66,11 +66,11 @@ export function BlastBuilder() {
     );
   }, [pastVideos, searchQuery]);
 
-  const blastMutation = useMutation({
+  const pushMutation = useMutation({
     mutationFn: (data: any) => automationAPI.blast(data, selectedClient?.id),
     onSuccess: () => {
-      toast.success("Blast enqueued! 🚀 Watch 'em fly.");
-      navigate("/blast");
+      toast.success("Push initiated! 🚀 Videos syncing now.");
+      navigate("/push");
     },
   });
 
@@ -112,9 +112,9 @@ export function BlastBuilder() {
     if (selectedVideos.length === 0)
       return toast.error("Pick some bangers first!");
     if (selectedTargets.length === 0)
-      return toast.error("Where are we blasting to?");
+      return toast.error("Where are we pushing to?");
 
-    blastMutation.mutate({
+    pushMutation.mutate({
       sourceAccountId,
       videoIds: selectedVideos.map((v) => v.id),
       targets: selectedTargets.map((id) => ({
@@ -129,20 +129,16 @@ export function BlastBuilder() {
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/blast")}
-          >
+          <Button variant="ghost" size="icon" onClick={() => navigate("/push")}>
             <ArrowLeft size={20} />
           </Button>
           <div>
             <h1 className="text-3xl font-black tracking-tighter flex items-center gap-2">
-              QUICK BLAST{" "}
+              QUICK PUSH{" "}
               <Rocket size={28} className="text-primary fill-primary/20" />
             </h1>
             <p className="text-muted-foreground text-sm font-medium uppercase tracking-widest opacity-60">
-              One-Time Instant Sync
+              One-Click Video Sync
             </p>
           </div>
         </div>
@@ -165,9 +161,9 @@ export function BlastBuilder() {
             size="lg"
             className="px-8 h-12 text-lg font-black gap-2 shadow-[0_0_20px_rgba(var(--primary),0.3)] hover:scale-105 active:scale-95 transition-all"
             onClick={handleLaunch}
-            disabled={blastMutation.isPending}
+            disabled={pushMutation.isPending}
           >
-            {blastMutation.isPending ? "ENQUEUING..." : "LAUNCH BLAST 🚀"}
+            {pushMutation.isPending ? "PUSHING..." : "PUSH NOW 🚀"}
           </Button>
         </div>
       </div>
@@ -374,14 +370,12 @@ export function BlastBuilder() {
                   );
                 })}
 
-              {connectedAccounts.length <= 1 && (
-                <div className="text-center py-10 opacity-40">
-                  <Layout size={32} className="mx-auto mb-2" />
-                  <p className="text-xs font-bold uppercase">
-                    Connect more accounts to blast
-                  </p>
-                </div>
-              )}
+              <div className="text-center py-10 opacity-40">
+                <Layout size={32} className="mx-auto mb-2" />
+                <p className="text-xs font-bold uppercase">
+                  Connect more accounts to push
+                </p>
+              </div>
             </div>
 
             <div className="mt-6 pt-6 border-t border-primary/10 shrink-0">

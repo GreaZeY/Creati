@@ -5,11 +5,11 @@ import { CreditIndicator } from "../composer/CreditIndicator";
 
 export function Header() {
   return (
-    <header
-      className={`sticky top-0 right-0 z-40 w-full bg-background/80 backdrop-blur-[30px] font-outfit h-${HEADER_HEIGHT}`}
-    >
+    <header className="sticky top-0 right-0 z-40 w-full bg-background/80 backdrop-blur-[30px] font-outfit">
       {/* Primary Header Row */}
-      <div className="max-w-7xl pr-8 flex items-center justify-end gap-4 h-full">
+      <div
+        className={`pr-4 flex items-center justify-end gap-4 h-${HEADER_HEIGHT}`}
+      >
         {/* Right: Actions */}
         <div className="flex justify-end items-center gap-4">
           <CreditIndicator />
@@ -19,7 +19,7 @@ export function Header() {
 
       {/* Secondary Row: Breadcrumbs */}
       <div className="border-t border-border/50">
-        <div className="max-w-7xl mx-auto px-8 h-10 flex items-center">
+        <div className="mx-auto px-4 h-10 flex items-center">
           <Breadcrumbs />
         </div>
       </div>
