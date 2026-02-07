@@ -24,6 +24,7 @@ import { Automations } from "./pages/automations/Automations";
 import { UnifiedBuilder } from "./pages/automations/UnifiedBuilder";
 import { QueuedJobs } from "@/pages/QueuedJobs";
 import { BlastBuilder } from "./pages/BlastBuilder";
+import { PostComposer } from "./pages/PostComposer";
 import { Pricing } from "./pages/Pricing";
 import { WorkspaceSetup } from "./pages/WorkspaceSetup";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -153,6 +154,14 @@ const router = createBrowserRouter([
             element: (
               <PageTransition>
                 <Upload />
+              </PageTransition>
+            ),
+          },
+          {
+            path: "create/:actor",
+            element: (
+              <PageTransition>
+                <PostComposer />
               </PageTransition>
             ),
           },

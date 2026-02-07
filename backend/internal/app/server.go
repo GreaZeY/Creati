@@ -95,6 +95,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	paymentHandler := api.NewPaymentHandler(db)
 	webhookHandler := api.NewWebhookHandler(db)
 	agencyHandler := api.NewAgencyHandler(db)
+	aiHandler := api.NewAiHandler(db)
 	// audienceHandler := api.NewAudienceHandler(db)
 
 	// Events
@@ -173,6 +174,12 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	protected.Put("/payments/subscription", paymentHandler.UpdateSubscription)
 	protected.Delete("/payments/subscription", paymentHandler.CancelSubscription)
 	protected.Get("/payments/subscription", paymentHandler.GetSubscription)
+
+	// AI & Credits
+	aiRoutes := protected.Group("/ai")
+	aiRoutes.Get("/credits", aiHandler.GetCredits)
+	aiRoutes.Post("/generate", aiHandler.GeneratePost)
+	aiRoutes.Post("/rewrite", aiHandler.RewritePost)
 
 	// Graceful shutdown
 	go func() {

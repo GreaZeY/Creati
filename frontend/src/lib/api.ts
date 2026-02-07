@@ -291,3 +291,22 @@ export const paymentsAPI = {
 
   cancelSubscription: () => api.delete("/payments/subscription"),
 };
+
+export const aiAPI = {
+  getCredits: () => api.get<ApiResponse<{ credits: number }>>("/ai/credits"),
+  generate: (data: {
+    topic: string;
+    tone: string;
+    goal: string;
+    platform?: string;
+  }) =>
+    api.post<ApiResponse<{ text: string; creditsRemaining: number }>>(
+      "/ai/generate",
+      data,
+    ),
+  rewrite: (data: { originalText: string; platform: string; tone: string }) =>
+    api.post<ApiResponse<{ text: string; creditsRemaining: number }>>(
+      "/ai/rewrite",
+      data,
+    ),
+};

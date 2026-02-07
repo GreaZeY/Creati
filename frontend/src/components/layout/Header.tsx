@@ -1,6 +1,7 @@
 import { ThemeToggle } from "../ThemeToggle";
 import { HEADER_HEIGHT } from "@/lib/constants";
 import { Breadcrumbs } from "./Breadcrumbs";
+import { CreditIndicator } from "../composer/CreditIndicator";
 
 export function Header() {
   return (
@@ -10,7 +11,8 @@ export function Header() {
       {/* Primary Header Row */}
       <div className="max-w-7xl pr-8 flex items-center justify-end gap-4 h-full">
         {/* Right: Actions */}
-        <div className="w-48 flex justify-end items-center gap-4">
+        <div className="flex justify-end items-center gap-4">
+          <CreditIndicator />
           <ThemeToggle />
         </div>
       </div>
