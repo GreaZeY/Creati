@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 interface EditorFooterProps {
   onMediaClick: () => void;
-  onEmojiClick: () => void;
+  onEmojiClick: (el: HTMLButtonElement) => void;
   onAIClick: () => void;
   onCanvaClick: () => void;
   onGiphyClick: () => void;
@@ -32,7 +32,7 @@ export function EditorFooter({
           <ImagePlay size={16} />
         </button>
         <button
-          onClick={onEmojiClick}
+          onClick={(e) => onEmojiClick(e.currentTarget)}
           className={cn(
             "h-8 w-8 rounded-lg flex items-center justify-center",
             "text-yellow-400 hover:bg-yellow-500/10",

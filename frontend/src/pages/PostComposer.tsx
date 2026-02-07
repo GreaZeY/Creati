@@ -1,17 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { platformsAPI, mediaAPI, postsAPI } from "@/lib/api";
 import { useClient } from "@/context/ClientContext";
 import { SocialTextArea } from "@/components/composer/Editor/SocialTextArea";
+import type { SocialTextAreaHandle } from "@/components/composer/Editor/SocialTextArea";
 import { PlatformChips } from "@/components/composer/Editor/PlatformChips";
 import { EditorFooter } from "@/components/composer/Editor/EditorFooter";
 import { AIWriteModal } from "@/components/composer/Editor/AIWriteModal";
 import { GiphyPicker } from "@/components/composer/Editor/GiphyPicker";
+import { EmojiPicker } from "@/components/composer/Editor/EmojiPicker";
 import { PreviewPane } from "@/components/composer/Preview/PreviewPane";
 import { PublishDropdown } from "@/components/composer/PublishBar/PublishDropdown";
 import { ScheduleModal } from "@/components/composer/PublishBar/ScheduleModal";
 import { Modal } from "@/components/ui/Modal";
+import { useCanva } from "@/hooks/useCanva";
 import { toast } from "@/lib/events";
 import { PageHeader } from "@/components/ui/PageHeader";
 
@@ -40,6 +43,45 @@ export function PostComposer() {
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [isGiphyPickerOpen, setIsGiphyPickerOpen] = useState(false);
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
+
+  const editorRef = useRef<SocialTextAreaHandle>(null);
+
+  // Canva Integration
+  const canvaApiKey = import.meta.env.VITE_CANVA_API_KEY;
+  const { createDesign } = useCanva(canvaApiKey);
+
+  const handleCanvaDesign = () => {
+    if (!canvaApiKey) {
+      toast.error(
+        "Canva API Key is missing. Please add VITE_CANVA_API_KEY to your .env file.",
+      );
+      return;
+    }
+
+    createDesign({
+      apiKey: canvaApiKey,
+      designType: "SocialMedia",
+      onDesignExport: (url) => {
+        const id = `canva-${Date.now()}`;
+        setPost((prev) => ({
+          ...prev,
+          media: [
+            ...prev.media,
+            {
+              id,
+              url,
+              preview: url,
+              type: "image",
+              uploading: false,
+            },
+          ],
+        }));
+        toast.success("Canva design attached!");
+      },
+    });
+  };
 
   // Redirect if wrong actor
   useEffect(() => {
@@ -246,28 +288,24 @@ export function PostComposer() {
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">
                 Message
               </label>
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.currentTarget.classList.add("ring-2", "ring-primary");
-                }}
-                onDragLeave={(e) => {
-                  e.currentTarget.classList.remove("ring-2", "ring-primary");
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  e.currentTarget.classList.remove("ring-2", "ring-primary");
-                  const files = Array.from(e.dataTransfer.files);
-                  if (files.length > 0) {
-                    handleAddMedia(files);
-                  }
-                }}
-                className="border border-border/40 rounded-lg p-3 bg-card/20 transition-all"
-              >
+              <div className="relative border border-border/40 rounded-lg p-3 bg-card/20 transition-all">
                 <SocialTextArea
+                  ref={editorRef}
                   value={post.text}
                   onChange={(text) => setPost((prev) => ({ ...prev, text }))}
                   placeholder="What's on your mind? (Drag images/videos here)"
+                />
+
+                <EmojiPicker
+                  isOpen={isEmojiPickerOpen}
+                  anchorEl={emojiAnchor}
+                  onClose={() => {
+                    setIsEmojiPickerOpen(false);
+                    setEmojiAnchor(null);
+                  }}
+                  onEmojiSelect={(emoji) =>
+                    editorRef.current?.insertText(emoji)
+                  }
                 />
 
                 {/* Media Previews (Max 4) */}
@@ -344,9 +382,12 @@ export function PostComposer() {
             onMediaClick={() =>
               document.getElementById("media-upload-input")?.click()
             }
-            onEmojiClick={() => toast.info("Emoji picker coming soon")}
+            onEmojiClick={(el) => {
+              setEmojiAnchor(el);
+              setIsEmojiPickerOpen(true);
+            }}
             onAIClick={() => setIsAIModalOpen(true)}
-            onCanvaClick={() => toast.info("Canva integration coming soon")}
+            onCanvaClick={handleCanvaDesign}
             onGiphyClick={() => setIsGiphyPickerOpen(true)}
           />
         </div>
