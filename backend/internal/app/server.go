@@ -103,6 +103,10 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	eventProcessor := workers.NewEventProcessor(db, dbURL, realtimeService, 30*time.Second, 50)
 	go eventProcessor.Start(ctx)
 
+	// Scheduler Worker
+	scheduler := workers.NewScheduler(db, queueService, 30*time.Second)
+	go scheduler.Start(ctx)
+
 	// Routes
 	apiRoutes := app.Group("/api")
 	apiRoutes.Post("/auth/register", authHandler.Register)

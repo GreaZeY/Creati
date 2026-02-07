@@ -7,6 +7,7 @@ import { ComposerAccordion } from "@/components/composer/ComposerAccordion";
 import { PostTextEditor } from "@/components/composer/PostTextEditor";
 import { PlatformSelector } from "@/components/composer/PlatformSelector";
 import { Button } from "@/components/ui/Button";
+import { SchedulePicker } from "@/components/composer/SchedulePicker";
 import { Type, Image, Sparkles, Send } from "lucide-react";
 import { useClient } from "@/context/ClientContext";
 
@@ -85,12 +86,15 @@ export function PostComposer() {
     });
   };
 
+  const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
+
   const handlePublish = () => {
-    // TODO: Implement publish logic
-    console.log("Publishing:", post);
+    // TODO: Implement publish logic with scheduling
+    console.log("Publishing:", post, "Scheduled for:", scheduledAt);
     // Clear draft after successful publish
     localStorage.removeItem(STORAGE_KEY);
     setPost({ text: "", media: [], platforms: [] });
+    setScheduledAt(null);
   };
 
   const hasDraft = post.text.length > 0 || post.media.length > 0;
@@ -167,8 +171,9 @@ export function PostComposer() {
         </ComposerAccordion>
       </div>
 
-      {/* Publish Button */}
-      <div className="sticky bottom-0 bg-background/80 backdrop-blur-md border-t border-border/40 -mx-4 -mb-4 md:-mx-8 md:-mb-8 p-4 md:p-6">
+      {/* Publish Section */}
+      <div className="sticky bottom-0 bg-background/80 backdrop-blur-md border-t border-border/40 -mx-4 -mb-4 md:-mx-8 md:-mb-8 p-4 md:p-6 space-y-4">
+        <SchedulePicker value={scheduledAt} onChange={setScheduledAt} />
         <Button
           onClick={handlePublish}
           disabled={!hasDraft || post.platforms.length === 0}

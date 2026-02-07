@@ -88,6 +88,12 @@ const StatusBadge = ({
           )}
         </span>
       );
+    case "scheduled":
+      return (
+        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+          <Clock size={10} className="animate-pulse" /> Scheduled
+        </span>
+      );
     default:
       return (
         <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground bg-secondary px-2.5 py-1 rounded-full border border-border">
