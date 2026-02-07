@@ -96,6 +96,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	webhookHandler := api.NewWebhookHandler(db)
 	agencyHandler := api.NewAgencyHandler(db)
 	aiHandler := api.NewAiHandler(db)
+	postsHandler := api.NewPostsHandler(db, storageService, queueService)
 	// audienceHandler := api.NewAudienceHandler(db)
 
 	// Events
@@ -184,6 +185,10 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	aiRoutes.Get("/credits", aiHandler.GetCredits)
 	aiRoutes.Post("/generate", aiHandler.GeneratePost)
 	aiRoutes.Post("/rewrite", aiHandler.RewritePost)
+
+	// Posts & Media
+	protected.Post("/media/upload", postsHandler.UploadMedia)
+	protected.Post("/posts", postsHandler.CreatePost)
 
 	// Graceful shutdown
 	go func() {

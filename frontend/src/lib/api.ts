@@ -310,3 +310,31 @@ export const aiAPI = {
       data,
     ),
 };
+
+export const mediaAPI = {
+  upload: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post<ApiResponse<{ id: string; url: string; type: string }>>(
+      "/media/upload",
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 60000, // 60s for large files
+      }
+    );
+  },
+};
+
+export const postsAPI = {
+  create: (data: {
+    text: string;
+    platformIds: string[];
+    mediaIds?: string[];
+    scheduledAt?: Date;
+  }, clientId?: number) =>
+    api.post<ApiResponse<{ id: string; jobIds: string[] }>>(
+      "/posts" + (clientId ? `?clientId=${clientId}` : ""),
+      data,
+    ),
+};

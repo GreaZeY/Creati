@@ -1,17 +1,17 @@
-import { Image, Video, Sparkles, Palette, Smile } from "lucide-react";
+import { Smile as EmojiIcon, Sparkles, Palette, ImagePlay } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface EditorFooterProps {
-  onImageClick: () => void;
-  onVideoClick: () => void;
+  onMediaClick: () => void;
+  onEmojiClick: () => void;
   onAIClick: () => void;
   onCanvaClick: () => void;
   onGiphyClick: () => void;
 }
 
 export function EditorFooter({
-  onImageClick,
-  onVideoClick,
+  onMediaClick,
+  onEmojiClick,
   onAIClick,
   onCanvaClick,
   onGiphyClick,
@@ -21,26 +21,26 @@ export function EditorFooter({
       {/* Left: Attachments */}
       <div className="flex items-center gap-1">
         <button
-          onClick={onImageClick}
+          onClick={onMediaClick}
           className={cn(
             "h-8 w-8 rounded-lg flex items-center justify-center",
-            "text-muted-foreground hover:text-foreground hover:bg-accent/50",
+            "text-emerald-400 hover:bg-emerald-500/10",
             "transition-colors",
           )}
-          title="Add image"
+          title="Add media"
         >
-          <Image size={16} />
+          <ImagePlay size={16} />
         </button>
         <button
-          onClick={onVideoClick}
+          onClick={onEmojiClick}
           className={cn(
             "h-8 w-8 rounded-lg flex items-center justify-center",
-            "text-muted-foreground hover:text-foreground hover:bg-accent/50",
+            "text-yellow-400 hover:bg-yellow-500/10",
             "transition-colors",
           )}
-          title="Add video"
+          title="Add emoji"
         >
-          <Video size={16} />
+          <EmojiIcon size={16} />
         </button>
       </div>
 
@@ -73,13 +73,14 @@ export function EditorFooter({
         <button
           onClick={onGiphyClick}
           className={cn(
-            "h-8 w-8 rounded-lg flex items-center justify-center",
+            "h-8 w-8 rounded-lg flex items-center justify-center gap-1.5",
             "text-pink-400 hover:bg-pink-500/10",
-            "transition-colors",
+            "transition-colors text-xs font-bold",
           )}
           title="Add GIF"
         >
-          <Smile size={16} />
+          <EmojiIcon size={16} />
+          <span>GIF</span>
         </button>
       </div>
     </div>

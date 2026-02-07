@@ -1,6 +1,18 @@
 import { useState } from "react";
 import { Monitor, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PlatformLogo } from "@/components/platforms/PlatformLogo";
+import { Button } from "@/components/ui/Button";
+import {
+  TwitterPreview,
+  LinkedInPreview,
+  FacebookPreview,
+} from "./PlatformPreviews";
+import {
+  InstagramPreview,
+  DiscordPreview,
+  RedditPreview,
+} from "./SocialPreviews";
 
 interface Platform {
   id: string;
@@ -56,31 +68,92 @@ export function PreviewPane({
 
   // Find active platform data
   const activePlatform = platforms.find((p) => p.id === activeTab);
+  const platformName = activePlatform?.name.toLowerCase() || "";
+
+  // Render platform-specific preview
+  const renderPreview = () => {
+    if (!activePlatform) return null;
+
+    const previewProps = {
+      name: activePlatform.name,
+      handle: activePlatform.handle || "handle",
+      text: postText,
+      media,
+      platform: platformName,
+    };
+
+    switch (platformName) {
+      case "twitter":
+        return <TwitterPreview {...previewProps} />;
+      case "linkedin":
+        return <LinkedInPreview {...previewProps} />;
+      case "facebook":
+        return <FacebookPreview {...previewProps} />;
+      case "instagram":
+        return <InstagramPreview {...previewProps} />;
+      case "discord":
+        return <DiscordPreview {...previewProps} />;
+      case "reddit":
+        return <RedditPreview {...previewProps} />;
+      default:
+        // Generic preview for other platforms
+        return (
+          <div className="bg-card rounded-xl border border-border/40 p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20" />
+              <div>
+                <p className="font-bold text-sm">{activePlatform.name}</p>
+                <p className="text-xs text-muted-foreground">
+                  @{activePlatform.handle || "handle"} · now
+                </p>
+              </div>
+            </div>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">
+              {postText || "Your post will appear here..."}
+            </p>
+            {media.length > 0 && (
+              <div className="mt-3 grid gap-2">
+                {media.map((m) => (
+                  <img
+                    key={m.id}
+                    src={m.url}
+                    alt=""
+                    className="rounded-lg w-full"
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col bg-secondary/10">
       {/* Header: Tabs + Device Toggle */}
       <div className="h-12 border-b border-border/40 flex items-center justify-between px-4 bg-card/20">
         {/* Platform Tabs */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto">
           {selectedPlatforms.map((platform) => (
-            <button
+            <Button
               key={platform.id}
               onClick={() => setActiveTab(platform.id)}
+              variant="ghost"
               className={cn(
-                "h-8 px-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors",
+                "h-8 px-3 rounded-lg text-xs font-bold tracking-wider transition-colors flex-shrink-0",
                 activeTab === platform.id
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
               )}
             >
+              <PlatformLogo platform={platform.name} />
               {platform.name}
-            </button>
+            </Button>
           ))}
         </div>
 
         {/* Device Toggle */}
-        <div className="flex gap-1 bg-secondary/50 rounded-lg p-0.5">
+        <div className="flex gap-1 bg-secondary/50 rounded-lg p-0.5 ml-2">
           <button
             onClick={() => setDevice("desktop")}
             className={cn(
@@ -113,41 +186,12 @@ export function PreviewPane({
         <div
           className={cn(
             "transition-all",
-            device === "desktop" ? "w-full max-w-[590px]" : "w-[375px]",
+            device === "desktop"
+              ? "w-full max-w-[590px]"
+              : "w-[375px] scale-95",
           )}
         >
-          {/* Platform-specific preview */}
-          <div className="bg-card rounded-xl border border-border/40 p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20" />
-              <div>
-                <p className="font-bold text-sm">
-                  {activePlatform?.name || "Platform Name"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {activePlatform?.handle
-                    ? `@${activePlatform.handle}`
-                    : "@handle"}{" "}
-                  · now
-                </p>
-              </div>
-            </div>
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">
-              {postText || "Your post will appear here..."}
-            </p>
-            {media.length > 0 && (
-              <div className="mt-3 grid gap-2">
-                {media.map((m) => (
-                  <img
-                    key={m.id}
-                    src={m.url}
-                    alt=""
-                    className="rounded-lg w-full"
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          {renderPreview()}
         </div>
       </div>
     </div>

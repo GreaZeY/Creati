@@ -1,21 +1,32 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { platformsAPI } from "@/lib/api";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { platformsAPI, mediaAPI, postsAPI } from "@/lib/api";
 import { useClient } from "@/context/ClientContext";
 import { SocialTextArea } from "@/components/composer/Editor/SocialTextArea";
 import { PlatformChips } from "@/components/composer/Editor/PlatformChips";
 import { EditorFooter } from "@/components/composer/Editor/EditorFooter";
+import { AIWriteModal } from "@/components/composer/Editor/AIWriteModal";
+import { GiphyPicker } from "@/components/composer/Editor/GiphyPicker";
 import { PreviewPane } from "@/components/composer/Preview/PreviewPane";
 import { PublishDropdown } from "@/components/composer/PublishBar/PublishDropdown";
 import { ScheduleModal } from "@/components/composer/PublishBar/ScheduleModal";
+import { Modal } from "@/components/ui/Modal";
 import { toast } from "@/lib/events";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 // Normalized post state
 interface PostState {
   text: string;
-  media: Array<{ id: string; url: string; type: "image" | "video" }>;
+  media: Array<{
+    id: string;
+    url: string;
+    preview?: string;
+    type: "image" | "video";
+    file?: File;
+    uploading?: boolean;
+    error?: string;
+  }>;
   platforms: string[];
 }
 
@@ -26,6 +37,9 @@ export function PostComposer() {
   const navigate = useNavigate();
   const { selectedClient } = useClient();
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const [isGiphyPickerOpen, setIsGiphyPickerOpen] = useState(false);
+  const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
 
   // Redirect if wrong actor
   useEffect(() => {
@@ -34,12 +48,13 @@ export function PostComposer() {
     }
   }, [actor, navigate]);
 
-  // Load draft from localStorage
+  // Load draft from localStorage (without media)
   const [post, setPost] = useState<PostState>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        return { ...parsed, media: [] }; // Don't restore media
       } catch {
         return { text: "", media: [], platforms: [] };
       }
@@ -47,9 +62,10 @@ export function PostComposer() {
     return { text: "", media: [], platforms: [] };
   });
 
-  // Auto-save draft
+  // Auto-save draft (text + platforms only)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(post));
+    const { media, ...draftData } = post;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(draftData));
   }, [post]);
 
   // Fetch connected platforms
@@ -70,25 +86,127 @@ export function PostComposer() {
       handle: p.handle,
     })) ?? [];
 
+  // Media upload handler
+  const handleAddMedia = async (files: File[]) => {
+    const newMedia = files.map((file) => ({
+      id: `temp-${Date.now()}-${Math.random()}`,
+      file,
+      url: URL.createObjectURL(file),
+      preview: URL.createObjectURL(file),
+      type: (file.type.startsWith("image/") ? "image" : "video") as
+        | "image"
+        | "video",
+      uploading: true,
+    }));
+
+    setPost((prev) => ({ ...prev, media: [...prev.media, ...newMedia] }));
+
+    // Upload each file
+    for (const item of newMedia) {
+      try {
+        const response = await mediaAPI.upload(item.file!);
+        const uploadedMedia = response.data.data;
+
+        setPost((prev) => ({
+          ...prev,
+          media: prev.media.map((m) =>
+            m.id === item.id
+              ? {
+                  ...m,
+                  id: uploadedMedia.id,
+                  url: uploadedMedia.url,
+                  uploading: false,
+                }
+              : m,
+          ),
+        }));
+      } catch (error: any) {
+        const errorMsg = error.response?.data?.message || "Upload failed";
+        toast.error(`Failed to upload ${item.file!.name}: ${errorMsg}`);
+
+        setPost((prev) => ({
+          ...prev,
+          media: prev.media.map((m) =>
+            m.id === item.id ? { ...m, uploading: false, error: errorMsg } : m,
+          ),
+        }));
+      }
+    }
+  };
+
+  const handleRemoveMedia = (id: string) => {
+    setPost((prev) => ({
+      ...prev,
+      media: prev.media.filter((m) => m.id !== id),
+    }));
+  };
+
+  const handleSelectGif = async (gifUrl: string) => {
+    // Add GIF as media (temp, upload later if needed)
+    const gifMedia = {
+      id: `gif-${Date.now()}`,
+      url: gifUrl,
+      preview: gifUrl,
+      type: "image" as const,
+    };
+    setPost((prev) => ({ ...prev, media: [...prev.media, gifMedia] }));
+  };
+
+  // Publish mutation
+  const publishMutation = useMutation({
+    mutationFn: async (scheduledAt?: Date) => {
+      const validMedia = post.media.filter((m) => !m.error && !m.uploading);
+
+      return postsAPI.create(
+        {
+          text: post.text,
+          platformIds: post.platforms,
+          mediaIds: validMedia.map((m) => m.id),
+          scheduledAt,
+        },
+        selectedClient?.id,
+      );
+    },
+    onSuccess: (response, scheduledAt) => {
+      const message = scheduledAt
+        ? `Scheduled for ${scheduledAt.toLocaleString()}! 📅`
+        : "Post published! 🚀";
+
+      toast.success(message);
+      localStorage.removeItem(STORAGE_KEY);
+      setPost({ text: "", media: [], platforms: [] });
+
+      // Navigate to queued jobs
+      navigate("/queued");
+    },
+    onError: (error: any) => {
+      const errorMsg =
+        error.response?.data?.message || "Failed to publish post";
+      toast.error(errorMsg);
+    },
+  });
+
   const handlePublishNow = () => {
     if (post.platforms.length === 0) {
       toast.error("Select at least one platform");
       return;
     }
-    console.log("Publishing now:", post);
-    toast.success("Post published! 🚀");
-    localStorage.removeItem(STORAGE_KEY);
-    setPost({ text: "", media: [], platforms: [] });
+
+    const hasUploadingMedia = post.media.some((m) => m.uploading);
+    if (hasUploadingMedia) {
+      toast.error("Wait for media to finish uploading");
+      return;
+    }
+
+    publishMutation.mutate(undefined);
   };
 
   const handleSchedule = (scheduledDate: Date) => {
-    console.log("Scheduling for:", scheduledDate, post);
-    toast.success(`Scheduled for ${scheduledDate.toLocaleString()}! 📅`);
-    localStorage.removeItem(STORAGE_KEY);
-    setPost({ text: "", media: [], platforms: [] });
+    publishMutation.mutate(scheduledDate);
   };
 
   const hasDraft = post.text.length > 0 || post.media.length > 0;
+  const isPublishing = publishMutation.isPending;
 
   return (
     <div className="flex h-screen flex-col">
@@ -96,7 +214,7 @@ export function PostComposer() {
         <PublishDropdown
           onPublishNow={handlePublishNow}
           onSchedule={() => setIsScheduleModalOpen(true)}
-          disabled={!hasDraft || post.platforms.length === 0}
+          disabled={!hasDraft || post.platforms.length === 0 || isPublishing}
         />
       </PageHeader>
       <div className="flex mt-2 h-full border border-border/40">
@@ -123,56 +241,113 @@ export function PostComposer() {
               />
             </div>
 
-            {/* Text Editor */}
+            {/* Text Editor with Drop Zone */}
             <div>
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">
                 Message
               </label>
-              <div className="border border-border/40 rounded-lg p-3 bg-card/20">
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.add("ring-2", "ring-primary");
+                }}
+                onDragLeave={(e) => {
+                  e.currentTarget.classList.remove("ring-2", "ring-primary");
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.currentTarget.classList.remove("ring-2", "ring-primary");
+                  const files = Array.from(e.dataTransfer.files);
+                  if (files.length > 0) {
+                    handleAddMedia(files);
+                  }
+                }}
+                className="border border-border/40 rounded-lg p-3 bg-card/20 transition-all"
+              >
                 <SocialTextArea
                   value={post.text}
                   onChange={(text) => setPost((prev) => ({ ...prev, text }))}
-                  placeholder="What's on your mind?"
+                  placeholder="What's on your mind? (Drag images/videos here)"
                 />
+
+                {/* Media Previews (Max 4) */}
+                {post.media.length > 0 && (
+                  <div className="mt-3 grid grid-cols-2 gap-2 h-48">
+                    {post.media.slice(0, 4).map((m, index) => (
+                      <div
+                        key={m.id}
+                        className="relative group rounded-lg overflow-hidden border border-border/40 bg-accent/5"
+                      >
+                        <img
+                          src={m.preview || m.url}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                        {m.uploading && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                            <div className="animate-spin h-6 w-6 border-2 border-white border-t-transparent rounded-full" />
+                          </div>
+                        )}
+                        {m.error && (
+                          <div className="absolute inset-0 bg-red-500/20 flex items-center justify-center">
+                            <p className="text-xs text-red-500">Error</p>
+                          </div>
+                        )}
+                        {/* +N More Overlay */}
+                        {index === 3 && post.media.length > 4 && (
+                          <button
+                            onClick={() => setIsMediaModalOpen(true)}
+                            className="absolute inset-0 bg-black/70 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+                          >
+                            <span className="text-2xl font-bold">
+                              +{post.media.length - 4}
+                            </span>
+                          </button>
+                        )}
+                        {/* Remove Button */}
+                        {!m.uploading &&
+                          index < 4 &&
+                          !(index === 3 && post.media.length > 4) && (
+                            <button
+                              onClick={() => handleRemoveMedia(m.id)}
+                              className="absolute top-2 right-2 h-6 w-6 bg-black/80 hover:bg-black text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              ×
+                            </button>
+                          )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
-
-            {/* Media Previews */}
-            {post.media.length > 0 && (
-              <div className="space-y-2">
-                {post.media.map((m) => (
-                  <div key={m.id} className="relative group">
-                    <img
-                      src={m.url}
-                      alt=""
-                      className="w-full rounded-lg border border-border/40"
-                    />
-                    <button
-                      onClick={() =>
-                        setPost((prev) => ({
-                          ...prev,
-                          media: prev.media.filter(
-                            (media) => media.id !== m.id,
-                          ),
-                        }))
-                      }
-                      className="absolute top-2 right-2 h-6 w-6 bg-black/80 hover:bg-black text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
+
+          {/* Hidden File Input */}
+          <input
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            onChange={(e) => {
+              const files = Array.from(e.target.files || []);
+              if (files.length > 0) {
+                handleAddMedia(files);
+              }
+              e.target.value = ""; // Reset for re-selection
+            }}
+            className="hidden"
+            id="media-upload-input"
+          />
 
           {/* Footer */}
           <EditorFooter
-            onImageClick={() => toast.info("Image upload coming soon")}
-            onVideoClick={() => toast.info("Video upload coming soon")}
-            onAIClick={() => toast.info("AI writing coming soon")}
+            onMediaClick={() =>
+              document.getElementById("media-upload-input")?.click()
+            }
+            onEmojiClick={() => toast.info("Emoji picker coming soon")}
+            onAIClick={() => setIsAIModalOpen(true)}
             onCanvaClick={() => toast.info("Canva integration coming soon")}
-            onGiphyClick={() => toast.info("Giphy search coming soon")}
+            onGiphyClick={() => setIsGiphyPickerOpen(true)}
           />
         </div>
 
@@ -182,6 +357,60 @@ export function PostComposer() {
           platforms={platforms}
           postText={post.text}
           media={post.media}
+        />
+
+        {/* AI Write Modal */}
+        <AIWriteModal
+          isOpen={isAIModalOpen}
+          onClose={() => setIsAIModalOpen(false)}
+          onInsert={(text) => setPost((prev) => ({ ...prev, text }))}
+          currentText={post.text}
+        />
+
+        {/* Media View Modal */}
+        <Modal
+          isOpen={isMediaModalOpen}
+          onClose={() => setIsMediaModalOpen(false)}
+          title={`Media (${post.media.length})`}
+        >
+          <div className="p-6 max-w-4xl w-full">
+            <div className="grid grid-cols-3 gap-3 max-h-[70vh] overflow-y-auto">
+              {post.media.map((m) => (
+                <div key={m.id} className="relative group aspect-square">
+                  <img
+                    src={m.preview || m.url}
+                    alt=""
+                    className="w-full h-full object-cover rounded-lg border border-border/40"
+                  />
+                  {m.uploading && (
+                    <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                      <div className="animate-spin h-6 w-6 border-2 border-white border-t-transparent rounded-full" />
+                    </div>
+                  )}
+                  {m.error && (
+                    <div className="absolute inset-0 bg-red-500/20 rounded-lg flex items-center justify-center">
+                      <p className="text-xs text-red-500">Error</p>
+                    </div>
+                  )}
+                  {!m.uploading && (
+                    <button
+                      onClick={() => handleRemoveMedia(m.id)}
+                      className="absolute top-2 right-2 h-6 w-6 bg-black/80 hover:bg-black text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Modal>
+
+        {/* Giphy Picker */}
+        <GiphyPicker
+          isOpen={isGiphyPickerOpen}
+          onClose={() => setIsGiphyPickerOpen(false)}
+          onSelect={handleSelectGif}
         />
 
         {/* Schedule Modal */}
