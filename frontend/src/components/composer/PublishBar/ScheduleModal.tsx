@@ -3,7 +3,6 @@ import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { DayPicker } from "react-day-picker";
 import { format, formatDistanceToNow, isBefore, addMinutes } from "date-fns";
-import { cn } from "@/lib/utils";
 import { Calendar, Clock } from "lucide-react";
 import "react-day-picker/dist/style.css";
 
@@ -54,9 +53,9 @@ export function ScheduleModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Schedule Post">
-      <div className="p-6 max-w-md">
+      <div className="p-6 w-full max-w-md mx-auto">
         {/* Header */}
-        <h2 className="text-lg font-black tracking-tight mb-4">
+        <h2 className="text-lg font-black tracking-tight mb-4 text-center">
           Schedule Post
         </h2>
 
@@ -66,18 +65,15 @@ export function ScheduleModal({
             <Calendar size={12} className="inline mr-1" />
             Date
           </label>
-          <DayPicker
-            mode="single"
-            selected={selectedDate}
-            onSelect={setSelectedDate}
-            disabled={{ before: new Date() }}
-            className={cn(
-              "border border-border/40 rounded-lg p-3",
-              "rdp-months { gap: 0 }",
-              "rdp-day_selected { background: hsl(var(--primary)) }",
-              "[&_.rdp-day_selected]:bg-primary [&_.rdp-day_selected]:text-primary-foreground",
-            )}
-          />
+          <div className="calendar-themed flex justify-center">
+            <DayPicker
+              mode="single"
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+              disabled={{ before: new Date() }}
+              className="rdp-themed"
+            />
+          </div>
         </div>
 
         {/* Time Picker */}
@@ -90,7 +86,7 @@ export function ScheduleModal({
             type="time"
             value={timeString}
             onChange={(e) => setTimeString(e.target.value)}
-            className="w-full h-9 px-3 rounded-lg border border-border/40 bg-background text-sm"
+            className="w-full h-9 px-3 rounded-lg border border-border/40 bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
           />
         </div>
 
@@ -128,6 +124,55 @@ export function ScheduleModal({
             Schedule
           </Button>
         </div>
+
+        {/* Custom CSS for calendar theming */}
+        <style>{`
+          .rdp-themed {
+            --rdp-cell-size: 36px;
+            --rdp-accent-color: hsl(var(--primary));
+            --rdp-background-color: hsl(var(--secondary));
+          }
+          
+          .rdp-themed .rdp-day_selected {
+            background-color: hsl(var(--primary)) !important;
+            color: hsl(var(--primary-foreground)) !important;
+            font-weight: 600;
+          }
+          
+          .rdp-themed .rdp-day_today {
+            font-weight: 600;
+            color: hsl(var(--primary));
+          }
+          
+          .rdp-themed .rdp-day:hover:not(.rdp-day_selected):not(.rdp-day_disabled) {
+            background-color: hsl(var(--accent)) !important;
+          }
+          
+          .rdp-themed .rdp-button:hover:not([disabled]):not(.rdp-day_selected) {
+            background-color: hsl(var(--accent));
+          }
+          
+          .rdp-themed .rdp-head_cell {
+            color: hsl(var(--muted-foreground));
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+          }
+          
+          .rdp-themed .rdp-caption {
+            color: hsl(var(--foreground));
+            font-weight: 700;
+            font-size: 0.875rem;
+          }
+          
+          .rdp-themed .rdp-nav_button:hover {
+            background-color: hsl(var(--accent));
+          }
+          
+          .rdp-themed .rdp-day_disabled {
+            opacity: 0.3;
+          }
+        `}</style>
       </div>
     </Modal>
   );

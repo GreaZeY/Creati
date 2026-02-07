@@ -2,8 +2,15 @@ import { useState } from "react";
 import { Monitor, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+interface Platform {
+  id: string;
+  name: string;
+  handle?: string;
+}
+
 interface PreviewPaneProps {
-  selectedPlatforms: string[];
+  selectedPlatformIds: string[];
+  platforms: Platform[];
   postText: string;
   media: Array<{ id: string; url: string; type: "image" | "video" }>;
 }
@@ -11,21 +18,30 @@ interface PreviewPaneProps {
 type DeviceType = "desktop" | "mobile";
 
 export function PreviewPane({
-  selectedPlatforms,
+  selectedPlatformIds,
+  platforms,
   postText,
   media,
 }: PreviewPaneProps) {
   const [device, setDevice] = useState<DeviceType>("desktop");
   const [activeTab, setActiveTab] = useState<string>(
-    selectedPlatforms[0] || "",
+    selectedPlatformIds[0] || "",
+  );
+
+  // Get selected platform objects
+  const selectedPlatforms = platforms.filter((p) =>
+    selectedPlatformIds.includes(p.id),
   );
 
   // Update active tab when platforms change
-  if (selectedPlatforms.length > 0 && !selectedPlatforms.includes(activeTab)) {
-    setActiveTab(selectedPlatforms[0]);
+  if (
+    selectedPlatformIds.length > 0 &&
+    !selectedPlatformIds.includes(activeTab)
+  ) {
+    setActiveTab(selectedPlatformIds[0]);
   }
 
-  if (selectedPlatforms.length === 0) {
+  if (selectedPlatformIds.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground/40">
         <div className="text-center">
@@ -38,6 +54,9 @@ export function PreviewPane({
     );
   }
 
+  // Find active platform data
+  const activePlatform = platforms.find((p) => p.id === activeTab);
+
   return (
     <div className="flex-1 flex flex-col bg-secondary/10">
       {/* Header: Tabs + Device Toggle */}
@@ -46,16 +65,16 @@ export function PreviewPane({
         <div className="flex gap-2">
           {selectedPlatforms.map((platform) => (
             <button
-              key={platform}
-              onClick={() => setActiveTab(platform)}
+              key={platform.id}
+              onClick={() => setActiveTab(platform.id)}
               className={cn(
                 "h-8 px-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors",
-                activeTab === platform
+                activeTab === platform.id
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent/50",
               )}
             >
-              {platform}
+              {platform.name}
             </button>
           ))}
         </div>
@@ -97,14 +116,19 @@ export function PreviewPane({
             device === "desktop" ? "w-full max-w-[590px]" : "w-[375px]",
           )}
         >
-          {/* Placeholder for actual platform previews */}
+          {/* Platform-specific preview */}
           <div className="bg-card rounded-xl border border-border/40 p-4">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20" />
               <div>
-                <p className="font-bold text-sm">Your Name</p>
+                <p className="font-bold text-sm">
+                  {activePlatform?.name || "Platform Name"}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  @yourhandle · now
+                  {activePlatform?.handle
+                    ? `@${activePlatform.handle}`
+                    : "@handle"}{" "}
+                  · now
                 </p>
               </div>
             </div>

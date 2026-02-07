@@ -99,9 +99,9 @@ export function PostComposer() {
           disabled={!hasDraft || post.platforms.length === 0}
         />
       </PageHeader>
-      <div className="flex mt-2 h-full">
-        {/* Left Pane: Editor (40%) */}
-        <div className="w-[40%] flex flex-col border-r border-border/40">
+      <div className="flex mt-2 h-full border border-border/40">
+        {/* Left Pane: Editor (60%) */}
+        <div className="w-[60%] flex flex-col border-r border-border/40">
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {/* Platforms */}
@@ -176,9 +176,10 @@ export function PostComposer() {
           />
         </div>
 
-        {/* Right Pane: Preview (60%) */}
+        {/* Right Pane: Preview (40%) */}
         <PreviewPane
-          selectedPlatforms={post.platforms}
+          selectedPlatformIds={post.platforms}
+          platforms={platforms}
           postText={post.text}
           media={post.media}
         />
