@@ -65,30 +65,25 @@ type DBTokenSource struct {
 }
 
 func (s *DBTokenSource) Token() (*oauth2.Token, error) {
+	logger.Get("youtube").WithField("account_id", s.accountID).Debug("DBTokenSource.Token() called")
 	t, err := s.src.Token()
 	if err != nil {
+		logger.Get("youtube").WithField("account_id", s.accountID).WithError(err).Error("Refresh token exchange failed")
 		return nil, err
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Check if token has changed (access or refresh) and needs saving
-	// We save if it's the first time checking (lastToken == nil) AND it's different from what we thought,
-	// OR if it explicitly changed from the last known state.
-	// Actually, simpler: if t.AccessToken != s.lastToken.AccessToken, save it.
 	if s.lastToken == nil || t.AccessToken != s.lastToken.AccessToken || t.RefreshToken != s.lastToken.RefreshToken {
-		// Encrypt tokens
+		logger.Get("youtube").WithField("account_id", s.accountID).Info("Detected new token, persisting to DB")
+		// ... existing persistence logic ...
 		encAccess, err := utils.Encrypt(t.AccessToken)
 		if err != nil {
 			fmt.Printf("Failed to encrypt new access token: %v\n", err)
-			return t, nil // return token even if save fails, to keep working
+			return t, nil
 		}
 
-		// If refresh token is empty in new token, likely it didn't change (OAuth2 standard),
-		// but we should keep the old one in DB.
-		// However, query expects a value.
-		// If t.RefreshToken is empty, we should use s.lastToken.RefreshToken if available.
 		refreshToken := t.RefreshToken
 		if refreshToken == "" && s.lastToken != nil {
 			refreshToken = s.lastToken.RefreshToken
@@ -100,7 +95,6 @@ func (s *DBTokenSource) Token() (*oauth2.Token, error) {
 			return t, nil
 		}
 
-		// Update DB with new token AND expiry
 		_, err = s.db.Exec(`
 			UPDATE platform_accounts 
 			SET access_token = $1, refresh_token = $2, expires_at = $3, status = 'connected', connected_at = NOW() 
@@ -112,7 +106,6 @@ func (s *DBTokenSource) Token() (*oauth2.Token, error) {
 		} else {
 			fmt.Printf("🔄 Refreshed and saved new YouTube token for account %d\n", s.accountID)
 			s.lastToken = t
-			// Ensure we keep the valid refresh token in memory if the new one was blank
 			if s.lastToken.RefreshToken == "" {
 				s.lastToken.RefreshToken = refreshToken
 			}
@@ -123,6 +116,7 @@ func (s *DBTokenSource) Token() (*oauth2.Token, error) {
 }
 
 func (y *YouTubeService) getClient(ctx context.Context, accountID int) (*http.Client, error) {
+	logger.Get("youtube").WithField("account_id", accountID).Debug("getClient called")
 	var encAccess, encRefresh string
 	var expiresAt sql.NullTime
 	err := y.db.QueryRow(
@@ -145,7 +139,7 @@ func (y *YouTubeService) getClient(ctx context.Context, accountID int) (*http.Cl
 	token := &oauth2.Token{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-		Expiry:       time.Now().Add(-1 * time.Minute), // Force check/refresh if needed (Expiry not stored, so assuming expired is safer, or let wrapper handle it?)
+		// Force check/refresh if needed (Expiry not stored, so assuming expired is safer, or let wrapper handle it?)
 		// Actually, if we don't store expiry, we can't be sure.
 		// If we set Expiry to past, TokenSource will immediately try to refresh.
 		// Setting it to zero time means "never expires" or "unknown", usually triggers refresh if checking.
@@ -182,9 +176,15 @@ func (y *YouTubeService) getClient(ctx context.Context, accountID int) (*http.Cl
 	// Use stored expiry if available, otherwise assume it needs refresh
 	if expiresAt.Valid {
 		token.Expiry = expiresAt.Time
+		logger.Get("youtube").WithFields(logrus.Fields{
+			"account_id": accountID,
+			"expiry":     token.Expiry.Format(time.RFC3339),
+			"expired":    token.Expiry.Before(time.Now()),
+		}).Debug("Loaded token from DB")
 	} else {
 		// If no expiry stored, assume expired to trigger one refresh
 		token.Expiry = time.Now().Add(-1 * time.Second)
+		logger.Get("youtube").WithField("account_id", accountID).Debug("No expiry found, forcing refresh")
 	}
 
 	ts := y.oauthConfig.TokenSource(ctx, token)
@@ -433,6 +433,7 @@ func (y *YouTubeService) SubscribeToChannel(channelID string) error {
 // FetchRecentVideos retrieves the most recent uploads from the channel
 func (y *YouTubeService) FetchRecentVideos(accountID int) ([]ExternalVideo, error) {
 	ctx := context.Background()
+	fmt.Println("Fetching recent videos for account", accountID)
 	client, err := y.getClient(ctx, accountID)
 	if err != nil {
 		return nil, err

@@ -105,7 +105,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	go eventProcessor.Start(ctx)
 
 	// Scheduler Worker
-	scheduler := workers.NewScheduler(db, 30*time.Second)
+	scheduler := workers.NewScheduler(db, queueService, 30*time.Second)
 	go scheduler.Start(ctx)
 
 	// Routes

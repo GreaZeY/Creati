@@ -88,20 +88,42 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 		FROM contents WHERE id = $1
 	`, job.ContentID).Scan(&originPlatform, &originID, &title, &description)
 	if err != nil {
-		return w.fail(ctx, job, payload, fmt.Errorf("failed to fetch content: %w", err))
+		// Handle cases where title/description might be empty or content not found gracefully
+		if err == sql.ErrNoRows {
+			logger.Get("worker").WithField("content_id", job.ContentID).Warn("Content not found, proceeding with empty title/description")
+			title = ""
+			description = ""
+		} else {
+			return w.fail(ctx, job, payload, fmt.Errorf("failed to fetch content: %w", err))
+		}
 	}
 
-	// 3. Optimized Download/Storage Logic (Shared Source)
-	// We use a unified source key per ContentID to prevent redundant downloads when blasting to multiple platforms.
-	s3Key := fmt.Sprintf("automation/v2/source/%s.mp4", job.ContentID)
-	s3URL := w.Storage.GetObjectURL(s3Key)
+	// 3. Source Media Resolution
+	var sourceS3URL sql.NullString
+	err = w.DB.QueryRowContext(ctx, `
+		SELECT s3_key FROM platform_contents 
+		WHERE content_id = $1 AND platform = $2
+	`, job.ContentID, originPlatform).Scan(&sourceS3URL)
+	
+	if err != nil && err != sql.ErrNoRows {
+		return w.fail(ctx, job, payload, fmt.Errorf("failed to fetch platform content: %w", err))
+	}
 
-	exists, _ := w.Storage.Exists(ctx, s3Key)
-	if !exists {
-		// Download from source only if not already present in shared storage
-		err = w.downloadToStorage(ctx, originPlatform, originID, s3Key, title)
-		if err != nil {
-			return w.fail(ctx, job, payload, err)
+	finalS3URL := ""
+	if sourceS3URL.Valid && sourceS3URL.String != "" {
+		finalS3URL = sourceS3URL.String
+		
+		// If it's an external platform, we might need to download it to our storage first
+		if originPlatform != "creati" {
+			s3Key := fmt.Sprintf("automation/v2/source/%s.mp4", job.ContentID)
+			exists, _ := w.Storage.Exists(ctx, s3Key)
+			if !exists {
+				err = w.downloadToStorage(ctx, originPlatform, originID, s3Key, title)
+				if err != nil {
+					return w.fail(ctx, job, payload, err)
+				}
+			}
+			finalS3URL = w.Storage.GetObjectURL(s3Key)
 		}
 	}
 
@@ -115,7 +137,7 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 	v := &models.Video{
 		Title:       title,
 		Description: description,
-		S3URL:       s3URL,
+		S3URL:       finalS3URL,
 	}
 
 	// Call Platform Service
@@ -134,7 +156,7 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 		INSERT INTO platform_contents (content_id, platform, platform_content_id, account_id, s3_key)
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (content_id, platform) DO NOTHING
-	`, job.ContentID, job.TargetPlatform, platformVideoID, job.AccountID, s3URL)
+	`, job.ContentID, job.TargetPlatform, platformVideoID, job.AccountID, finalS3URL)
 
 	// 7. Enqueue Post Processing
 	postPayload, _ := json.Marshal(map[string]interface{}{

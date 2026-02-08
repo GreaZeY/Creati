@@ -330,21 +330,28 @@ func (p *EventProcessor) evaluateAutomationRules(ctx context.Context, event *eve
 				continue
 			}
 
-			_, err := p.db.ExecContext(ctx, `
-				INSERT INTO automation_jobs (
-					rule_id, video_id, source_platform_id, target_account_id, status, created_at
-				) VALUES ($1, $2, $3, $4, 'pending', $5)
-			`, ruleID, videoID, event.ExternalID, int(targetAccountID), time.Now())
+			// Create V2 automation execution
+			var executionID string
+			err := p.db.QueryRowContext(ctx, `
+				INSERT INTO automation_executions (
+					rule_id, content_id, source_platform, target_platform, target_account_id, status, created_at, updated_at
+				) VALUES (
+					$1, $2, $3, 
+					(SELECT platform FROM platform_accounts WHERE id = $4),
+					$4, 'pending', NOW(), NOW()
+				) RETURNING id
+			`, ruleID, videoID, event.Platform, int(targetAccountID)).Scan(&executionID)
 
 			if err != nil {
-				logger.Get("event_processor").WithField("error", err).Error("Error creating automation job")
+				logger.Get("event_processor").WithField("error", err).Error("Error creating automation execution")
 				continue
 			}
 
 			logger.Get("event_processor").WithFields(logrus.Fields{
 				"rule":           ruleName,
 				"target_account": int(targetAccountID),
-			}).Info("Created automation job")
+				"execution_id":   executionID,
+			}).Info("Created automation execution")
 		}
 
 		// Update rule's last_run_at

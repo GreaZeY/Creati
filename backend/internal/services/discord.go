@@ -161,6 +161,31 @@ func (d *DiscordService) Upload(video *models.Video, accountID int) (string, err
 		return "", fmt.Errorf("account not found or no webhook: %w", err)
 	}
 
+	// If no media, send text-only message
+	if video.S3URL == "" {
+		payload := map[string]interface{}{
+			"content": fmt.Sprintf("**%s**\n%s", video.Title, video.Description),
+		}
+		payloadJSON, _ := json.Marshal(payload)
+		
+		resp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(payloadJSON))
+		if err != nil {
+			return "", fmt.Errorf("failed to send text-only message to discord: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode >= 400 {
+			respBody, _ := io.ReadAll(resp.Body)
+			return "", fmt.Errorf("discord webhook error (%d): %s", resp.StatusCode, string(respBody))
+		}
+
+		var result struct {
+			ID string `json:"id"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&result)
+		return result.ID, nil
+	}
+
 	// Download video to temp file for reliable upload
 	tmpFile, err := utils.DownloadToTempFile(video.S3URL)
 	if err != nil {

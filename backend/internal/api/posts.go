@@ -79,50 +79,102 @@ func (h *PostsHandler) CreatePost(c *fiber.Ctx) error {
 		// platformID from frontend is actually the account ID (platform_accounts.id)
 		// Verify account exists and is connected
 		var platform string
-		err := tx.QueryRow(`
-			SELECT platform FROM platform_accounts 
-			WHERE user_id = $1 AND id = $2 AND connected = true
-		`, userID, platformID).Scan(&platform)
+		var err error
+
+		if clientID != nil {
+			err = tx.QueryRow(`
+				SELECT platform FROM platform_accounts 
+				WHERE user_id = $1 AND id = $2 AND client_id = $3 AND (status = 'connected' OR status = 'active')
+			`, userID, platformID, *clientID).Scan(&platform)
+		} else {
+			err = tx.QueryRow(`
+				SELECT platform FROM platform_accounts 
+				WHERE user_id = $1 AND id = $2 AND client_id IS NULL AND (status = 'connected' OR status = 'active')
+			`, userID, platformID).Scan(&platform)
+		}
+
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusBadRequest, 
+				fmt.Sprintf("Platform account %s not found or not connected", platformID))
+		}
+	}
+	// 1. Normalize Content (V2)
+	normalizer := services.NewContentNormalizer(h.db)
+	
+	// Determine Title/Description (using text)
+	title := req.Text
+	if len(title) > 50 {
+		title = title[:47] + "..."
+	}
+	description := req.Text
+
+	// Handle media
+	mainS3URL := ""
+	if len(req.MediaIDs) > 0 {
+		mainS3URL = req.MediaIDs[0] // Frontend sends URL as ID now
+	}
+
+	normalized, err := normalizer.NormalizeContent(
+		c.Context(),
+		"creati", // Manual post origin
+		traceID.String(), // Use traceID as platform content ID
+		0, // No specific account
+		title,
+		description,
+		0,
+		mainS3URL,
+	)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to normalize content", err)
+	}
+
+	for _, platformID := range req.PlatformIDs {
+		// platformID from frontend is actually the account ID (platform_accounts.id)
+		var platform string
+		var err error
+
+		if clientID != nil {
+			err = tx.QueryRow(`
+				SELECT platform FROM platform_accounts 
+				WHERE user_id = $1 AND id = $2 AND client_id = $3 AND (status = 'connected' OR status = 'active')
+			`, userID, platformID, *clientID).Scan(&platform)
+		} else {
+			err = tx.QueryRow(`
+				SELECT platform FROM platform_accounts 
+				WHERE user_id = $1 AND id = $2 AND client_id IS NULL AND (status = 'connected' OR status = 'active')
+			`, userID, platformID).Scan(&platform)
+		}
 
 		if err != nil {
 			return utils.ErrorResponse(c, fiber.StatusBadRequest, 
 				fmt.Sprintf("Platform account %s not found or not connected", platformID))
 		}
 
-		// Create automation job
-		var jobID string
-		progressData := map[string]interface{}{
-			"text":       req.Text,
-			"mediaIds":   req.MediaIDs,
-			"accountId":  platformID,
-			"platform":   platform,
-		}
-		progressJSON, _ := json.Marshal(progressData)
-
+		// Create V2 automation execution
+		var executionID string
 		err = tx.QueryRow(`
-			INSERT INTO automation_jobs 
-			(user_id, client_id, job_type, status, scheduled_status, scheduled_at, progress, trace_id, created_at, updated_at)
-			VALUES ($1, $2, 'post', $3, $4, $5, $6, $7, NOW(), NOW())
+			INSERT INTO automation_executions 
+			(content_id, client_id, rule_id, source_platform, target_platform, target_account_id, status, trace_id, scheduled_at, scheduled_status)
+			VALUES ($1, $2, 0, 'creati', $3, $4, $5, $6, $7, $8)
 			RETURNING id
-		`, userID, clientID, status, scheduledStatus, scheduledAt, progressJSON, traceID).Scan(&jobID)
+		`, normalized.ContentID, clientID, platform, platformID, status, traceID, scheduledAt, scheduledStatus).Scan(&executionID)
 
 		if err != nil {
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to create job", err)
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to create execution record", err)
 		}
 
-		jobIDs = append(jobIDs, jobID)
+		jobIDs = append(jobIDs, executionID)
 
-		// Enqueue for immediate processing (scheduler will skip if scheduled)
+		// Enqueue V2 Payload for immediate processing
 		if h.queue != nil && req.ScheduledAt == nil {
 			payload, _ := json.Marshal(map[string]interface{}{
-				"job_id":      jobID,
-				"account_id":  platformID,
-				"platform":    platform,
-				"text":        req.Text,
-				"media_ids":   req.MediaIDs,
-				"enqueued_at": time.Now(),
+				"content_id":      normalized.ContentID,
+				"target_platform": platform,
+				"account_id":      platformID,
+				"execution_id":    executionID,
+				"enqueued_at":     time.Now(),
 			})
-			h.queue.Client.LPush(c.Context(), "queue:posts", payload)
+			h.queue.Client.LPush(c.Context(), "upload_queue", payload)
 		}
 	}
 
@@ -135,11 +187,15 @@ func (h *PostsHandler) CreatePost(c *fiber.Ctx) error {
 		message = fmt.Sprintf("Post scheduled for %s", req.ScheduledAt.Format("2006-01-02 15:04"))
 	}
 
-	return utils.SuccessResponse(c, fiber.Map{
-		"id":     jobIDs[0],
-		"jobIds": jobIDs,
+	resp := fiber.Map{
+		"jobIds":  jobIDs,
 		"traceId": traceID.String(),
-	}, message)
+	}
+	if len(jobIDs) > 0 {
+		resp["id"] = jobIDs[0]
+	}
+
+	return utils.SuccessResponse(c, resp, message)
 }
 
 // UploadMedia handles direct multipart file upload for posts
@@ -172,7 +228,6 @@ func (h *PostsHandler) UploadMedia(c *fiber.Ctx) error {
 	}
 
 	// Generate unique key
-	mediaID := uuid.New().String()
 	key := fmt.Sprintf("posts/%d/%s/%s", userID, mediaType,  file.Filename)
 
 	// Open file stream
@@ -191,7 +246,7 @@ func (h *PostsHandler) UploadMedia(c *fiber.Ctx) error {
 	url := h.storage.GetObjectURL(key)
 
 	return utils.SuccessResponse(c, fiber.Map{
-		"id":   mediaID,
+		"id":   url,  // Use URL as ID for simple backend resolution
 		"url":  url,
 		"type": mediaType,
 	}, "Media uploaded successfully")
