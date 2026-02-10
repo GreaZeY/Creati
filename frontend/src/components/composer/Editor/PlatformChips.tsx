@@ -1,6 +1,6 @@
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
-import { cn } from "@/lib/utils";
-import { Check } from "lucide-react";
+import { ChipSelector } from "@/components/ui/ChipSelector";
+import type { Tag } from "@/components/ui/ChipSelector";
 
 interface Platform {
   id: string;
@@ -13,12 +13,16 @@ interface PlatformChipsProps {
   platforms: Platform[];
   selectedPlatforms: string[];
   onToggle: (platformId: string) => void;
+  selection?: "single" | "multi";
+  maxVisibleCount?: number;
 }
 
 export function PlatformChips({
   platforms,
   selectedPlatforms,
   onToggle,
+  selection = "multi",
+  maxVisibleCount = 5,
 }: PlatformChipsProps) {
   const connectedPlatforms = platforms.filter((p) => p.connected);
 
@@ -30,30 +34,20 @@ export function PlatformChips({
     );
   }
 
+  // Map platforms to the generic Tag format
+  const tags: Tag[] = connectedPlatforms.map((p) => ({
+    id: p.id,
+    label: p.handle || p.name,
+    icon: <PlatformLogo platform={p.name.toLowerCase()} size={14} />,
+  }));
+
   return (
-    <div className="flex flex-wrap gap-2">
-      {connectedPlatforms.map((platform) => {
-        const isSelected = selectedPlatforms.includes(platform.id);
-        return (
-          <button
-            key={platform.id}
-            onClick={() => onToggle(platform.id)}
-            className={cn(
-              "h-8 px-3 rounded-full border flex items-center gap-2",
-              "transition-all text-xs font-medium",
-              isSelected
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border/40 hover:border-primary/40 text-muted-foreground",
-            )}
-          >
-            <PlatformLogo platform={platform.name.toLowerCase()} size={14} />
-            <span className="truncate max-w-[100px]">
-              {platform.handle || platform.name}
-            </span>
-            {isSelected && <Check size={12} className="stroke-[3]" />}
-          </button>
-        );
-      })}
-    </div>
+    <ChipSelector
+      tags={tags}
+      selectedIds={selectedPlatforms}
+      onSelect={onToggle}
+      selection={selection}
+      maxVisibleCount={maxVisibleCount}
+    />
   );
 }

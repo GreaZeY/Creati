@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { platformsAPI, mediaAPI, postsAPI } from "@/lib/api";
+import { useMutation } from "@tanstack/react-query";
+import { mediaAPI, postsAPI } from "@/lib/api";
 import { useClient } from "@/context/ClientContext";
 import { SocialTextArea } from "@/components/composer/Editor/SocialTextArea";
 import type { SocialTextAreaHandle } from "@/components/composer/Editor/SocialTextArea";
@@ -15,6 +15,7 @@ import { PublishDropdown } from "@/components/composer/PublishBar/PublishDropdow
 import { ScheduleModal } from "@/components/composer/PublishBar/ScheduleModal";
 import { Modal } from "@/components/ui/Modal";
 import { useCanva } from "@/hooks/useCanva";
+import { usePlatforms } from "@/hooks/usePlatforms";
 import { toast } from "@/lib/events";
 import { PageHeader } from "@/components/ui/PageHeader";
 
@@ -110,23 +111,8 @@ export function PostComposer() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(draftData));
   }, [post]);
 
-  // Fetch connected platforms
-  const { data: platformsData } = useQuery({
-    queryKey: ["platforms", selectedClient?.id],
-    queryFn: async () => {
-      const response = await platformsAPI.list(selectedClient?.id);
-      return response.data.data;
-    },
-  });
-
-  const platforms =
-    platformsData?.map((p: any) => ({
-      id: p.id,
-      name: p.name,
-      connected: p.connected,
-      accountId: p.accountId,
-      handle: p.handle,
-    })) ?? [];
+  // Fetch platforms via unified hook
+  const { platforms } = usePlatforms();
 
   // Media upload handler
   const handleAddMedia = async (files: File[]) => {

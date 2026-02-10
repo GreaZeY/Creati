@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -10,7 +10,7 @@ import {
   Zap,
   Layout,
 } from "lucide-react";
-import { platformsAPI, automationAPI } from "@/lib/api";
+import { automationAPI, platformsAPI } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { toast } from "@/lib/events";
@@ -18,6 +18,8 @@ import { motion } from "framer-motion";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
 import { cn } from "@/lib/utils";
 import { useClient } from "@/context/ClientContext";
+import { PlatformChips } from "@/components/composer/Editor/PlatformChips";
+import { usePlatforms } from "@/hooks/usePlatforms";
 
 export function BlastBuilder() {
   const navigate = useNavigate();
@@ -27,18 +29,7 @@ export function BlastBuilder() {
   const [searchQuery, setSearchQuery] = useState("");
   const { selectedClient } = useClient();
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ["connected-accounts", selectedClient?.id],
-    queryFn: async () => {
-      const resp = await platformsAPI.list(selectedClient?.id);
-      return resp.data.data || [];
-    },
-  });
-
-  const connectedAccounts = useMemo(
-    () => accounts.filter((a: any) => a.connected),
-    [accounts],
-  );
+  const { connectedAccounts, platformOptions } = usePlatforms();
 
   const sourceAccount = connectedAccounts.find(
     (a: any) => a.accountId === sourceAccountId,
@@ -176,26 +167,18 @@ export function BlastBuilder() {
               1. Pick Your Vault
             </h2>
             <div className="flex flex-wrap gap-2">
-              {connectedAccounts.map((acc: any) => (
-                <button
-                  key={acc.accountId}
-                  onClick={() => {
-                    setSourceAccountId(acc.accountId);
-                    setSelectedVideos([]);
-                  }}
-                  className={cn(
-                    "flex items-center gap-3 px-4 py-2 rounded-xl border-2 transition-all",
-                    sourceAccountId === acc.accountId
-                      ? "border-primary bg-primary/10 scale-105"
-                      : "border-border/40 hover:border-primary/50",
-                  )}
-                >
-                  <PlatformLogo platform={acc.platform} size={18} />
-                  <span className="font-bold text-sm truncate max-w-[120px]">
-                    {acc.profileName || acc.handle}
-                  </span>
-                </button>
-              ))}
+              <PlatformChips
+                platforms={platformOptions}
+                selectedPlatforms={
+                  sourceAccountId ? [sourceAccountId.toString()] : []
+                }
+                onToggle={(id) => {
+                  setSourceAccountId(parseInt(id));
+                  setSelectedVideos([]);
+                }}
+                selection="single"
+                maxVisibleCount={8}
+              />
             </div>
           </Card>
 
