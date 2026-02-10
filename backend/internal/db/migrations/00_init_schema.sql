@@ -11,7 +11,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- ============================================================================
 
 -- Users table
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -19,10 +19,10 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 
 -- Creator preferences
-CREATE TABLE creator_preferences (
+CREATE TABLE IF NOT EXISTS creator_preferences (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     content_type VARCHAR(100),
     frequency VARCHAR(50)
@@ -33,7 +33,7 @@ CREATE TABLE creator_preferences (
 -- ============================================================================
 
 -- Organizations (Agency Mode)
-CREATE TABLE organizations (
+CREATE TABLE IF NOT EXISTS organizations (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     owner_id INT REFERENCES users(id) ON DELETE CASCADE,
@@ -41,7 +41,7 @@ CREATE TABLE organizations (
 );
 
 -- Clients (Workspaces within Organizations)
-CREATE TABLE clients (
+CREATE TABLE IF NOT EXISTS clients (
     id SERIAL PRIMARY KEY,
     org_id INT REFERENCES organizations(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -51,10 +51,10 @@ CREATE TABLE clients (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_clients_org ON clients(org_id);
+CREATE INDEX IF NOT EXISTS idx_clients_org ON clients(org_id);
 
 -- Team Members (Roles within Organizations)
-CREATE TABLE team_members (
+CREATE TABLE IF NOT EXISTS team_members (
     id SERIAL PRIMARY KEY,
     org_id INT REFERENCES organizations(id) ON DELETE CASCADE,
     user_id INT REFERENCES users(id) ON DELETE CASCADE,
@@ -64,15 +64,15 @@ CREATE TABLE team_members (
     UNIQUE(org_id, user_id)
 );
 
-CREATE INDEX idx_team_members_org ON team_members(org_id);
-CREATE INDEX idx_team_members_user ON team_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_org ON team_members(org_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(user_id);
 
 -- ============================================================================
 -- PLATFORM INTEGRATION TABLES
 -- ============================================================================
 
 -- Platform Accounts (Connected Social Media Accounts)
-CREATE TABLE platform_accounts (
+CREATE TABLE IF NOT EXISTS platform_accounts (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     client_id INT REFERENCES clients(id) ON DELETE SET NULL,
@@ -86,19 +86,26 @@ CREATE TABLE platform_accounts (
     handle VARCHAR(255),
     webhook_url TEXT,
     status VARCHAR(20) DEFAULT 'active',
-    connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-   CONSTRAINT platform_accounts_v2_unique UNIQUE(user_id, platform, platform_user_id, client_id)
+    connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_platform_accounts_user ON platform_accounts(user_id);
-CREATE INDEX idx_platform_accounts_client ON platform_accounts(client_id);
+-- Add unique constraint after table creation
+DO $$ BEGIN
+    ALTER TABLE platform_accounts ADD CONSTRAINT platform_accounts_v2_unique 
+        UNIQUE(user_id, platform, platform_user_id, client_id);
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_platform_accounts_user ON platform_accounts(user_id);
+CREATE INDEX IF NOT EXISTS idx_platform_accounts_client ON platform_accounts(client_id);
 
 -- ============================================================================
 -- CONTENT & VIDEO TABLES
 -- ============================================================================
 
 -- Videos (Legacy Table)
-CREATE TABLE videos (
+CREATE TABLE IF NOT EXISTS videos (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     client_id INT REFERENCES clients(id) ON DELETE SET NULL,
@@ -113,12 +120,12 @@ CREATE TABLE videos (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_videos_user ON videos(user_id);
-CREATE INDEX idx_videos_client ON videos(client_id);
-CREATE INDEX idx_videos_created ON videos(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_videos_user ON videos(user_id);
+CREATE INDEX IF NOT EXISTS idx_videos_client ON videos(client_id);
+CREATE INDEX IF NOT EXISTS idx_videos_created ON videos(created_at DESC);
 
 -- Video Analytics
-CREATE TABLE video_analytics (
+CREATE TABLE IF NOT EXISTS video_analytics (
     id SERIAL PRIMARY KEY,
     video_id INTEGER NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
     account_id INTEGER REFERENCES platform_accounts(id) ON DELETE SET NULL,
@@ -133,12 +140,12 @@ CREATE TABLE video_analytics (
     UNIQUE(video_id, platform)
 );
 
-CREATE INDEX idx_analytics_video ON video_analytics(video_id);
-CREATE INDEX idx_analytics_account ON video_analytics(account_id);
-CREATE INDEX idx_analytics_client ON video_analytics(client_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_video ON video_analytics(video_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_account ON video_analytics(account_id);
+CREATE INDEX IF NOT EXISTS idx_analytics_client ON video_analytics(client_id);
 
 -- Video Platform Jobs (Legacy Upload Tracking)
-CREATE TABLE video_platform_jobs (
+CREATE TABLE IF NOT EXISTS video_platform_jobs (
     id SERIAL PRIMARY KEY,
     video_id INTEGER NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
     account_id INTEGER REFERENCES platform_accounts(id) ON DELETE SET NULL,
@@ -151,16 +158,16 @@ CREATE TABLE video_platform_jobs (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_jobs_video ON video_platform_jobs(video_id);
-CREATE INDEX idx_jobs_status ON video_platform_jobs(status);
-CREATE INDEX idx_jobs_platform ON video_platform_jobs(platform);
+CREATE INDEX IF NOT EXISTS idx_jobs_video ON video_platform_jobs(video_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON video_platform_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_jobs_platform ON video_platform_jobs(platform);
 
 -- ============================================================================
 -- V2 CONTENT NORMALIZATION (Cycle-Proof Architecture)
 -- ============================================================================
 
 -- Canonical Content Identity (Single Source of Truth)
-CREATE TABLE contents (
+CREATE TABLE IF NOT EXISTS contents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     fingerprint VARCHAR(255) UNIQUE NOT NULL,
     origin_platform VARCHAR(50) NOT NULL,
@@ -172,12 +179,12 @@ CREATE TABLE contents (
     updated_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX idx_contents_fingerprint ON contents(fingerprint);
+CREATE INDEX IF NOT EXISTS idx_contents_fingerprint ON contents(fingerprint);
 
 COMMENT ON TABLE contents IS 'Canonical content identity - single source of truth across all platforms';
 
 -- Platform-Specific Content References (Prevents Duplicate Posts)
-CREATE TABLE platform_contents (
+CREATE TABLE IF NOT EXISTS platform_contents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     content_id UUID NOT NULL REFERENCES contents(id) ON DELETE CASCADE,
     platform VARCHAR(50) NOT NULL,
@@ -190,8 +197,8 @@ CREATE TABLE platform_contents (
     UNIQUE(content_id, platform)  -- CYCLE KILLER: One content can only appear once per platform
 );
 
-CREATE INDEX idx_platform_contents_content ON platform_contents(content_id);
-CREATE INDEX idx_platform_contents_platform ON platform_contents(platform, platform_content_id);
+CREATE INDEX IF NOT EXISTS idx_platform_contents_content ON platform_contents(content_id);
+CREATE INDEX IF NOT EXISTS idx_platform_contents_platform ON platform_contents(platform, platform_content_id);
 
 COMMENT ON TABLE platform_contents IS 'Platform-specific references to content - UNIQUE constraint prevents cycles';
 
@@ -200,7 +207,7 @@ COMMENT ON TABLE platform_contents IS 'Platform-specific references to content -
 -- ============================================================================
 
 -- Automation Rules
-CREATE TABLE automation_rules (
+CREATE TABLE IF NOT EXISTS automation_rules (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     client_id INT REFERENCES clients(id) ON DELETE SET NULL,
@@ -217,11 +224,11 @@ CREATE TABLE automation_rules (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_automation_rules_user_id ON automation_rules(user_id);
-CREATE INDEX idx_automation_rules_source_account ON automation_rules(source_account_id);
+CREATE INDEX IF NOT EXISTS idx_automation_rules_user_id ON automation_rules(user_id);
+CREATE INDEX IF NOT EXISTS idx_automation_rules_source_account ON automation_rules(source_account_id);
 
 -- Automation Execution Tracking (Cycle-Proof by Design)
-CREATE TABLE automation_executions (
+CREATE TABLE IF NOT EXISTS automation_executions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     content_id UUID REFERENCES contents(id) ON DELETE CASCADE,
     client_id INT REFERENCES clients(id) ON DELETE SET NULL,
@@ -240,15 +247,15 @@ CREATE TABLE automation_executions (
     UNIQUE(content_id, target_platform)  -- PREVENTS DUPLICATE POSTS
 );
 
-CREATE INDEX idx_executions_status ON automation_executions(status);
-CREATE INDEX idx_executions_content ON automation_executions(content_id);
-CREATE INDEX idx_executions_rule ON automation_executions(rule_id);
-CREATE INDEX idx_executions_scheduled ON automation_executions(scheduled_at) WHERE scheduled_status = 'scheduled';
+CREATE INDEX IF NOT EXISTS idx_executions_status ON automation_executions(status);
+CREATE INDEX IF NOT EXISTS idx_executions_content ON automation_executions(content_id);
+CREATE INDEX IF NOT EXISTS idx_executions_rule ON automation_executions(rule_id);
+CREATE INDEX IF NOT EXISTS idx_executions_scheduled ON automation_executions(scheduled_at) WHERE scheduled_status = 'scheduled';
 
 COMMENT ON TABLE automation_executions IS 'Automation execution tracking - UNIQUE constraint prevents duplicate posts';
 
 -- Automation Logs (Activity History)
-CREATE TABLE automation_logs (
+CREATE TABLE IF NOT EXISTS automation_logs (
     id SERIAL PRIMARY KEY,
     rule_id INT NOT NULL REFERENCES automation_rules(id) ON DELETE CASCADE,
     content_id UUID REFERENCES contents(id) ON DELETE SET NULL,
@@ -258,15 +265,15 @@ CREATE TABLE automation_logs (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_automation_logs_rule ON automation_logs(rule_id);
-CREATE INDEX idx_automation_logs_content ON automation_logs(content_id);
+CREATE INDEX IF NOT EXISTS idx_automation_logs_rule ON automation_logs(rule_id);
+CREATE INDEX IF NOT EXISTS idx_automation_logs_content ON automation_logs(content_id);
 
 -- ============================================================================
 -- PLATFORM EVENTS & WEBHOOKS
 -- ============================================================================
 
 -- Platform Events (Real-time Event Stream)
-CREATE TABLE platform_events (
+CREATE TABLE IF NOT EXISTS platform_events (
     id SERIAL PRIMARY KEY,
     account_id INTEGER NOT NULL REFERENCES platform_accounts(id) ON DELETE CASCADE,
     platform VARCHAR(50) NOT NULL,
@@ -277,13 +284,13 @@ CREATE TABLE platform_events (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_platform_events_account ON platform_events(account_id);
-CREATE INDEX idx_platform_events_type ON platform_events(event_type);
-CREATE INDEX idx_platform_events_processed ON platform_events(processed);
-CREATE INDEX idx_platform_events_external ON platform_events(external_id);
+CREATE INDEX IF NOT EXISTS idx_platform_events_account ON platform_events(account_id);
+CREATE INDEX IF NOT EXISTS idx_platform_events_type ON platform_events(event_type);
+CREATE INDEX IF NOT EXISTS idx_platform_events_processed ON platform_events(processed);
+CREATE INDEX IF NOT EXISTS idx_platform_events_external ON platform_events(external_id);
 
 -- Webhook Subscriptions
-CREATE TABLE webhook_subscriptions (
+CREATE TABLE IF NOT EXISTS webhook_subscriptions (
     id SERIAL PRIMARY KEY,
     account_id INTEGER NOT NULL REFERENCES platform_accounts(id) ON DELETE CASCADE,
     platform VARCHAR(50) NOT NULL,
@@ -294,10 +301,10 @@ CREATE TABLE webhook_subscriptions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_webhook_subscriptions_account ON webhook_subscriptions(account_id);
+CREATE INDEX IF NOT EXISTS idx_webhook_subscriptions_account ON webhook_subscriptions(account_id);
 
 -- Polling State (For Non-Webhook Platforms)
-CREATE TABLE polling_state (
+CREATE TABLE IF NOT EXISTS polling_state (
     id SERIAL PRIMARY KEY,
     account_id INTEGER NOT NULL REFERENCES platform_accounts(id) ON DELETE CASCADE,
     platform VARCHAR(50) NOT NULL,
@@ -311,7 +318,7 @@ CREATE TABLE polling_state (
 -- ============================================================================
 
 -- Subscriptions
-CREATE TABLE subscriptions (
+CREATE TABLE IF NOT EXISTS subscriptions (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     stripe_subscription_id VARCHAR(255) UNIQUE,
@@ -323,7 +330,7 @@ CREATE TABLE subscriptions (
 );
 
 -- Payments
-CREATE TABLE payments (
+CREATE TABLE IF NOT EXISTS payments (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     stripe_payment_id VARCHAR(255) UNIQUE,
@@ -337,7 +344,7 @@ CREATE TABLE payments (
 -- ============================================================================
 
 -- AI Credit Usage Logs
-CREATE TABLE ai_credit_logs (
+CREATE TABLE IF NOT EXISTS ai_credit_logs (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     amount INTEGER NOT NULL,
@@ -345,7 +352,7 @@ CREATE TABLE ai_credit_logs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_ai_credit_logs_user ON ai_credit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_credit_logs_user ON ai_credit_logs(user_id);
 
 -- ============================================================================
 -- TRIGGERS & FUNCTIONS
@@ -361,12 +368,14 @@ END;
 $$ language 'plpgsql';
 
 -- Trigger: automation_rules updated_at
+DROP TRIGGER IF EXISTS update_automation_rules_updated_at ON automation_rules;
 CREATE TRIGGER update_automation_rules_updated_at
     BEFORE UPDATE ON automation_rules
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
 -- Trigger: automation_executions updated_at
+DROP TRIGGER IF EXISTS update_automation_executions_updated_at ON automation_executions;
 CREATE TRIGGER update_automation_executions_updated_at
     BEFORE UPDATE ON automation_executions
     FOR EACH ROW
@@ -393,6 +402,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger: Realtime execution updates
+DROP TRIGGER IF EXISTS execution_change_trigger ON automation_executions;
 CREATE TRIGGER execution_change_trigger
     AFTER INSERT OR UPDATE ON automation_executions
     FOR EACH ROW
@@ -403,7 +413,13 @@ CREATE TRIGGER execution_change_trigger
 -- ============================================================================
 
 -- Ensure valid platform values (can be extended)
-ALTER TABLE platform_accounts ADD CONSTRAINT valid_platform 
-    CHECK (platform IN ('youtube', 'instagram', 'facebook', 'twitter', 'discord', 'tiktok', 'reddit', 'linkedin', 'creati'));
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'valid_platform'
+    ) THEN
+        ALTER TABLE platform_accounts ADD CONSTRAINT valid_platform 
+            CHECK (platform IN ('youtube', 'instagram', 'facebook', 'twitter', 'discord', 'tiktok', 'reddit', 'linkedin'));
+    END IF;
+END $$;
 
 COMMENT ON DATABASE creati IS 'Creati - Multi-Platform Content Distribution System';

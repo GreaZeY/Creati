@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"creati.in/creati/backend/internal/types"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -41,6 +42,15 @@ func (s *CacheService) Get(ctx context.Context, key string, target interface{}) 
 // Delete removes a key from the cache
 func (s *CacheService) Delete(ctx context.Context, key string) error {
 	return s.client.Del(ctx, key).Err()
+}
+
+// GetAccountsKey builds a cache key for account-related lists based on user context
+func (s *CacheService) GetAccountsKey(ctx types.UserContext, suffix string) string {
+	key := fmt.Sprintf("user:%d:accounts:%s", ctx.UserID, suffix)
+	if ctx.ClientID != nil {
+		return fmt.Sprintf("%s:%d", key, *ctx.ClientID)
+	}
+	return key + ":personal"
 }
 
 // Keys for common cached items
