@@ -89,13 +89,10 @@ CREATE TABLE IF NOT EXISTS platform_accounts (
     connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Add unique constraint after table creation
-DO $$ BEGIN
-    ALTER TABLE platform_accounts ADD CONSTRAINT platform_accounts_v2_unique 
-        UNIQUE(user_id, platform, platform_user_id, client_id);
-EXCEPTION
-    WHEN duplicate_object THEN NULL;
-END $$;
+-- REPLACEMENT: Use Unique Index with Coalesce to handle NULL client_id (Personal Workspace)
+-- This ensures ON CONFLICT works for both Personal (NULL) and Workspace (INT) accounts
+CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_accounts_unique_logic
+    ON platform_accounts (user_id, platform, platform_user_id, (COALESCE(client_id, 0)));
 
 CREATE INDEX IF NOT EXISTS idx_platform_accounts_user ON platform_accounts(user_id);
 CREATE INDEX IF NOT EXISTS idx_platform_accounts_client ON platform_accounts(client_id);
@@ -189,7 +186,6 @@ CREATE TABLE IF NOT EXISTS platform_contents (
     content_id UUID NOT NULL REFERENCES contents(id) ON DELETE CASCADE,
     platform VARCHAR(50) NOT NULL,
     platform_content_id VARCHAR(255) NOT NULL,
-    account_id INT REFERENCES platform_accounts(id),
     s3_key VARCHAR(500),
     published_at TIMESTAMP DEFAULT NOW(),
     created_at TIMESTAMP DEFAULT NOW(),
@@ -235,7 +231,7 @@ CREATE TABLE IF NOT EXISTS automation_executions (
     rule_id INT NOT NULL REFERENCES automation_rules(id) ON DELETE CASCADE,
     source_platform VARCHAR(50) NOT NULL,
     target_platform VARCHAR(50) NOT NULL,
-    target_account_id INT REFERENCES platform_accounts(id),
+    target_account_id INT REFERENCES platform_accounts(id) ON DELETE SET NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'queued',
     trace_id UUID,
     error TEXT,

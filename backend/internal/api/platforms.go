@@ -195,14 +195,24 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 	isReconnect := errID == nil
 
 	if isReconnect {
-		// Reconnect specific account: get platform name and email hint
+		// Reconnect specific account: get platform name, email hint, AND original client_id
 		var dbPlatform string
 		var email sql.NullString
-		err := h.db.QueryRow("SELECT platform, email FROM platform_accounts WHERE id = $1 AND user_id = $2", accountID, ctx.UserID).Scan(&dbPlatform, &email)
+		var dbClientID sql.NullInt64
+		err := h.db.QueryRow(`
+			SELECT platform, email, client_id FROM platform_accounts WHERE id = $1 AND user_id = $2
+		`, accountID, ctx.UserID).Scan(&dbPlatform, &email, &dbClientID)
 		if err != nil {
 			log.Printf("Reconnect lookup failed for account %d (user %d): %v", accountID, ctx.UserID, err)
 			return utils.ErrorResponse(c, fiber.StatusNotFound, "account not found or unauthorized")
 		}
+
+		// Update state to use the account's ACTUAL client_id
+		state = strconv.Itoa(ctx.UserID)
+		if dbClientID.Valid {
+			state = fmt.Sprintf("%d:%d", ctx.UserID, dbClientID.Int64)
+		}
+
 		targetPlatform = dbPlatform
 		emailHint := email.String
 
@@ -333,16 +343,16 @@ func (h *PlatformHandler) DeactivatePlatform(c *fiber.Ctx) error {
 	platform := c.Params("platform")
 	ctx := middleware.GetContext(c)
 
-	if err := h.disconnectPlatformInternal(ctx.UserID, platform); err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to disconnect platform", err)
-	}
-
-	// Invalidate Cache
+	// Invalidate Cache - MUST HAPPEN BEFORE OR WE LOSE clientID
 	var clientID *int
 	if accountID, errID := strconv.Atoi(platform); errID == nil {
 		_ = h.db.QueryRow("SELECT client_id FROM platform_accounts WHERE id = $1", accountID).Scan(&clientID)
 	}
 	h.invalidateUserCache(c.Context(), ctx.UserID, clientID)
+
+	if err := h.disconnectPlatformInternal(ctx.UserID, platform); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to disconnect platform", err)
+	}
 
 	return utils.SuccessResponse(c, nil, "Platform disconnected successfully")
 }
@@ -352,35 +362,28 @@ func (h *PlatformHandler) RemovePlatform(c *fiber.Ctx) error {
 	target := c.Params("platform")
 	ctx := middleware.GetContext(c)
 
-	// Always attempt to disconnect first (reusing logic as requested)
-	_ = h.disconnectPlatformInternal(ctx.UserID, target)
-
-	// Check if target is a numeric account ID or a platform name
-	accountID, errID := strconv.Atoi(target)
-
-	var err error
-	if errID == nil {
-		// Target is an ID
-		_, err = h.db.Exec(`
-			DELETE FROM platform_accounts WHERE id = $1 AND user_id = $2
-		`, accountID, ctx.UserID)
-	} else {
-		// Target is a platform name
-		_, err = h.db.Exec(`
-			DELETE FROM platform_accounts WHERE platform = $1 AND user_id = $2
-		`, target, ctx.UserID)
-	}
-
-	if err != nil {
-		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to remove platform", err)
-	}
-
-	// Invalidate Cache
+	// Invalidate Cache - MUST HAPPEN BEFORE DELETION
 	var clientID *int
 	if accountID, errID := strconv.Atoi(target); errID == nil {
 		_ = h.db.QueryRow("SELECT client_id FROM platform_accounts WHERE id = $1", accountID).Scan(&clientID)
 	}
 	h.invalidateUserCache(c.Context(), ctx.UserID, clientID)
+
+	// Always attempt to disconnect first (revoking tokens if possible)
+	_ = h.disconnectPlatformInternal(ctx.UserID, target)
+
+	// Check if target is a numeric account ID or a platform name
+	accountID, errID := strconv.Atoi(target)
+	var err error
+	if errID == nil {
+		_, err = h.db.Exec("DELETE FROM platform_accounts WHERE id = $1 AND user_id = $2", accountID, ctx.UserID)
+	} else {
+		_, err = h.db.Exec("DELETE FROM platform_accounts WHERE platform = $1 AND user_id = $2", target, ctx.UserID)
+	}
+
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to remove platform", err)
+	}
 
 	return utils.SuccessResponse(c, nil, "Platform removed successfully")
 }

@@ -145,7 +145,6 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 		c.Context(),
 		"creati", // Manual upload origin
 		fmt.Sprintf("%d", videoID),
-		0, // No specific account for manual origin
 		req.Title,
 		req.Description,
 		0,     // Duration not known yet

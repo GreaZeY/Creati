@@ -20,17 +20,18 @@ func NewPlatformRepository(db *sql.DB) *PlatformRepository {
 // UpsertAccount inserts or updates a platform account
 func (r *PlatformRepository) UpsertAccount(ctx context.Context, account *models.PlatformAccount) error {
 	query := `
-		INSERT INTO platform_accounts (user_id, client_id, platform, access_token, refresh_token, platform_user_id, status, profile_name, handle, email, webhook_url)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO platform_accounts (user_id, client_id, platform, access_token, refresh_token, platform_user_id, status, profile_name, handle, email, webhook_url, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		ON CONFLICT (user_id, platform, platform_user_id, (COALESCE(client_id, 0))) 
 		DO UPDATE SET 
 			access_token = $4, 
-			refresh_token = $5,
+			refresh_token = CASE WHEN $5 != '' THEN $5 ELSE platform_accounts.refresh_token END,
 			status = $7, 
 			profile_name = $8, 
 			handle = $9,
 			email = $10,
 			webhook_url = $11,
+			expires_at = $12,
 			connected_at = NOW()
 	`
 	_, err := r.db.ExecContext(ctx, query,
@@ -45,6 +46,7 @@ func (r *PlatformRepository) UpsertAccount(ctx context.Context, account *models.
 		account.Handle,
 		account.Email,
 		account.WebhookURL,
+		account.ExpiresAt,
 	)
 	return err
 }
@@ -67,7 +69,8 @@ func (r *PlatformRepository) ListAccounts(
             status,
             profile_name,
             handle,
-            email
+            email,
+            expires_at
         FROM platform_accounts
         WHERE user_id = $1
     `
@@ -119,6 +122,7 @@ func scanPlatformAccount(rows *sql.Rows) (models.PlatformAccount, error) {
 		&profileName,
 		&handle,
 		&email,
+		&acc.ExpiresAt,
 	)
 	if err != nil {
 		return acc, err

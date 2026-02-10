@@ -191,7 +191,7 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 
 	// 5. Normalize Content (V2)
 	normalizer := NewContentNormalizer(s.db)
-	normalized, err := normalizer.NormalizeContent(ctx, sourcePlatform, sourceVideoID, sourceAccountID, title, "", 0, "")
+	normalized, err := normalizer.NormalizeContent(ctx, sourcePlatform, sourceVideoID, title, "", 0, "")
 	if err != nil {
 		log.Printf("Failed to normalize content for automation %s: %v", executionID, err)
 		s.db.Exec("UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", err.Error(), executionID)
@@ -364,7 +364,7 @@ func (s *AutomationService) createNotificationJob(ruleID int, sourceVideoID stri
 
 	// 3. Normalize Content
 	normalizer := NewContentNormalizer(s.db)
-	normalized, err := normalizer.NormalizeContent(ctx, sourcePlatform, sourceVideoID, sourceAccountID, title, "", 0, "")
+	normalized, err := normalizer.NormalizeContent(ctx, sourcePlatform, sourceVideoID, title, "", 0, "")
 	if err != nil {
 		log.Printf("Failed to normalize content for notification %s: %v", executionID, err)
 		s.db.Exec("UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", err.Error(), executionID)

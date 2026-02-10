@@ -97,7 +97,7 @@ func (s *DBTokenSource) Token() (*oauth2.Token, error) {
 
 		_, err = s.db.Exec(`
 			UPDATE platform_accounts 
-			SET access_token = $1, refresh_token = $2, expires_at = $3, status = 'connected', connected_at = NOW() 
+			SET access_token = $1, refresh_token = $2, expires_at = $3, status = 'active', connected_at = NOW() 
 			WHERE id = $4
 		`, encAccess, encRefresh, t.Expiry, s.accountID)
 
@@ -279,9 +279,12 @@ func (y *YouTubeService) Authenticate(code string, userID int, clientID *int) er
 	if err != nil {
 		return fmt.Errorf("failed to encrypt access token: %w", err)
 	}
-	encRefresh, err := utils.Encrypt(token.RefreshToken)
-	if err != nil {
-		return fmt.Errorf("failed to encrypt refresh token: %w", err)
+	var encRefresh string
+	if token.RefreshToken != "" {
+		encRefresh, err = utils.Encrypt(token.RefreshToken)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt refresh token: %w", err)
+		}
 	}
 
 	// Use Repository to persist account
@@ -292,10 +295,11 @@ func (y *YouTubeService) Authenticate(code string, userID int, clientID *int) er
 		AccessToken:    encAccess,
 		RefreshToken:   encRefresh,
 		PlatformUserID: channelID,
-		Status:         "connected",
+		Status:         "active",
 		ProfileName:    channelName,
 		Handle:         handle,
 		Email:          userEmail,
+		ExpiresAt:      &token.Expiry,
 	}
 
 	err = y.repo.UpsertAccount(context.Background(), account)

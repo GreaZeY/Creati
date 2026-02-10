@@ -54,7 +54,6 @@ func (w *IngestionWorker) Process(ctx context.Context, payload []byte) error {
 		ctx,
 		job.Platform,
 		job.PlatformContentID,
-		job.AccountID,
 		job.Title,
 		job.Description,
 		job.Duration,

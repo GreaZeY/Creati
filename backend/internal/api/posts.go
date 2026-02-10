@@ -94,13 +94,13 @@ func (h *PostsHandler) CreatePost(c *fiber.Ctx) error {
 		}
 
 		if err != nil {
-			return utils.ErrorResponse(c, fiber.StatusBadRequest, 
+			return utils.ErrorResponse(c, fiber.StatusBadRequest,
 				fmt.Sprintf("Platform account %s not found or not connected", platformID))
 		}
 	}
 	// 1. Normalize Content (V2)
 	normalizer := services.NewContentNormalizer(h.db)
-	
+
 	// Determine Title/Description (using text)
 	title := req.Text
 	if len(title) > 50 {
@@ -116,9 +116,8 @@ func (h *PostsHandler) CreatePost(c *fiber.Ctx) error {
 
 	normalized, err := normalizer.NormalizeContent(
 		c.Context(),
-		"creati", // Manual post origin
+		"creati",         // Manual post origin
 		traceID.String(), // Use traceID as platform content ID
-		0, // No specific account
 		title,
 		description,
 		0,
@@ -146,7 +145,7 @@ func (h *PostsHandler) CreatePost(c *fiber.Ctx) error {
 		}
 
 		if err != nil {
-			return utils.ErrorResponse(c, fiber.StatusBadRequest, 
+			return utils.ErrorResponse(c, fiber.StatusBadRequest,
 				fmt.Sprintf("Platform account %s not found or not connected", platformID))
 		}
 
@@ -228,7 +227,7 @@ func (h *PostsHandler) UploadMedia(c *fiber.Ctx) error {
 	}
 
 	// Generate unique key
-	key := fmt.Sprintf("posts/%d/%s/%s", userID, mediaType,  file.Filename)
+	key := fmt.Sprintf("posts/%d/%s/%s", userID, mediaType, file.Filename)
 
 	// Open file stream
 	src, err := file.Open()
@@ -246,7 +245,7 @@ func (h *PostsHandler) UploadMedia(c *fiber.Ctx) error {
 	url := h.storage.GetObjectURL(key)
 
 	return utils.SuccessResponse(c, fiber.Map{
-		"id":   url,  // Use URL as ID for simple backend resolution
+		"id":   url, // Use URL as ID for simple backend resolution
 		"url":  url,
 		"type": mediaType,
 	}, "Media uploaded successfully")

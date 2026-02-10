@@ -35,14 +35,11 @@ func (cn *ContentNormalizer) NormalizeContent(
 	ctx context.Context,
 	platform string,
 	platformContentID string,
-	accountID int,
 	title string,
 	description string,
 	durationSeconds int,
 	s3Key string,
 ) (*NormalizedContent, error) {
-	// Handle optional account ID (0 means NULL)
-	dbAccountID := sql.NullInt64{Int64: int64(accountID), Valid: accountID != 0}
 
 	// 1. Check if this platform content is already linked to a canonical record
 	var existingContentID string
@@ -92,13 +89,12 @@ func (cn *ContentNormalizer) NormalizeContent(
 
 		_, err = cn.db.ExecContext(ctx, `
 			INSERT INTO platform_contents 
-			(content_id, platform, platform_content_id, account_id, s3_key, published_at)
-			VALUES ($1, $2, $3, $4, $5, NOW())
+			(content_id, platform, platform_content_id, s3_key, published_at)
+			VALUES ($1, $2, $3, $4, NOW())
 			ON CONFLICT (platform, platform_content_id) DO UPDATE
 			SET content_id = EXCLUDED.content_id,
-			    account_id = EXCLUDED.account_id,
 			    s3_key = EXCLUDED.s3_key
-		`, existingContentID, platform, platformContentID, dbAccountID, s3Key)
+		`, existingContentID, platform, platformContentID, s3Key)
 
 		if err != nil {
 			return nil, fmt.Errorf("failed to link existing content: %w", err)
@@ -127,9 +123,9 @@ func (cn *ContentNormalizer) NormalizeContent(
 	// Add platform reference
 	_, err = cn.db.ExecContext(ctx, `
 		INSERT INTO platform_contents 
-		(content_id, platform, platform_content_id, account_id, s3_key, published_at)
-		VALUES ($1, $2, $3, $4, $5, NOW())
-	`, existingContentID, platform, platformContentID, dbAccountID, s3Key)
+		(content_id, platform, platform_content_id, s3_key, published_at)
+		VALUES ($1, $2, $3, $4, NOW())
+	`, existingContentID, platform, platformContentID, s3Key)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create platform reference: %w", err)
