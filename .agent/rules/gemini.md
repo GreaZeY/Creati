@@ -103,6 +103,57 @@ These rules apply to every line of code written or modified in this codebase. Th
 
 ---
 
+## 🔒 SECURITY RULES (Critical - Non-Negotiable)
+
+### Authentication & Authorization
+
+- **Never** trust client-side data. Always validate and sanitize on the server.
+- Use **JWT** or session-based authentication with short expiration times.
+- Implement **role-based access control (RBAC)** for all protected resources.
+- Verify user permissions at the **service layer**, not just at the API layer.
+- Use **HTTP-only, Secure, SameSite cookies** for session management.
+
+### Data Protection
+
+- **Encrypt** all sensitive data (tokens, passwords, personal information) at rest and in transit.
+- Use **bcrypt** or **Argon2** for password hashing (never store plain-text passwords).
+- Implement **rate limiting** on all public endpoints to prevent abuse.
+- **Never log** sensitive information (passwords, tokens, credit cards).
+- Use **parameterized queries** or ORMs to prevent SQL injection.
+
+### API Security
+
+- Validate **all inputs** (type, length, format) before processing.
+- Implement **CORS** with strict origin whitelisting.
+- Use **HTTPS** everywhere in production.
+- Set appropriate **security headers** (CSP, X-Frame-Options, X-Content-Type-Options).
+- Implement **CSRF protection** for state-changing operations.
+
+### External Integrations
+
+- **Never expose** API keys, secrets, or credentials in code or logs.
+- Use **environment variables** for all sensitive configuration.
+- Implement **OAuth 2.0** for third-party integrations with proper scope management.
+- Validate and sanitize **webhook payloads** before processing.
+- Use **signature verification** for webhooks (HMAC, JWT).
+
+### Frontend Security
+
+- **Sanitize** all user-generated content before rendering (prevent XSS).
+- Use **Content Security Policy (CSP)** to prevent script injection.
+- Never store **sensitive data** in localStorage or sessionStorage.
+- Implement **secure redirect** handling (validate URLs before redirecting).
+- Use **DOMPurify** or similar for rendering untrusted HTML.
+
+### Error Handling
+
+- **Never expose** internal errors, stack traces, or system details to clients.
+- Log errors with **correlation IDs** for debugging without exposing sensitive info.
+- Return **generic error messages** to users while logging detailed errors internally.
+- Implement **circuit breakers** for external service calls.
+
+---
+
 ## 🤖 AI OPERATING INSTRUCTIONS
 
 - **Phase-Based Workflow**: Always: **Research -> Planning -> Implementation -> Verification**.
