@@ -116,19 +116,19 @@ export function BlastBuilder() {
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto py-6 px-4 h-[calc(100vh-100px)] flex flex-col gap-6">
+    <div className="h-full flex flex-col p-4 gap-4">
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/push")}>
-            <ArrowLeft size={20} />
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/push")}>
+            <ArrowLeft size={16} />
           </Button>
           <div>
-            <h1 className="text-3xl font-black tracking-tighter flex items-center gap-2">
+            <h1 className="text-xl font-black tracking-tighter flex items-center gap-2">
               QUICK PUSH{" "}
-              <Rocket size={28} className="text-primary fill-primary/20" />
+              <Rocket size={20} className="text-primary fill-primary/20" />
             </h1>
-            <p className="text-muted-foreground text-sm font-medium uppercase tracking-widest opacity-60">
+            <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-widest opacity-60">
               One-Click Video Sync
             </p>
           </div>
@@ -140,7 +140,7 @@ export function BlastBuilder() {
               animate={{ scale: 1, opacity: 1 }}
               className="text-right mr-4"
             >
-              <p className="text-2xl font-black leading-none">
+              <p className="text-xl font-black leading-none">
                 {selectedVideos.length}
               </p>
               <p className="text-[10px] font-bold uppercase text-primary">
@@ -149,8 +149,8 @@ export function BlastBuilder() {
             </motion.div>
           )}
           <Button
-            size="lg"
-            className="px-8 h-12 text-lg font-black gap-2 shadow-[0_0_20px_rgba(var(--primary),0.3)] hover:scale-105 active:scale-95 transition-all"
+            size="sm"
+            className="px-6 h-9 text-sm font-black gap-2 shadow-[0_0_20px_rgba(var(--primary),0.3)] hover:scale-105 active:scale-95 transition-all"
             onClick={handleLaunch}
             disabled={pushMutation.isPending}
           >
@@ -159,11 +159,11 @@ export function BlastBuilder() {
         </div>
       </div>
 
-      <div className="flex flex-1 gap-6 min-h-0">
+      <div className="flex flex-1 gap-4 min-h-0">
         {/* Left Side: Raiding the Vault */}
         <div className="flex-[1.5] flex flex-col gap-4 min-w-0">
-          <Card className="p-4 bg-secondary/20 border-none shrink-0">
-            <h2 className="text-xs font-black uppercase tracking-[0.2em] mb-3 text-muted-foreground">
+          <Card className="p-3 bg-secondary/20 border-none shrink-0">
+            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-muted-foreground">
               1. Pick Your Vault
             </h2>
             <div className="flex flex-wrap gap-2">
@@ -177,16 +177,16 @@ export function BlastBuilder() {
                   setSelectedVideos([]);
                 }}
                 selection="single"
-                maxVisibleCount={8}
+                maxVisibleCount={6}
               />
             </div>
           </Card>
 
           <Card className="flex-1 flex flex-col p-0 overflow-hidden bg-card/40 border-border/40 min-h-0">
-            <div className="p-4 border-b border-border/40 flex items-center justify-between shrink-0">
+            <div className="p-3 border-b border-border/40 flex items-center justify-between shrink-0">
               <div>
-                <h2 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">
-                  2. Select Bangers
+                <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                  2. Select Content
                 </h2>
                 <div className="flex items-center gap-4 mt-1">
                   <p className="text-[10px] font-medium text-muted-foreground/60">
@@ -206,7 +206,7 @@ export function BlastBuilder() {
               </div>
               <div className="relative w-48">
                 <Search
-                  size={14}
+                  size={12}
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                 />
                 <input
@@ -214,34 +214,34 @@ export function BlastBuilder() {
                   placeholder="Search vault..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-secondary/50 border-none rounded-full py-1.5 pl-9 pr-4 text-xs focus:ring-1 ring-primary/50"
+                  className="w-full bg-secondary/50 border-none rounded-full py-1 pl-8 pr-4 text-[10px] h-7 focus:ring-1 ring-primary/50"
                 />
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-3 custom-scrollbar">
               {!sourceAccountId ? (
                 <div className="h-full flex flex-col items-center justify-center opacity-20">
-                  <History size={64} className="mb-4" />
-                  <p className="font-bold uppercase tracking-widest text-sm">
+                  <History size={48} className="mb-4" />
+                  <p className="font-bold uppercase tracking-widest text-xs">
                     Select a source to raid
                   </p>
                 </div>
               ) : isLoadingVideos ? (
                 <div className="h-full flex flex-col items-center justify-center">
-                  <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
-                  <p className="text-xs font-bold uppercase animate-pulse">
+                  <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-4" />
+                  <p className="text-[10px] font-bold uppercase animate-pulse">
                     Raiding the Vault...
                   </p>
                 </div>
               ) : filteredVideos.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center opacity-40">
-                  <p className="font-black italic text-xl">
-                    NO BANGERS FOUND 💀
+                  <p className="font-black italic text-sm">
+                    NO VIDEOS FOUND 💀
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-5 xl:grid-cols-6 gap-2">
                   {filteredVideos.map((video: any) => {
                     const isSelected = selectedVideos.some(
                       (v) => v.id === video.id,
@@ -254,9 +254,9 @@ export function BlastBuilder() {
                         whileTap={{ scale: 0.98 }}
                         onClick={() => toggleVideo(video)}
                         className={cn(
-                          "relative group aspect-video rounded-xl overflow-hidden border-2 cursor-pointer transition-all",
+                          "relative group aspect-video rounded-lg overflow-hidden border-2 cursor-pointer transition-all",
                           isSelected
-                            ? "border-primary ring-4 ring-primary/20 shadow-xl"
+                            ? "border-primary ring-2 ring-primary/20 shadow-lg"
                             : "border-transparent",
                         )}
                       >
@@ -267,8 +267,8 @@ export function BlastBuilder() {
                             isSelected && "opacity-50",
                           )}
                         />
-                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-2">
-                          <p className="text-[10px] font-bold text-white line-clamp-1 leading-tight">
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-1.5">
+                          <p className="text-[9px] font-bold text-white line-clamp-1 leading-tight">
                             {video.title}
                           </p>
                           <p className="text-[8px] text-white/60 font-medium">
@@ -276,8 +276,8 @@ export function BlastBuilder() {
                           </p>
                         </div>
                         {isSelected && (
-                          <div className="absolute top-2 right-2 w-5 h-5 bg-primary text-black rounded-full flex items-center justify-center shadow-lg">
-                            <Check size={12} className="stroke-[4]" />
+                          <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-primary text-black rounded-full flex items-center justify-center shadow-lg">
+                            <Check size={10} className="stroke-[4]" />
                           </div>
                         )}
                       </motion.div>
@@ -290,11 +290,11 @@ export function BlastBuilder() {
         </div>
 
         {/* Right Side: Deployment */}
-        <div className="flex-1 flex flex-col gap-6 max-w-[400px]">
-          <Card className="flex-1 flex flex-col p-6 bg-primary/5 border-primary/20">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xs font-black uppercase tracking-[0.2em] text-primary">
-                3. Target Destinations
+        <div className="flex-1 flex flex-col gap-4 max-w-[320px]">
+          <Card className="flex-1 flex flex-col p-4 bg-primary/5 border-primary/20">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
+                3. Destinations
               </h2>
               {connectedAccounts.filter((a) => a.accountId !== sourceAccountId)
                 .length > 0 && (
@@ -312,7 +312,7 @@ export function BlastBuilder() {
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
               {connectedAccounts
                 .filter((a) => a.accountId !== sourceAccountId)
                 .map((acc: any) => {
@@ -322,58 +322,58 @@ export function BlastBuilder() {
                       key={acc.accountId}
                       onClick={() => toggleTarget(acc.accountId)}
                       className={cn(
-                        "w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-left",
+                        "w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left",
                         isSelected
-                          ? "border-primary bg-primary/10 shadow-md translate-x-1"
+                          ? "border-primary bg-primary/10 shadow-sm translate-x-1"
                           : "border-border/40 hover:border-primary/30",
                       )}
                     >
-                      <PlatformLogo platform={acc.platform} size={24} />
+                      <PlatformLogo platform={acc.platform} size={20} />
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-sm truncate">
+                        <p className="font-bold text-xs truncate">
                           {acc.profileName || acc.handle}
                         </p>
-                        <p className="text-[10px] uppercase font-black tracking-widest opacity-40">
+                        <p className="text-[9px] uppercase font-black tracking-widest opacity-40">
                           {acc.platform}
                         </p>
                       </div>
                       <div
                         className={cn(
-                          "w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
+                          "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
                           isSelected
                             ? "bg-primary border-primary text-black"
                             : "border-border/40",
                         )}
                       >
                         {isSelected && (
-                          <Check size={14} className="stroke-[4]" />
+                          <Check size={12} className="stroke-[4]" />
                         )}
                       </div>
                     </button>
                   );
                 })}
 
-              <div className="text-center py-10 opacity-40">
-                <Layout size={32} className="mx-auto mb-2" />
-                <p className="text-xs font-bold uppercase">
-                  Connect more accounts to push
+              <div className="text-center py-8 opacity-40">
+                <Layout size={24} className="mx-auto mb-1" />
+                <p className="text-[10px] font-bold uppercase">
+                  Connect more accounts
                 </p>
               </div>
             </div>
 
-            <div className="mt-6 pt-6 border-t border-primary/10 shrink-0">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-xs font-black uppercase text-muted-foreground opacity-60 tracking-wider">
+            <div className="mt-4 pt-4 border-t border-primary/10 shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[10px] font-black uppercase text-muted-foreground opacity-60 tracking-wider">
                   Estimated Jobs
                 </p>
-                <p className="text-xl font-black italic">
+                <p className="text-lg font-black italic">
                   {selectedVideos.length * selectedTargets.length}
                 </p>
               </div>
-              <div className="p-3 bg-secondary/30 rounded-xl border border-border/40">
-                <div className="flex items-center gap-2 text-xs font-medium opacity-60">
-                  <Zap size={12} className="text-primary fill-primary" />
-                  Instant deployment. No keywords required.
+              <div className="p-2.5 bg-secondary/30 rounded-lg border border-border/40">
+                <div className="flex items-center gap-2 text-[10px] font-medium opacity-60">
+                  <Zap size={10} className="text-primary fill-primary" />
+                  Instant deployment ready.
                 </div>
               </div>
             </div>

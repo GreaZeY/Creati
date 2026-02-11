@@ -78,9 +78,9 @@
     --success-foreground: 144 100% 98%;
 
     /* Borders: Subtle */
-    --border: 216 20% 20%;
-    --input: 216 20% 20%;
-    --ring: 345 100% 36%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+  --ring: 345 100% 36%;
   }
 }
 

@@ -65,32 +65,31 @@ export const Analytics = () => {
       : (totalViews * 0.002).toFixed(2); // Fallback to mock RPV
 
   return (
-    <div className="flex-1 overflow-y-auto space-y-8 pb-12 max-w-7xl mx-auto px-4 w-full">
+    <div className="h-full overflow-y-auto space-y-6 pb-8 max-w-7xl mx-auto px-4 w-full">
       <PageHeader
-        title="Analytics"
         description="Actionable intelligence across your entire creator footprint. Pure data, no noise."
       />
 
       {/* Hero Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 font-outfit">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 font-outfit">
         {isLoading ? (
           Array(4)
             .fill(0)
             .map((_, i) => (
-              <Skeleton key={i} className="h-40 rounded-3xl bg-card/20" />
+              <Skeleton key={i} className="h-32 rounded-2xl bg-card/20" />
             ))
         ) : (
           <>
-            <LensedCard className="border-cyan-500/20">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
-                  <Play size={20} />
+            <LensedCard className="border-cyan-500/20 p-4">
+              <div className="flex justify-between items-start mb-3">
+                <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
+                  <Play size={16} />
                 </div>
                 <span className="text-[10px] font-black text-cyan-400 uppercase tracking-widest bg-cyan-500/5 px-2 py-1 rounded">
                   Reach
                 </span>
               </div>
-              <h3 className="text-2xl font-black tracking-tighter">
+              <h3 className="text-xl font-black tracking-tighter">
                 {formatNumber(totalViews)}
               </h3>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1 opacity-60">
@@ -98,16 +97,16 @@ export const Analytics = () => {
               </p>
             </LensedCard>
 
-            <LensedCard className="border-magenta-500/20">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-2 rounded-lg bg-pink-500/10 text-pink-400">
-                  <Zap size={20} />
+            <LensedCard className="border-magenta-500/20 p-4">
+              <div className="flex justify-between items-start mb-3">
+                <div className="p-1.5 rounded-lg bg-pink-500/10 text-pink-400">
+                  <Zap size={16} />
                 </div>
                 <span className="text-[10px] font-black text-pink-400 uppercase tracking-widest bg-pink-500/5 px-2 py-1 rounded">
                   Velocity
                 </span>
               </div>
-              <h3 className="text-2xl font-black tracking-tighter">
+              <h3 className="text-xl font-black tracking-tighter">
                 {viralityCoef}
               </h3>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1 opacity-60">
@@ -115,16 +114,16 @@ export const Analytics = () => {
               </p>
             </LensedCard>
 
-            <LensedCard className="border-lime-500/20">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-2 rounded-lg bg-lime-500/10 text-lime-400">
-                  <Target size={20} />
+            <LensedCard className="border-lime-500/20 p-4">
+              <div className="flex justify-between items-start mb-3">
+                <div className="p-1.5 rounded-lg bg-lime-500/10 text-lime-400">
+                  <Target size={16} />
                 </div>
                 <span className="text-[10px] font-black text-lime-400 uppercase tracking-widest bg-lime-500/5 px-2 py-1 rounded">
                   Density
                 </span>
               </div>
-              <h3 className="text-2xl font-black tracking-tighter">
+              <h3 className="text-xl font-black tracking-tighter">
                 {engagementDensity}%
               </h3>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1 opacity-60">
@@ -132,16 +131,16 @@ export const Analytics = () => {
               </p>
             </LensedCard>
 
-            <LensedCard className="border-primary/20">
-              <div className="flex justify-between items-start mb-4">
-                <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                  <DollarSign size={20} />
+            <LensedCard className="border-primary/20 p-4">
+              <div className="flex justify-between items-start mb-3">
+                <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                  <DollarSign size={16} />
                 </div>
                 <span className="text-[10px] font-black text-primary uppercase tracking-widest bg-primary/5 px-2 py-1 rounded">
                   Revenue
                 </span>
               </div>
-              <h3 className="text-2xl font-black tracking-tighter">
+              <h3 className="text-xl font-black tracking-tighter">
                 ${projectedRevenue}
               </h3>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1 opacity-60">
@@ -153,10 +152,10 @@ export const Analytics = () => {
       </div>
 
       {/* Pulse Chart Area */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <LensedCard className="lg:col-span-2 h-[450px] flex flex-col">
-          <div className="flex justify-between items-center mb-8">
-            <h3 className="text-lg font-bold uppercase tracking-tight italic">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <LensedCard className="lg:col-span-2 h-[360px] flex flex-col p-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-base font-bold uppercase tracking-tight italic">
               Combined Growth Map
             </h3>
             <div className="flex gap-2">
@@ -168,7 +167,7 @@ export const Analytics = () => {
               </span>
             </div>
           </div>
-          <div className="flex-1 w-full min-h-[300px]">
+          <div className="flex-1 w-full min-h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
                 data={
@@ -227,7 +226,7 @@ export const Analytics = () => {
                   type="monotone"
                   dataKey="reach"
                   stroke="#22d3ee"
-                  strokeWidth={4}
+                  strokeWidth={3}
                   fillOpacity={1}
                   fill="url(#colorReach)"
                 />
@@ -235,7 +234,7 @@ export const Analytics = () => {
                   type="monotone"
                   dataKey="engagement"
                   stroke="#f472b6"
-                  strokeWidth={4}
+                  strokeWidth={3}
                   fillOpacity={1}
                   fill="url(#colorEngagement)"
                 />
@@ -244,17 +243,17 @@ export const Analytics = () => {
           </div>
         </LensedCard>
 
-        <LensedCard className="flex flex-col p-5 border-primary/10">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 rounded-xl bg-primary/10 ring-1 ring-primary/20">
-              <TrendingUp className="w-5 h-5 text-primary shadow-[0_0_15px_rgba(var(--primary),0.5)]" />
+        <LensedCard className="flex flex-col p-4 border-primary/10">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-1.5 rounded-lg bg-primary/10 ring-1 ring-primary/20">
+              <TrendingUp className="w-4 h-4 text-primary shadow-[0_0_15px_rgba(var(--primary),0.5)]" />
             </div>
-            <h3 className="text-lg font-bold tracking-tight italic uppercase">
+            <h3 className="text-sm font-bold tracking-tight italic uppercase">
               Resonance Mapping
             </h3>
           </div>
 
-          <div className="flex-1 space-y-6">
+          <div className="flex-1 space-y-4">
             {analytics?.platformBreakdown?.length ? (
               analytics.platformBreakdown.map((platform: any) => (
                 <div key={platform.platform} className="space-y-2">
@@ -297,7 +296,7 @@ export const Analytics = () => {
             )}
           </div>
 
-          <div className="mt-10 p-5 bg-muted rounded-2xl border border-border relative overflow-hidden group">
+          <div className="mt-6 p-4 bg-muted rounded-xl border border-border relative overflow-hidden group">
             <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
             <p className="relative z-10 text-[9px] font-black text-muted-foreground uppercase leading-relaxed tracking-[0.2em] text-center">
               Neural engine prioritizing high-affinity sectors. <br />

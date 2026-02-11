@@ -128,7 +128,7 @@ export const Upload = () => {
   };
 
   return (
-    <div className="max-w-4xl space-y-8 pb-12">
+    <div className="max-w-4xl space-y-6 pb-8">
       <PageHeader
         title="Upload"
         description="Upload once, publish everywhere across your network."
@@ -147,7 +147,7 @@ export const Upload = () => {
               <div
                 {...getRootProps()}
                 className={cn(
-                  "rounded-2xl bg-card/40 backdrop-blur-xl border-2 border-dashed flex flex-col items-center justify-center p-12 text-center cursor-pointer transition-all duration-500 relative overflow-hidden group shadow-xl ring-1 ring-border",
+                  "rounded-xl bg-card/40 backdrop-blur-xl border-2 border-dashed flex flex-col items-center justify-center p-10 text-center cursor-pointer transition-all duration-500 relative overflow-hidden group shadow-lg ring-1 ring-border",
                   isDragActive
                     ? "border-primary bg-primary/[0.05] ring-4 ring-primary/20 scale-[1.02]"
                     : "border-border hover:border-primary/50 hover:bg-card/60 hover:shadow-primary/5",
@@ -160,23 +160,22 @@ export const Upload = () => {
 
                 <div
                   className={cn(
-                    "w-16 h-16 rounded-xl flex items-center justify-center mb-6 transition-all duration-700 relative z-10 shadow-xl ring-1 ring-border",
+                    "w-14 h-14 rounded-lg flex items-center justify-center mb-5 transition-all duration-700 relative z-10 shadow-lg ring-1 ring-border",
                     isDragActive
                       ? "bg-primary text-slate-950 rotate-12 scale-110 shadow-primary/30"
                       : "bg-secondary/50 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary group-hover:rotate-3",
                   )}
                 >
-                  <UploadCloud className="w-8 h-8" />
+                  <UploadCloud className="w-7 h-7" />
                 </div>
-                <h3 className="text-lg font-bold mb-2 tracking-tight relative z-10">
+                <h3 className="text-base font-bold mb-2 tracking-tight relative z-10">
                   Drop your masterpiece here
                 </h3>
-                <p className="text-muted-foreground mb-8 max-w-sm text-sm font-medium leading-relaxed relative z-10">
+                <p className="text-muted-foreground mb-6 max-w-sm text-xs font-medium leading-relaxed relative z-10">
                   MP4, MOV, or AVI up to 2GB. We'll handle the rest.
                 </p>
                 <Button
-                  size="lg"
-                  className="rounded-xl h-11 px-8 shadow-xl shadow-primary/30 font-bold text-sm bg-gradient-to-r from-primary to-cyan-500 hover:scale-105 active:scale-95 transition-all relative z-10"
+                  className="rounded-lg h-9 px-6 shadow-lg shadow-primary/30 font-bold text-sm bg-gradient-to-r from-primary to-cyan-500 hover:scale-105 active:scale-95 transition-all relative z-10"
                 >
                   Browse Files
                 </Button>
@@ -189,11 +188,11 @@ export const Upload = () => {
               animate={{ opacity: 1, y: 0 }}
               className="grid grid-cols-1 lg:grid-cols-3 gap-8"
             >
-              <div className="lg:col-span-2 space-y-8">
-                <Card className="p-5 space-y-6 border-0 bg-card/40 backdrop-blur-xl rounded-2xl shadow-xl ring-1 ring-border relative overflow-hidden">
+              <div className="lg:col-span-2 space-y-6">
+                <Card className="p-4 space-y-5 border-0 bg-card/40 backdrop-blur-xl rounded-xl shadow-lg ring-1 ring-border relative overflow-hidden">
                   <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/5 rounded-full blur-[80px]" />
 
-                  <div className="space-y-6 relative z-10">
+                  <div className="space-y-5 relative z-10">
                     <div className="space-y-2.5">
                       <label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-2">
                         Video Title
@@ -204,7 +203,7 @@ export const Upload = () => {
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="Catchy title for your video"
-                        className="w-full h-11 px-4 rounded-xl bg-muted/30 border-border focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold text-sm placeholder:text-muted-foreground/30 ring-1 ring-border/50"
+                        className="w-full h-9 px-3 rounded-lg bg-muted/30 border-border focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold text-xs placeholder:text-muted-foreground/30 ring-1 ring-border/50"
                       />
                     </div>
                     <div className="space-y-2.5">
@@ -215,17 +214,17 @@ export const Upload = () => {
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         placeholder="Tell your audience about this video..."
-                        rows={6}
-                        className="w-full p-6 rounded-2xl bg-muted/30 border-border focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none font-medium leading-relaxed placeholder:text-muted-foreground/30 ring-1 ring-border/50"
+                        rows={5}
+                        className="w-full p-4 rounded-xl bg-muted/30 border-border focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none font-medium leading-relaxed placeholder:text-muted-foreground/30 ring-1 ring-border/50"
                       />
                     </div>
                   </div>
 
-                  <div className="space-y-6 relative z-10">
+                  <div className="space-y-5 relative z-10">
                     <label className="text-xs font-black uppercase tracking-widest text-muted-foreground/60">
                       Target Accounts
                     </label>
-                    <div className="flex flex-wrap gap-3">
+                    <div className="flex flex-wrap gap-2">
                       {connectedAccounts.length > 0 ? (
                         connectedAccounts.map((account) => {
                           const isSelected = selectedAccounts.includes(
@@ -246,7 +245,7 @@ export const Upload = () => {
                               }}
                               disabled={uploading || success}
                               className={cn(
-                                "flex items-center gap-3 px-6 py-3 rounded-2xl border-0 transition-all font-black text-sm uppercase tracking-wider ring-1 shadow-lg",
+                                "flex items-center gap-2 px-4 py-2 rounded-lg border-0 transition-all font-black text-xs uppercase tracking-wider ring-1 shadow-md",
                                 isSelected
                                   ? "bg-gradient-to-r from-primary to-cyan-500 text-primary-foreground ring-primary shadow-primary/20 scale-105"
                                   : "bg-muted/50 text-muted-foreground/60 ring-border hover:bg-muted hover:text-muted-foreground hover:scale-105",
@@ -254,7 +253,7 @@ export const Upload = () => {
                             >
                               <PlatformLogo
                                 platform={account.platform}
-                                size={18}
+                                size={16}
                                 className={cn(
                                   "transition-colors",
                                   isSelected
@@ -297,25 +296,25 @@ export const Upload = () => {
                 </Card>
               </div>
 
-              <div className="space-y-8">
-                <Card className="p-5 border-0 bg-card/40 backdrop-blur-xl rounded-2xl shadow-xl ring-1 ring-border relative overflow-hidden group">
+              <div className="space-y-6">
+                <Card className="p-4 border-0 bg-card/40 backdrop-blur-xl rounded-xl shadow-lg ring-1 ring-border relative overflow-hidden group">
                   <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/5 rounded-full blur-[80px] group-hover:bg-primary/10 transition-all duration-700" />
 
-                  <div className="flex items-center justify-between mb-6 relative z-10">
-                    <div className="p-3 rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20 shadow-inner group-hover:rotate-6 transition-transform">
-                      <FileVideo size={20} />
+                  <div className="flex items-center justify-between mb-5 relative z-10">
+                    <div className="p-2 rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20 shadow-inner group-hover:rotate-6 transition-transform">
+                      <FileVideo size={18} />
                     </div>
                     <button
                       onClick={() => setFile(null)}
-                      className="w-10 h-10 rounded-xl flex items-center justify-center text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-all duration-300"
+                      className="w-9 h-9 rounded-lg flex items-center justify-center text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-all duration-300"
                     >
-                      <X size={20} />
+                      <X size={18} />
                     </button>
                   </div>
 
-                  <div className="space-y-1 mb-8 relative z-10">
+                  <div className="space-y-1 mb-6 relative z-10">
                     <h4
-                      className="font-bold text-lg tracking-tight truncate group-hover:text-primary transition-colors"
+                      className="font-bold text-base tracking-tight truncate group-hover:text-primary transition-colors"
                       title={file.name}
                     >
                       {file.name}
@@ -329,14 +328,14 @@ export const Upload = () => {
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="p-4 bg-destructive/10 text-destructive rounded-xl text-xs font-black uppercase tracking-widest ring-1 ring-destructive/20 mb-6"
+                      className="p-3 bg-destructive/10 text-destructive rounded-lg text-[10px] font-black uppercase tracking-widest ring-1 ring-destructive/20 mb-5"
                     >
                       {error}
                     </motion.div>
                   )}
 
                   <Button
-                    className="w-full h-11 rounded-xl font-bold text-sm shadow-xl shadow-primary/30 relative overflow-hidden group-hover:scale-105 active:scale-95 transition-all bg-gradient-to-r from-primary to-cyan-500"
+                    className="w-full h-10 rounded-lg font-bold text-sm shadow-lg shadow-primary/30 relative overflow-hidden group-hover:scale-105 active:scale-95 transition-all bg-gradient-to-r from-primary to-cyan-500"
                     onClick={handleUpload}
                     isLoading={uploading}
                     isSuccess={success}
@@ -348,10 +347,10 @@ export const Upload = () => {
                   </Button>
                 </Card>
 
-                <div className="p-4 bg-primary/5 rounded-2xl border border-primary/10 backdrop-blur-md relative overflow-hidden group hover:bg-primary/10 transition-colors">
-                  <div className="flex gap-4 relative z-10">
-                    <Sparkles className="w-5 h-5 text-primary shrink-0 animate-pulse" />
-                    <p className="text-xs text-primary/80 leading-relaxed font-black uppercase tracking-widest">
+                <div className="p-3 bg-primary/5 rounded-xl border border-primary/10 backdrop-blur-md relative overflow-hidden group hover:bg-primary/10 transition-colors">
+                  <div className="flex gap-3 relative z-10">
+                    <Sparkles className="w-4 h-4 text-primary shrink-0 animate-pulse" />
+                    <p className="text-[10px] text-primary/80 leading-relaxed font-black uppercase tracking-widest">
                       Pro Tip: Customizing descriptions for each platform can
                       improve your reach!
                     </p>

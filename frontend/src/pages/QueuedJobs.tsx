@@ -285,7 +285,7 @@ export function QueuedJobs() {
         if (!source) return null;
         return (
           <div className="flex items-center gap-1">
-            <PlatformLogo platform={source.platform} size={20} />
+            <PlatformLogo platform={source.platform} size={16} />
             <div>
               <p className="font-bold text-xs">
                 {source.handle || source.platform}
@@ -321,7 +321,7 @@ export function QueuedJobs() {
         return (
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
-              <PlatformLogo platform={primaryTarget.platform} size={20} />
+              <PlatformLogo platform={primaryTarget.platform} size={16} />
               <div>
                 <p className="font-bold text-xs">
                   {primaryTarget.handle || primaryTarget.platform}
@@ -434,9 +434,8 @@ export function QueuedJobs() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 font-outfit flex flex-col overflow-hidden w-full flex-1 min-h-0">
+    <div className="max-w-7xl mx-auto p-4 space-y-6 font-outfit flex flex-col overflow-hidden w-full flex-1 min-h-0">
       <PageHeader
-        title="Mission Control"
         description="Live view of all automated executions and notification events."
       >
         <div className="flex items-center gap-2 bg-secondary/50 px-3 py-1 rounded-full border border-border/50">
@@ -465,7 +464,7 @@ export function QueuedJobs() {
         onClose={() => setSelectedJob(null)}
         title={
           <div className="flex items-center gap-2">
-            <Terminal size={18} />
+            <Terminal size={16} />
             <span className="uppercase tracking-widest text-sm font-black">
               Job Details
             </span>
@@ -501,7 +500,7 @@ export function QueuedJobs() {
                 <div className="flex items-center gap-3">
                   <PlatformLogo
                     platform={selectedJob.sources?.[0]?.platform}
-                    size={24}
+                    size={20}
                   />
                   <div>
                     <p className="font-bold text-xs">
@@ -534,7 +533,7 @@ export function QueuedJobs() {
                         <div className="flex items-center gap-3">
                           <PlatformLogo
                             platform={selectedJob.sources?.[0]?.platform}
-                            size={24}
+                            size={20}
                           />
                           <div>
                             <p className="font-bold text-xs">
@@ -568,7 +567,7 @@ export function QueuedJobs() {
                           </div>
                           <PlatformLogo
                             platform={selectedJob.targets[0].platform}
-                            size={24}
+                            size={20}
                           />
                         </div>
                       </div>
@@ -601,7 +600,7 @@ export function QueuedJobs() {
                             <PlatformLogo
                               key={i}
                               platform={t.platform}
-                              size={24}
+                              size={20}
                               className="ring-2 ring-background rounded-full"
                             />
                           ))}

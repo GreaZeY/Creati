@@ -52,7 +52,7 @@ export const Settings = () => {
     : null;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 pb-12">
+    <div className="mx-10 w-xl space-y-6 pb-8">
       <div className="flex items-center gap-4">
         {activeSection && (
           <Button
@@ -61,11 +61,10 @@ export const Settings = () => {
             onClick={() => navigate("/settings")}
             className="rounded-xl hover:bg-muted"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-4 h-4" />
           </Button>
         )}
         <PageHeader
-          title={activeSectionData ? activeSectionData.label : "Settings"}
           description={
             activeSectionData
               ? activeSectionData.desc
@@ -114,7 +113,7 @@ export const SettingsMain = () => {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="space-y-4"
+      className="space-y-3"
     >
       {sections.map((section, i) => (
         <motion.div
@@ -129,34 +128,34 @@ export const SettingsMain = () => {
         >
           <Card
             onClick={() => navigate(`/settings/${section.id}`)}
-            className="p-5 flex items-center justify-between border-0 bg-card/40 backdrop-blur-xl hover:bg-card/60 transition-all cursor-pointer group rounded-2xl ring-1 ring-border hover:ring-primary/30 shadow-xl relative overflow-hidden"
+            className="p-4 flex items-center justify-between border-0 bg-card/40 backdrop-blur-xl hover:bg-card/60 transition-all cursor-pointer group rounded-xl ring-1 ring-border hover:ring-primary/30 shadow-lg relative overflow-hidden"
           >
             <div className="absolute -top-20 -left-20 w-40 h-40 bg-primary/5 rounded-full blur-[60px] opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
 
-            <div className="flex items-center gap-5 relative z-10">
-              <div className="p-3 rounded-xl bg-secondary/50 group-hover:bg-primary/10 transition-all duration-500 ring-1 ring-border/50 group-hover:rotate-6">
-                <section.icon className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+            <div className="flex items-center gap-4 relative z-10">
+              <div className="p-2 rounded-lg bg-secondary/50 group-hover:bg-primary/10 transition-all duration-500 ring-1 ring-border/50 group-hover:rotate-6">
+                <section.icon className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
               <div>
-                <h3 className="font-bold text-lg tracking-tight group-hover:text-primary transition-colors">
+                <h3 className="font-bold text-base tracking-tight group-hover:text-primary transition-colors">
                   {section.label}
                 </h3>
-                <p className="text-sm text-muted-foreground font-medium">
+                <p className="text-xs text-muted-foreground font-medium">
                   {section.desc}
                 </p>
               </div>
             </div>
-            <ChevronRight className="w-5 h-5 text-muted-foreground/30 group-hover:text-foreground transition-all group-hover:translate-x-1 relative z-10" />
+            <ChevronRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-foreground transition-all group-hover:translate-x-1 relative z-10" />
           </Card>
         </motion.div>
       ))}
 
-      <div className="pt-8 mt-4 border-t border-border">
-        <Card className="p-6 border-0 bg-destructive/5 backdrop-blur-xl rounded-2xl ring-1 ring-destructive/20 relative overflow-hidden group">
+      <div className="pt-6 mt-3 border-t border-border">
+        <Card className="p-4 border-0 bg-destructive/5 backdrop-blur-xl rounded-xl ring-1 ring-destructive/20 relative overflow-hidden group">
           <div className="absolute inset-0 bg-destructive/[0.02] group-hover:bg-destructive/[0.05] transition-colors duration-700" />
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
             <div className="space-y-1">
-              <h3 className="font-bold text-lg text-destructive tracking-tight">
+              <h3 className="font-bold text-base text-destructive tracking-tight">
                 Danger Zone
               </h3>
               <p className="text-sm text-muted-foreground font-medium">
@@ -165,7 +164,7 @@ export const SettingsMain = () => {
             </div>
             <Button
               variant="destructive"
-              className="rounded-xl h-10 px-6 font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-destructive/20 hover:scale-105 active:scale-95 transition-all"
+              className="rounded-lg h-9 px-5 font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-destructive/20 hover:scale-105 active:scale-95 transition-all"
             >
               Delete Account
             </Button>

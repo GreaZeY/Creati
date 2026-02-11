@@ -60,7 +60,7 @@ export const Dashboard = () => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto space-y-8 pb-12 max-w-7xl mx-auto px-4 w-full">
+    <div className="h-full overflow-y-auto space-y-6 pb-8 max-w-7xl mx-auto px-4 w-full">
       <PageHeader
         title="Dashboard"
         description="Your global distribution engine is primed. Total control across all nodes."
@@ -74,18 +74,18 @@ export const Dashboard = () => {
       </PageHeader>
 
       {/* Hero Ecosystem Pulse */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 font-outfit">
-        <LensedCard className="lg:col-span-2 border-primary/20 flex flex-col justify-center min-h-[220px]">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 rounded-lg bg-primary/10 text-primary">
-              <Zap size={18} fill="currentColor" />
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 font-outfit">
+        <LensedCard className="lg:col-span-2 border-primary/20 flex flex-col justify-center p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+              <Zap size={16} fill="currentColor" />
             </div>
             <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">
               Live Ecosystem Reach
             </span>
           </div>
-          <div className="flex items-baseline gap-4">
-            <h2 className="text-5xl font-black tracking-tighter">
+          <div className="flex items-baseline gap-3">
+            <h2 className="text-4xl font-black tracking-tighter">
               {analyticsLoading
                 ? "---"
                 : formatNumber(analytics?.totalViews || 0)}
@@ -94,15 +94,15 @@ export const Dashboard = () => {
               +12.4% WEEKLY
             </span>
           </div>
-          <p className="text-sm font-bold text-muted-foreground mt-4 opacity-40 uppercase tracking-widest">
+          <p className="text-[10px] font-bold text-muted-foreground mt-3 opacity-40 uppercase tracking-widest">
             Aggregated performance across {connectedPlatforms.length} nodes
           </p>
         </LensedCard>
 
-        <LensedCard className="border-cyan-500/20">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
-              <Link2 size={18} />
+        <LensedCard className="border-cyan-500/20 p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
+              <Link2 size={16} />
             </div>
             <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">
               Node Status
@@ -133,7 +133,7 @@ export const Dashboard = () => {
               </span>
             )}
           </div>
-          <div className="mt-auto pt-6">
+          <div className="mt-auto pt-4">
             <button
               onClick={() => navigate("/platforms")}
               className="text-[10px] font-black text-cyan-400 uppercase tracking-widest hover:underline"
@@ -143,17 +143,17 @@ export const Dashboard = () => {
           </div>
         </LensedCard>
 
-        <LensedCard className="border-magenta-500/20">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 rounded-lg bg-pink-500/10 text-pink-400">
-              <LayoutDashboard size={18} />
+        <LensedCard className="border-magenta-500/20 p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-1.5 rounded-lg bg-pink-500/10 text-pink-400">
+              <LayoutDashboard size={16} />
             </div>
             <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">
               Library Sync
             </span>
           </div>
-          <div className="flex items-baseline gap-2 mb-3">
-            <span className="text-4xl font-black">{videos.length}</span>
+          <div className="flex items-baseline gap-2 mb-2">
+            <span className="text-3xl font-black">{videos.length}</span>
             <span className="text-[10px] font-black opacity-40 uppercase tracking-widest">
               Assets Distributed
             </span>
@@ -169,13 +169,13 @@ export const Dashboard = () => {
       </div>
 
       {/* Recent Activity Section */}
-      <div className="pt-4">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-muted">
-              <BarChart className="w-6 h-6 text-muted-foreground/40" />
+      <div className="pt-2">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-muted">
+              <BarChart className="w-5 h-5 text-muted-foreground/40" />
             </div>
-            <h3 className="text-lg font-bold tracking-tight uppercase italic font-outfit">
+            <h3 className="text-base font-bold tracking-tight uppercase italic font-outfit">
               Asset Feed
             </h3>
           </div>
@@ -192,13 +192,13 @@ export const Dashboard = () => {
         </div>
 
         {isLoading ? (
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((i) => (
               <VideoCardSkeleton key={i} />
             ))}
           </div>
         ) : videos.length > 0 ? (
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {videos.map((video: any) => (
               <VideoCard key={video.id} video={video} />
             ))}

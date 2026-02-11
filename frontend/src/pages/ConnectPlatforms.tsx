@@ -68,7 +68,7 @@ export const ConnectPlatforms = () => {
     : "";
 
   return (
-    <div className="max-w-5xl space-y-8 pb-10">
+    <div className="max-w-5xl space-y-6 pb-8">
       <PageHeader
         title="Connect Platforms"
         description="Link new delivery nodes to broadcast your message across the digital fabric."
@@ -244,10 +244,10 @@ export const ConnectPlatforms = () => {
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3">
         {isLimitReached && (
-          <div className="md:col-span-2 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-3 mb-4">
-            <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+          <div className="md:col-span-2 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-center gap-2 mb-3">
+            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
             <div>
               <p className="text-sm font-medium text-amber-200">
                 Account Limit Reached ({connectedCount}/{maxAccounts})
@@ -275,17 +275,17 @@ export const ConnectPlatforms = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05, type: "spring", stiffness: 100 }}
             >
-              <Card className="p-5 bg-card/40 backdrop-blur-xl border-border/40 hover:border-primary/50 transition-all duration-500 group relative overflow-hidden rounded-2xl ring-1 ring-border/20 shadow-xl hover:shadow-primary/5">
+              <Card className="p-4 bg-card/40 backdrop-blur-xl border-border/40 hover:border-primary/50 transition-all duration-500 group relative overflow-hidden rounded-xl ring-1 ring-border/20 shadow-lg hover:shadow-primary/5">
                 <div className="flex items-start gap-4 relative z-10">
-                  <div className="w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 shadow-xl">
-                    <PlatformLogo platform={platform.id} size={32} />
+                  <div className="w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 shadow-lg">
+                    <PlatformLogo platform={platform.id} size={28} />
                   </div>
 
                   <div className="flex-1 space-y-1">
-                    <h3 className="text-lg font-bold tracking-tight">
+                    <h3 className="text-base font-bold tracking-tight">
                       {platform.name}
                     </h3>
-                    <p className="text-muted-foreground/80 font-medium mb-4 line-clamp-2 text-sm leading-relaxed">
+                    <p className="text-muted-foreground/80 font-medium mb-3 line-clamp-2 text-xs leading-relaxed">
                       Seamlessly link your {platform.name} account to automate
                       content distribution.
                     </p>
@@ -295,7 +295,7 @@ export const ConnectPlatforms = () => {
                         onClick={() => handleConnectClick(platform.id)} // Changed handler
                         disabled={finalDisabled}
                         variant="default"
-                        className="h-10 px-8 rounded-xl font-bold transition-all"
+                        className="h-9 px-6 rounded-lg font-bold transition-all"
                       >
                         {isSyncing
                           ? "Linking..."
@@ -307,7 +307,7 @@ export const ConnectPlatforms = () => {
                       {platform.enabled && (
                         <div className="flex items-center gap-1.5 text-[10px] text-primary/60 font-black uppercase tracking-[0.2em]">
                           <Zap
-                            size={14}
+                            size={12}
                             className="text-primary fill-primary"
                           />
                           One-Tap
@@ -338,15 +338,15 @@ export const ConnectPlatforms = () => {
       </div>
 
       {/* ... Footer Card kept same */}
-      <Card className="p-5 border-primary/20 bg-primary/[0.02] mt-10 rounded-2xl relative overflow-hidden group">
+      <Card className="p-4 border-primary/20 bg-primary/[0.02] mt-8 rounded-xl relative overflow-hidden group">
         {/* ... */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-primary/10 transition-colors" />
-        <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
-          <div className="p-5 rounded-2xl bg-primary/10 text-primary">
-            <LinkIcon size={32} />
+        <div className="flex flex-col md:flex-row items-center gap-6 relative z-10">
+          <div className="p-4 rounded-xl bg-primary/10 text-primary">
+            <LinkIcon size={28} />
           </div>
           <div className="text-center md:text-left flex-1 space-y-2">
-            <h4 className="text-xl font-bold">Why link multiple accounts?</h4>
+            <h4 className="text-lg font-bold">Why link multiple accounts?</h4>
             <p className="text-muted-foreground max-w-xl">
               Our intelligent distribution engine automatically reformats and
               optimizes your video for each platform's specific audiences and
@@ -355,14 +355,14 @@ export const ConnectPlatforms = () => {
           </div>
           <div className="flex items-center gap-6">
             <div className="text-center">
-              <div className="text-2xl font-black text-primary">2.4x</div>
+              <div className="text-xl font-black text-primary">2.4x</div>
               <div className="text-[10px] font-bold uppercase text-muted-foreground">
                 Reach
               </div>
             </div>
             <div className="w-[1px] h-10 bg-border/50" />
             <div className="text-center">
-              <div className="text-2xl font-black text-primary">0</div>
+              <div className="text-xl font-black text-primary">0</div>
               <div className="text-[10px] font-bold uppercase text-muted-foreground">
                 Extra Work
               </div>

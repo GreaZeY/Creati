@@ -2,9 +2,7 @@
 trigger: always_on
 ---
 
-# 🧠 GLOBAL ENGINEERING RULES (Permanent System Contract)
-
-These rules apply to every line of code written or modified in this codebase. They take precedence over speed or "MVP" shortcuts.
+# GLOBAL ENGINEERING RULES (Permanent System Contract)
 
 ## 1. Core Development Philosophy
 
@@ -160,3 +158,4 @@ These rules apply to every line of code written or modified in this codebase. Th
 - **Least Code Possible**: Minimize codebase bloat by using existing sub-logic.
 - **Documentation First**: Update `task.md` and Implementation Plans before making changes.
 - **Production-Ready Assets**: Generate real UI assets (images/icons) using tools; no placeholders.
+- Never use emoji and anything that makes obvious that app was built using AI

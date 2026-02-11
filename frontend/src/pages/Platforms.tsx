@@ -128,7 +128,7 @@ export const Platforms = () => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto space-y-8 pb-12 max-w-7xl mx-auto px-4 font-outfit w-full">
+    <div className="h-full overflow-y-auto space-y-6 pb-8 max-w-7xl mx-auto px-4 font-outfit w-full">
       <PageHeader
         title="My Platforms"
         description="Your connected neural pathways across the digital workspace."
@@ -159,13 +159,13 @@ export const Platforms = () => {
       </PageHeader>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
             <PlatformSkeleton key={i} />
           ))}
         </div>
       ) : platformStats.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <AnimatePresence mode="popLayout">
             {platformStats.map((platform: PlatformData, i: number) => {
               const accentClass =
@@ -187,7 +187,7 @@ export const Platforms = () => {
                 >
                   <LensedCard
                     className={cn(
-                      "p-5 relative flex flex-row items-center gap-6",
+                      "p-4 relative flex flex-row items-center gap-4",
                       !platform.connected && "opacity-60",
                     )}
                   >
@@ -195,8 +195,8 @@ export const Platforms = () => {
                     <div className="absolute top-2 right-2 z-20">
                       <DropdownMenu
                         trigger={
-                          <button className="p-2.5 rounded-full text-muted-foreground/80 hover:text-foreground hover:bg-secondary/80 transition-all">
-                            <MoreVertical size={18} />
+                          <button className="p-2 rounded-full text-muted-foreground/80 hover:text-foreground hover:bg-secondary/80 transition-all">
+                            <MoreVertical size={16} />
                           </button>
                         }
                       >
@@ -250,7 +250,7 @@ export const Platforms = () => {
                       >
                         <PlatformLogo
                           platform={platform.platform}
-                          size={140}
+                          size={120}
                           className="text-current"
                         />
                       </div>
@@ -259,7 +259,7 @@ export const Platforms = () => {
                     <div className="flex-1 min-w-0 md:pl-2 relative z-10">
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-3">
-                          <h3 className="text-lg font-bold tracking-tight uppercase truncate leading-none">
+                          <h3 className="text-base font-bold tracking-tight uppercase truncate leading-none">
                             {platform.profileName || platform.name}
                           </h3>
                           {platform.connected ? (
@@ -288,7 +288,7 @@ export const Platforms = () => {
                           connectMutation.isPending &&
                           connectMutation.variables === platform.id
                         }
-                        className="h-10 px-6 rounded-xl bg-primary text-primary-foreground font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20 transition-all"
+                        className="h-9 px-5 rounded-lg bg-primary text-primary-foreground font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20 transition-all"
                       >
                         Reconnect
                       </Button>
@@ -316,7 +316,7 @@ export const Platforms = () => {
           <Button
             asChild
             size="lg"
-            className="mt-8 h-11 px-8 rounded-xl bg-primary text-primary-foreground font-bold text-sm transition-all"
+            className="mt-8 h-10 px-7 rounded-lg bg-primary text-primary-foreground font-bold text-sm transition-all"
           >
             <Link to="/platforms/connect">AUTH FIRST NODE</Link>
           </Button>
@@ -349,11 +349,11 @@ export const Platforms = () => {
 
 const PlatformSkeleton = () => {
   return (
-    <LensedCard className="p-8 h-[140px] flex items-center gap-8">
-      <Skeleton className="w-20 h-20 rounded-2xl bg-muted/50" />
-      <div className="flex-1 space-y-4">
-        <Skeleton className="h-8 w-2/3 rounded-xl bg-muted/50" />
-        <Skeleton className="h-4 w-1/3 rounded-lg bg-muted/50 opacity-50" />
+    <LensedCard className="p-4 h-[100px] flex items-center gap-4">
+      <Skeleton className="w-16 h-16 rounded-xl bg-muted/50" />
+      <div className="flex-1 space-y-2">
+        <Skeleton className="h-6 w-2/3 rounded-lg bg-muted/50" />
+        <Skeleton className="h-3 w-1/3 rounded-md bg-muted/50 opacity-50" />
       </div>
     </LensedCard>
   );
