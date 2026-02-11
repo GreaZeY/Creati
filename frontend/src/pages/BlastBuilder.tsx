@@ -120,11 +120,16 @@ export function BlastBuilder() {
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/push")}>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => navigate("/push")}
+          >
             <ArrowLeft size={16} />
           </Button>
           <div>
-            <h1 className="text-xl font-black tracking-tighter flex items-center gap-2">
+            <h1 className="text-xl font-black tracking-tighter flex items-center gap-2 text-foreground dark:text-white">
               QUICK PUSH{" "}
               <Rocket size={20} className="text-primary fill-primary/20" />
             </h1>
@@ -162,7 +167,7 @@ export function BlastBuilder() {
       <div className="flex flex-1 gap-4 min-h-0">
         {/* Left Side: Raiding the Vault */}
         <div className="flex-[1.5] flex flex-col gap-4 min-w-0">
-          <Card className="p-3 bg-secondary/20 border-none shrink-0">
+          <Card className="p-3 bg-secondary/50 dark:bg-secondary/20 border-none shrink-0">
             <h2 className="text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-muted-foreground">
               1. Pick Your Vault
             </h2>
@@ -182,7 +187,7 @@ export function BlastBuilder() {
             </div>
           </Card>
 
-          <Card className="flex-1 flex flex-col p-0 overflow-hidden bg-card/40 border-border/40 min-h-0">
+          <Card className="flex-1 flex flex-col p-0 overflow-hidden bg-white/40 dark:bg-card/40 border-border/40 min-h-0">
             <div className="p-3 border-b border-border/40 flex items-center justify-between shrink-0">
               <div>
                 <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
@@ -324,8 +329,8 @@ export function BlastBuilder() {
                       className={cn(
                         "w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left",
                         isSelected
-                          ? "border-primary bg-primary/10 shadow-sm translate-x-1"
-                          : "border-border/40 hover:border-primary/30",
+                          ? "border-primary bg-primary/10 dark:bg-primary/5 shadow-sm translate-x-1 font-bold"
+                          : "border-border/40 hover:border-primary/30 bg-secondary/30 dark:bg-transparent",
                       )}
                     >
                       <PlatformLogo platform={acc.platform} size={20} />

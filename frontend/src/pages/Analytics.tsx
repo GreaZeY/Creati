@@ -65,8 +65,14 @@ export const Analytics = () => {
       : (totalViews * 0.002).toFixed(2); // Fallback to mock RPV
 
   return (
-    <div className="h-full overflow-y-auto space-y-6 pb-8 max-w-7xl mx-auto px-4 w-full">
+    <div className="h-full overflow-y-auto space-y-8 pb-12 max-w-7xl mx-auto px-8 w-full relative z-0">
+      {/* Structural Depth - Atmospheric Blobs (v14 Parity) */}
+      <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-[var(--blob-1)] rounded-full blur-[100px] pointer-events-none mix-blend-screen dark:mix-blend-screen mix-blend-multiply z-0" />
+      <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-[var(--blob-2)] rounded-full blur-[100px] pointer-events-none mix-blend-screen dark:mix-blend-screen mix-blend-multiply z-0" />
+      <div className="absolute top-[20%] left-[30%] w-[400px] h-[400px] bg-[var(--blob-3)] rounded-full blur-[80px] pointer-events-none mix-blend-screen dark:mix-blend-screen mix-blend-multiply z-0" />
+
       <PageHeader
+        title="Creator Intelligence"
         description="Actionable intelligence across your entire creator footprint. Pure data, no noise."
       />
 
@@ -76,24 +82,24 @@ export const Analytics = () => {
           Array(4)
             .fill(0)
             .map((_, i) => (
-              <Skeleton key={i} className="h-32 rounded-2xl bg-card/20" />
+              <Skeleton key={i} className="h-32 rounded-2xl bg-secondary" />
             ))
         ) : (
           <>
-            <LensedCard className="border-cyan-500/20 p-4">
-              <div className="flex justify-between items-start mb-3">
-                <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
-                  <Play size={16} />
+            <LensedCard className="bg-white/80 dark:bg-card/40 border-0 ring-1 ring-border shadow-glass p-6">
+              <div className="flex justify-between items-start mb-4">
+                <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-500 shadow-glow-blue/10">
+                  <Play size={18} />
                 </div>
-                <span className="text-[10px] font-black text-cyan-400 uppercase tracking-widest bg-cyan-500/5 px-2 py-1 rounded">
-                  Reach
+                <span className="text-xs font-bold text-cyan-500 uppercase tracking-widest bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/20">
+                  Total Reach
                 </span>
               </div>
-              <h3 className="text-xl font-black tracking-tighter">
+              <h3 className="text-3xl font-black tracking-tighter text-slate-900 dark:text-white">
                 {formatNumber(totalViews)}
               </h3>
-              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1 opacity-60">
-                Total Ecosystem Views
+              <p className="text-[10px] text-slate-400 dark:text-muted-foreground uppercase font-black tracking-[0.2em] mt-2 opacity-60">
+                Ecosystem Views
               </p>
             </LensedCard>
 
@@ -106,7 +112,7 @@ export const Analytics = () => {
                   Velocity
                 </span>
               </div>
-              <h3 className="text-xl font-black tracking-tighter">
+              <h3 className="text-xl font-black tracking-tighter text-foreground dark:text-white">
                 {viralityCoef}
               </h3>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1 opacity-60">
@@ -123,7 +129,7 @@ export const Analytics = () => {
                   Density
                 </span>
               </div>
-              <h3 className="text-xl font-black tracking-tighter">
+              <h3 className="text-xl font-black tracking-tighter text-foreground dark:text-white">
                 {engagementDensity}%
               </h3>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1 opacity-60">
@@ -140,7 +146,7 @@ export const Analytics = () => {
                   Revenue
                 </span>
               </div>
-              <h3 className="text-xl font-black tracking-tighter">
+              <h3 className="text-xl font-black tracking-tighter text-foreground dark:text-white">
                 ${projectedRevenue}
               </h3>
               <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-1 opacity-60">
@@ -179,8 +185,8 @@ export const Analytics = () => {
               >
                 <defs>
                   <linearGradient id="colorReach" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#22d3ee" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
                   </linearGradient>
                   <linearGradient
                     id="colorEngagement"
@@ -189,8 +195,8 @@ export const Analytics = () => {
                     x2="0"
                     y2="1"
                   >
-                    <stop offset="5%" stopColor="#f472b6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#f472b6" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#a855f7" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid
@@ -225,18 +231,20 @@ export const Analytics = () => {
                 <Area
                   type="monotone"
                   dataKey="reach"
-                  stroke="#22d3ee"
-                  strokeWidth={3}
+                  stroke="#0ea5e9"
+                  strokeWidth={4}
                   fillOpacity={1}
                   fill="url(#colorReach)"
+                  animationDuration={2000}
                 />
                 <Area
                   type="monotone"
                   dataKey="engagement"
-                  stroke="#f472b6"
-                  strokeWidth={3}
+                  stroke="#a855f7"
+                  strokeWidth={4}
                   fillOpacity={1}
                   fill="url(#colorEngagement)"
+                  animationDuration={2000}
                 />
               </AreaChart>
             </ResponsiveContainer>

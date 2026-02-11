@@ -60,29 +60,29 @@ const StatusBadge = ({
     case "success":
     case "sent":
       return (
-        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-          <CheckCircle2 size={10} /> Success
+        <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-emerald-500 bg-emerald-500/10 px-4 py-1.5 rounded-full border border-emerald-500/30 shadow-glow-lime/10">
+          <CheckCircle2 size={12} /> PROCESSED
         </span>
       );
     case "failed":
       return (
-        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-red-500 bg-red-500/10 px-2.5 py-1 rounded-full border border-red-500/20">
-          <AlertTriangle size={10} /> Failed
+        <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-neon-pink bg-neon-pink/10 px-4 py-1.5 rounded-full border border-neon-pink/30 shadow-glow-pink/10">
+          <AlertTriangle size={12} /> FAILED
         </span>
       );
     case "partial":
       return (
-        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
-          <AlertTriangle size={10} /> Partial
+        <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-amber-500 bg-amber-500/10 px-4 py-1.5 rounded-full border border-amber-500/30">
+          <AlertTriangle size={12} /> PARTIAL
           {progress && (
-            <span className="text-[9px] opacity-70 ml-0.5">({progress})</span>
+            <span className="text-[10px] opacity-70 ml-0.5">({progress})</span>
           )}
         </span>
       );
     case "processing":
       return (
-        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-cyan-500 bg-cyan-500/10 px-2.5 py-1 rounded-full border border-cyan-500/20">
-          <Loader2 size={10} className="animate-spin" /> Processing
+        <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-neon-blue bg-neon-blue/10 px-4 py-1.5 rounded-full border border-neon-blue/20 shadow-glow-blue/20">
+          <Loader2 size={12} className="animate-spin" /> DISPATCHING
           {progress && (
             <span className="text-[9px] opacity-70 ml-0.5">({progress})</span>
           )}
@@ -90,14 +90,14 @@ const StatusBadge = ({
       );
     case "scheduled":
       return (
-        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
-          <Clock size={10} className="animate-pulse" /> Scheduled
+        <span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-amber-500 bg-amber-500/10 px-4 py-1.5 rounded-full border border-amber-500/20">
+          <Clock size={12} className="animate-pulse" /> SCHEDULED
         </span>
       );
     default:
       return (
-        <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground bg-secondary px-2.5 py-1 rounded-full border border-border">
-          <Clock size={10} /> {status}
+        <span className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground/60 bg-white/10 dark:bg-white/5 px-4 py-1.5 rounded-full border border-white/20 dark:border-white/10">
+          <Clock size={12} /> {status}
         </span>
       );
   }
@@ -434,14 +434,15 @@ export function QueuedJobs() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto p-4 space-y-6 font-outfit flex flex-col overflow-hidden w-full flex-1 min-h-0">
+    <div className="max-w-7xl mx-auto p-4 space-y-6 font-sans flex flex-col overflow-hidden w-full flex-1 min-h-0">
       <PageHeader
-        description="Live view of all automated executions and notification events."
+        title="Execution Queue"
+        description="Live view of all automated distributions and sensor events."
       >
-        <div className="flex items-center gap-2 bg-secondary/50 px-3 py-1 rounded-full border border-border/50">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-            Live Uplink Active
+        <div className="flex items-center gap-3 bg-neon-purple/10 px-4 py-2 rounded-full border border-neon-purple/20 shadow-glow-purple/20">
+          <div className="w-2.5 h-2.5 rounded-full bg-neon-purple animate-pulse" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-neon-purple">
+            UPLINK ACTIVE
           </span>
         </div>
       </PageHeader>

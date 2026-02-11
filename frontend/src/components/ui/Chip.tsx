@@ -31,16 +31,16 @@ export function Chip({
         "inline-flex items-center gap-2 rounded-full transition-all duration-200",
         size === "sm" ? "h-7 px-2.5 text-[10px]" : "h-8 px-3 text-xs",
         variant === "outline" && [
-          "border font-medium",
+          "border font-semibold",
           isSelected
-            ? "border-primary bg-primary/10 text-primary shadow-sm shadow-primary/20"
-            : "border-border/40 bg-background/50 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+            ? "border-neon-purple/50 bg-neon-purple/10 text-neon-purple shadow-glow-purple scale-[1.02]"
+            : "border-border/40 bg-card/60 backdrop-blur-sm text-muted-foreground hover:border-neon-purple/30 hover:text-foreground",
         ],
         variant === "ghost" && [
-          "font-medium",
+          "font-semibold",
           isSelected
-            ? "bg-primary/10 text-primary"
-            : "text-muted-foreground hover:bg-accent/10 hover:text-foreground",
+            ? "bg-neon-purple/10 text-neon-purple"
+            : "text-muted-foreground hover:bg-neon-purple/5 hover:text-foreground",
         ],
         className,
       )}

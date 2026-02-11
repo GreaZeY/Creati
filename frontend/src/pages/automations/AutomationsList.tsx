@@ -140,7 +140,7 @@ export function AutomationsList() {
                     )}
                   </div>
                   {rule.isActive && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full ring-2 ring-background animate-pulse" />
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full ring-2 ring-white dark:ring-background animate-pulse" />
                   )}
                 </div>
 
@@ -165,13 +165,13 @@ export function AutomationsList() {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-y-2 gap-x-3 mt-3 text-sm">
-                    <div className="flex items-center gap-2 bg-secondary/50 px-3 py-1 rounded-lg">
+                    <div className="flex items-center gap-2 bg-secondary/50 dark:bg-secondary/30 px-3 py-1 rounded-lg border border-border/20">
                       <PlatformLogo
                         platform={rule.sourceAccount?.platform || "youtube"}
                         size={14}
                         className="text-primary"
                       />
-                      <span className="text-xs font-semibold uppercase tracking-wider">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-foreground dark:text-white">
                         {rule.sourceAccount?.profileName ||
                           rule.sourceAccount?.platform}
                       </span>
@@ -185,7 +185,7 @@ export function AutomationsList() {
                           key={target.accountId}
                           className="flex items-center gap-1.5"
                         >
-                          <div className="flex items-center gap-1.5 bg-secondary/50 px-3 py-1 rounded-lg">
+                          <div className="flex items-center gap-1.5 bg-secondary/50 dark:bg-secondary/30 px-3 py-1 rounded-lg border border-border/20 text-foreground dark:text-muted-foreground">
                             <PlatformLogo
                               platform={target?.platform}
                               size={14}

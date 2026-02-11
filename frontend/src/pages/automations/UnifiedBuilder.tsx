@@ -269,7 +269,7 @@ export function UnifiedBuilder({ initialType }: UnifiedBuilderProps) {
               </div>
               <span
                 className={cn(
-                  "text-[10px] font-bold uppercase tracking-widest",
+                  "text-[10px] font-black uppercase tracking-widest",
                   isActive ? "text-primary" : "text-muted-foreground",
                 )}
               >
@@ -281,7 +281,7 @@ export function UnifiedBuilder({ initialType }: UnifiedBuilderProps) {
         <div className="absolute top-[20px] left-[calc(10%+20px)] right-[calc(10%+20px)] h-[2px] bg-muted -z-0" />
       </div>
 
-      <Card className="p-8 mt-4 min-h-[440px] flex flex-col bg-card/40 backdrop-blur-md border-primary/20 relative overflow-hidden">
+      <Card className="p-8 mt-4 min-h-[440px] flex flex-col bg-white/40 dark:bg-card/40 backdrop-blur-md border-border dark:border-primary/20 relative overflow-hidden rounded-[2rem] shadow-xl ring-1 ring-border">
         {/* Step 0: Type Selection */}
         {currentStep === 0 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 flex-1 flex flex-col justify-center">
@@ -303,8 +303,8 @@ export function UnifiedBuilder({ initialType }: UnifiedBuilderProps) {
                 className={cn(
                   "flex flex-col items-center gap-4 p-8 rounded-[2rem] border-2 transition-all group relative overflow-hidden",
                   type === "sync"
-                    ? "border-primary bg-primary/5 ring-4 ring-primary/10"
-                    : "border-border/50 hover:border-primary/50 hover:bg-muted/10",
+                    ? "border-primary bg-primary/10 dark:bg-primary/5 ring-4 ring-primary/20 shadow-lg"
+                    : "border-border/50 hover:border-primary/50 hover:bg-secondary/40 dark:hover:bg-muted/10",
                 )}
               >
                 <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
@@ -328,8 +328,8 @@ export function UnifiedBuilder({ initialType }: UnifiedBuilderProps) {
                 className={cn(
                   "flex flex-col items-center gap-4 p-8 rounded-[2rem] border-2 transition-all group relative overflow-hidden",
                   type === "notify"
-                    ? "border-primary bg-primary/5 ring-4 ring-primary/10"
-                    : "border-border/50 hover:border-primary/50 hover:bg-muted/10",
+                    ? "border-primary bg-primary/10 dark:bg-primary/5 ring-4 ring-primary/20 shadow-lg"
+                    : "border-border/50 hover:border-primary/50 hover:bg-secondary/40 dark:hover:bg-muted/10",
                 )}
               >
                 <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">

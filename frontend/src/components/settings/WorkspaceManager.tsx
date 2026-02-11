@@ -112,7 +112,7 @@ const SortableWorkspaceItem = ({
     >
       <Card
         className={cn(
-          "p-2 border-0 bg-card/40 backdrop-blur-xl ring-1 ring-border/50 transition-all group flex items-center gap-3",
+          "p-2 border-0 bg-white/40 dark:bg-card/40 backdrop-blur-xl ring-1 ring-border transition-all group flex items-center gap-3",
           isDragging && "shadow-2xl ring-primary/50",
         )}
       >
@@ -400,7 +400,7 @@ export const WorkspaceManager = () => {
             exit={{ height: 0, opacity: 0 }}
             className="overflow-hidden"
           >
-            <Card className="mb-6 p-4 border-primary/20 bg-primary/[0.02] ring-1 ring-primary/30 rounded-xl">
+            <Card className="mb-6 p-4 border-primary/20 bg-primary/[0.02] ring-1 ring-primary/30 rounded-2xl">
               <div className="space-y-3">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase tracking-widest opacity-40">
@@ -412,7 +412,7 @@ export const WorkspaceManager = () => {
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                    className="h-10 text-sm font-bold bg-background/50 border-0 ring-1 ring-border/50 focus:ring-primary/50"
+                    className="h-10 text-sm font-bold bg-secondary/30 dark:bg-background/50 border-0 ring-1 ring-border focus:ring-primary/50"
                   />
                 </div>
                 <div className="flex gap-2">

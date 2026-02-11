@@ -52,14 +52,40 @@ const config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Cyber-Premium Colors (Exact Stitch Specs)
+        'midnight': '#0a0a0c',
+        'charcoal': '#131316',
+        'surface-dark': '#0f0f11',
+        'neon-purple': '#b946ff',
+        'neon-lime': '#ccff00',
+        'neon-blue': '#00f0ff',
+        'neon-pink': '#ff0099',
+        'glass': 'rgba(255, 255, 255, 0.03)',
+        'glass-border': 'rgba(255, 255, 255, 0.08)',
         // Legacy support maps
         'dark-bg': "hsl(var(--background))",
         'dark-card': "hsl(var(--card))",
+      },
+      fontFamily: {
+        sans: ["Inter", "sans-serif"],
+        display: ["Montserrat", "sans-serif"],
+      },
+      letterSpacing: {
+        tighter: "-0.05em",
+        widest: "0.2em",
+      },
+      boxShadow: {
+        "glow-purple": "0 0 25px rgba(185, 70, 255, 0.25)",
+        "glow-lime": "0 0 25px rgba(204, 255, 0, 0.25)",
+        "glow-blue": "0 0 25px rgba(0, 240, 255, 0.25)",
+        "glow-pink": "0 0 25px rgba(255, 0, 153, 0.25)",
+        "glass": "var(--shadow-glass)",
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        "3xl": "2rem",
       },
       keyframes: {
         "accordion-down": {

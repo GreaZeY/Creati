@@ -7,25 +7,30 @@ import { Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "text-white relative inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 overflow-hidden",
+  "relative inline-flex items-center justify-center whitespace-nowrap text-xs font-bold uppercase tracking-wider transition-all duration-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neon-purple disabled:pointer-events-none disabled:opacity-50 overflow-hidden",
   {
     variants: {
       variant: {
-        default: "bg-primary shadow-sm font-semibold",
-        destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm",
+        default:
+          "bg-primary text-white dark:bg-white dark:text-black hover:bg-primary/90 dark:hover:bg-slate-200 shadow-glow-purple dark:shadow-[0_0_20px_rgba(255,255,255,0.3)]",
+        destructive: "bg-red-500 text-white hover:bg-red-600 shadow-glow-pink",
         outline:
-          "text-primary border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+          "text-foreground dark:text-white border border-border dark:border-white/10 bg-transparent hover:bg-secondary/10 dark:hover:bg-white/5 hover:border-primary/20 dark:hover:border-white/20",
         secondary:
-          "text-primary bg-transparent border border-border hover:bg-accent hover:border-primary/30 hover:text-slate-950",
-        ghost: "text-foreground hover:bg-accent/10 border border-transparent hover:border-primary/50 hover:text-accent",
-        link: "text-primary text-primary underline-offset-4 hover:underline",
+          "text-foreground dark:text-white bg-secondary/10 dark:bg-white/5 border border-border dark:border-white/10 hover:bg-secondary/20 dark:hover:bg-white/10 hover:border-primary/20 dark:hover:border-white/20",
+        premium:
+          "bg-gradient-to-r from-neon-purple to-neon-blue text-white shadow-glow-purple hover:scale-[1.02] active:scale-[0.98]",
+        ghost:
+          "text-muted-foreground hover:text-foreground dark:hover:text-white hover:bg-secondary/20 dark:hover:bg-white/5",
+        link: "text-primary underline-offset-4 hover:underline lowercase tracking-normal font-medium",
+        neon: "bg-neon-purple text-black font-black shadow-glow-purple hover:bg-neon-purple/90",
+        lime: "bg-neon-lime text-black font-black shadow-glow-lime hover:bg-neon-lime/90",
       },
       size: {
-        default: "h-[45px] px-6 rounded-[8px]",
-        sm: "h-9 rounded-sm px-3",
-        lg: "h-14 rounded-md px-8 text-md font-medium",
-        icon: "h-10 w-10 rounded-[6px]",
+        default: "h-12 px-8 rounded-full",
+        sm: "h-9 rounded-full px-4 text-[10px]",
+        lg: "h-14 rounded-full px-10 text-sm",
+        icon: "h-10 w-10 rounded-full",
       },
     },
     defaultVariants: {
@@ -190,20 +195,24 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           </AnimatePresence>
         </span>
 
-        {/* Idle Sheen (Only for Primary, when not interacting) */}
-        {/* {isPrimary && !isLoading && !isSuccess && !isError && (
-                    <motion.div
-                        className="absolute inset-0 z-1 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12"
-                        initial={{ x: "-100%" }}
-                        animate={{ x: "200%" }}
-                        transition={{
-                            repeat: Infinity,
-                            duration: 1.5,
-                            repeatDelay: 5, // 6-8 seconds cycle implies ~6s wait
-                            ease: "linear"
-                        }}
-                    />
-                )} */}
+        {/* Premium Sheen Animation */}
+        {!isLoading &&
+          !isSuccess &&
+          !isError &&
+          variant !== "ghost" &&
+          variant !== "link" && (
+            <motion.div
+              className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-20 w-[40%]"
+              initial={{ x: "-150%" }}
+              animate={{ x: "400%" }}
+              transition={{
+                repeat: Infinity,
+                duration: 2.5,
+                repeatDelay: 4,
+                ease: "easeInOut",
+              }}
+            />
+          )}
       </motion.button>
     );
   },

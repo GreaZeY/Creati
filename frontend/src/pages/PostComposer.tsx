@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Zap } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { mediaAPI, postsAPI } from "@/lib/api";
@@ -18,6 +19,8 @@ import { useCanva } from "@/hooks/useCanva";
 import { usePlatforms } from "@/hooks/usePlatforms";
 import { toast } from "@/lib/events";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { cn } from "@/lib/utils";
+import { LensedCard } from "@/components/ui/LensedCard";
 
 // Normalized post state
 interface PostState {
@@ -236,217 +239,245 @@ export function PostComposer() {
   const hasDraft = post.text.length > 0 || post.media.length > 0;
   const isPublishing = publishMutation.isPending;
 
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      handleAddMedia(files);
+    }
+  };
+
   return (
-    <div className="flex h-screen flex-col">
-      <PageHeader description="Create Post">
+    <div className="h-full overflow-hidden flex flex-col space-y-8 max-w-[1600px] mx-auto px-8 w-full relative z-0">
+      {/* Structural Depth - Atmospheric Blobs (v14 Parity) */}
+      {/* <div className="absolute top-[-5%] right-[-10%] w-[500px] h-[500px] bg-[var(--blob-1)] rounded-full blur-[100px] pointer-events-none mix-blend-screen dark:mix-blend-screen mix-blend-multiply z-0" />
+      <div className="absolute bottom-[-5%] left-[-10%] w-[500px] h-[500px] bg-[var(--blob-2)] rounded-full blur-[100px] pointer-events-none mix-blend-screen dark:mix-blend-screen mix-blend-multiply z-0" /> */}
+
+      <PageHeader
+        title="Post Composer"
+        description="Craft your message for the entire ecosystem. Precision and impact."
+      >
         <PublishDropdown
           onPublishNow={handlePublishNow}
           onSchedule={() => setIsScheduleModalOpen(true)}
           disabled={!hasDraft || post.platforms.length === 0 || isPublishing}
         />
       </PageHeader>
-      <div className="flex mt-2 h-full border border-border/40">
-        {/* Left Pane: Editor (60%) */}
-        <div className="w-[60%] flex flex-col border-r border-border/40">
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Platforms */}
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">
-                Platforms
-              </label>
-              <PlatformChips
-                platforms={platforms}
-                selectedPlatforms={post.platforms}
-                onToggle={(platformId) =>
-                  setPost((prev) => ({
-                    ...prev,
-                    platforms: prev.platforms.includes(platformId)
-                      ? prev.platforms.filter((p) => p !== platformId)
-                      : [...prev.platforms, platformId],
-                  }))
-                }
-              />
-            </div>
 
-            {/* Text Editor with Drop Zone */}
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2 block">
-                Message
-              </label>
-              <div className="relative border border-border/40 rounded-lg p-3 bg-card/20 transition-all">
-                <SocialTextArea
-                  ref={editorRef}
-                  value={post.text}
-                  onChange={(text) => setPost((prev) => ({ ...prev, text }))}
-                  placeholder="What's on your mind? (Drag images/videos here)"
-                />
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 min-h-0 relative z-10">
+        <div className="lg:col-span-7 flex flex-col min-h-0 space-y-6">
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={cn(
+              "flex-1 flex flex-col transition-all duration-300 rounded-[2rem]",
+              isDragging && "ring-2 ring-primary shadow-glow-purple",
+            )}
+          >
+            <LensedCard
+              className={cn(
+                "flex-1 flex flex-col p-8 bg-white/80 dark:bg-card/40 border-0 ring-1 ring-border shadow-glass rounded-[2rem]",
+              )}
+            >
+              <div className="flex-1 flex flex-col pr-2 custom-scrollbar space-y-8">
+                {/* Platforms in Editor Area for better UX */}
+                <div className="space-y-4">
+                  <label className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 dark:text-muted-foreground/40 block">
+                    Active Uplink Nodes
+                  </label>
+                  <PlatformChips
+                    platforms={platforms}
+                    selectedPlatforms={post.platforms}
+                    onToggle={(platformId) =>
+                      setPost((prev) => ({
+                        ...prev,
+                        platforms: prev.platforms.includes(platformId)
+                          ? prev.platforms.filter((p) => p !== platformId)
+                          : [...prev.platforms, platformId],
+                      }))
+                    }
+                  />
+                </div>
 
-                <EmojiPicker
-                  isOpen={isEmojiPickerOpen}
-                  anchorEl={emojiAnchor}
-                  onClose={() => {
-                    setIsEmojiPickerOpen(false);
-                    setEmojiAnchor(null);
-                  }}
-                  onEmojiSelect={(emoji) =>
-                    editorRef.current?.insertText(emoji)
-                  }
-                />
+                <div className="space-y-4 flex-1 flex flex-col min-h-[300px]">
+                  <label className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 dark:text-muted-foreground/40 block">
+                    Transmission Payload
+                  </label>
+                  <div className="flex-1 bg-slate-50 dark:bg-black/20 rounded-[2rem] p-8 border border-slate-100 dark:border-white/5 focus-within:ring-2 ring-primary/20 transition-all">
+                    <SocialTextArea
+                      ref={editorRef}
+                      value={post.text}
+                      onChange={(text) =>
+                        setPost((prev) => ({ ...prev, text }))
+                      }
+                      placeholder="Ecosystem broadcast sequence ready. Awaiting input..."
+                    />
+                  </div>
+                </div>
 
-                {/* Media Previews (Max 4) */}
+                {/* Media Preview Grid */}
                 {post.media.length > 0 && (
-                  <div className="mt-3 grid grid-cols-2 gap-2 h-48">
-                    {post.media.slice(0, 4).map((m, index) => (
+                  <div className="grid grid-cols-4 gap-4">
+                    {post.media.slice(0, 4).map((m) => (
                       <div
                         key={m.id}
-                        className="relative group rounded-lg overflow-hidden border border-border/40 bg-accent/5"
+                        className="relative aspect-square rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 group"
                       >
                         <img
                           src={m.preview || m.url}
-                          alt=""
                           className="w-full h-full object-cover"
                         />
                         {m.uploading && (
-                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                            <div className="animate-spin h-6 w-6 border-2 border-white border-t-transparent rounded-full" />
+                          <div className="absolute inset-0 bg-white/80 dark:bg-black/80 flex items-center justify-center">
+                            <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full" />
                           </div>
                         )}
-                        {m.error && (
-                          <div className="absolute inset-0 bg-red-500/20 flex items-center justify-center">
-                            <p className="text-xs text-red-500">Error</p>
-                          </div>
-                        )}
-                        {/* +N More Overlay */}
-                        {index === 3 && post.media.length > 4 && (
-                          <button
-                            onClick={() => setIsMediaModalOpen(true)}
-                            className="absolute inset-0 bg-black/70 flex items-center justify-center text-white hover:bg-black/80 transition-colors"
-                          >
-                            <span className="text-2xl font-bold">
-                              +{post.media.length - 4}
-                            </span>
-                          </button>
-                        )}
-                        {/* Remove Button */}
-                        {!m.uploading &&
-                          index < 4 &&
-                          !(index === 3 && post.media.length > 4) && (
-                            <button
-                              onClick={() => handleRemoveMedia(m.id)}
-                              className="absolute top-2 right-2 h-6 w-6 bg-black/80 hover:bg-black text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                              ×
-                            </button>
-                          )}
+                        <button
+                          onClick={() => handleRemoveMedia(m.id)}
+                          className="absolute top-2 right-2 p-1.5 bg-slate-900/80 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Zap size={12} />
+                        </button>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-            </div>
+
+              <div className="mt-8 pt-6 border-t border-slate-100 dark:border-white/5">
+                <EditorFooter
+                  onMediaClick={() =>
+                    document.getElementById("media-upload-input")?.click()
+                  }
+                  onEmojiClick={(el) => {
+                    setEmojiAnchor(el);
+                    setIsEmojiPickerOpen(true);
+                  }}
+                  onAIClick={() => setIsAIModalOpen(true)}
+                  onCanvaClick={handleCanvaDesign}
+                  onGiphyClick={() => setIsGiphyPickerOpen(true)}
+                />
+              </div>
+            </LensedCard>
           </div>
-
-          {/* Hidden File Input */}
-          <input
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            onChange={(e) => {
-              const files = Array.from(e.target.files || []);
-              if (files.length > 0) {
-                handleAddMedia(files);
-              }
-              e.target.value = ""; // Reset for re-selection
-            }}
-            className="hidden"
-            id="media-upload-input"
-          />
-
-          {/* Footer */}
-          <EditorFooter
-            onMediaClick={() =>
-              document.getElementById("media-upload-input")?.click()
-            }
-            onEmojiClick={(el) => {
-              setEmojiAnchor(el);
-              setIsEmojiPickerOpen(true);
-            }}
-            onAIClick={() => setIsAIModalOpen(true)}
-            onCanvaClick={handleCanvaDesign}
-            onGiphyClick={() => setIsGiphyPickerOpen(true)}
-          />
         </div>
 
-        {/* Right Pane: Preview (40%) */}
-        <PreviewPane
-          selectedPlatformIds={post.platforms}
-          platforms={platforms}
-          postText={post.text}
-          media={post.media}
-        />
-
-        {/* AI Write Modal */}
-        <AIWriteModal
-          isOpen={isAIModalOpen}
-          onClose={() => setIsAIModalOpen(false)}
-          onInsert={(text) => setPost((prev) => ({ ...prev, text }))}
-          currentText={post.text}
-        />
-
-        {/* Media View Modal */}
-        <Modal
-          isOpen={isMediaModalOpen}
-          onClose={() => setIsMediaModalOpen(false)}
-          title={`Media (${post.media.length})`}
-        >
-          <div className="p-6 max-w-4xl w-full">
-            <div className="grid grid-cols-3 gap-3 max-h-[70vh] overflow-y-auto">
-              {post.media.map((m) => (
-                <div key={m.id} className="relative group aspect-square">
-                  <img
-                    src={m.preview || m.url}
-                    alt=""
-                    className="w-full h-full object-cover rounded-lg border border-border/40"
-                  />
-                  {m.uploading && (
-                    <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
-                      <div className="animate-spin h-6 w-6 border-2 border-white border-t-transparent rounded-full" />
-                    </div>
-                  )}
-                  {m.error && (
-                    <div className="absolute inset-0 bg-red-500/20 rounded-lg flex items-center justify-center">
-                      <p className="text-xs text-red-500">Error</p>
-                    </div>
-                  )}
-                  {!m.uploading && (
-                    <button
-                      onClick={() => handleRemoveMedia(m.id)}
-                      className="absolute top-2 right-2 h-6 w-6 bg-black/80 hover:bg-black text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              ))}
+        <div className="lg:col-span-5 flex flex-col min-h-0 space-y-6">
+          <LensedCard className="flex-1 min-h-0 bg-white dark:bg-black/20 border-0 shadow-2xl dark:shadow-none ring-1 ring-slate-100 dark:ring-white/5 rounded-[3rem] relative overflow-hidden flex flex-col">
+            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-neon-purple via-neon-blue to-neon-pink" />
+            <div className="p-8 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.02]">
+              <label className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 dark:text-muted-foreground/40 block">
+                Visual Projection
+              </label>
             </div>
-          </div>
-        </Modal>
+            <div className="flex-1 p-8 custom-scrollbar">
+              <PreviewPane
+                selectedPlatformIds={post.platforms}
+                platforms={platforms}
+                postText={post.text}
+                media={post.media}
+              />
+            </div>
+          </LensedCard>
 
-        {/* Giphy Picker */}
-        <GiphyPicker
-          isOpen={isGiphyPickerOpen}
-          onClose={() => setIsGiphyPickerOpen(false)}
-          onSelect={handleSelectGif}
-        />
-
-        {/* Schedule Modal */}
-        <ScheduleModal
-          isOpen={isScheduleModalOpen}
-          onClose={() => setIsScheduleModalOpen(false)}
-          onSchedule={handleSchedule}
-        />
+          <LensedCard className="p-8 bg-neon-purple/5 border-0 ring-1 ring-neon-purple/20 rounded-[2rem]">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-neon-purple mb-2">
+              System Insight
+            </p>
+            <p className="text-sm font-bold text-slate-600 dark:text-slate-400 leading-relaxed">
+              Distribution sequence optimized for current ecosystem traffic.{" "}
+              <br />
+              <span className="text-slate-900 dark:text-white">
+                Reach potential: High Affinity.
+              </span>
+            </p>
+          </LensedCard>
+        </div>
       </div>
+
+      <input
+        type="file"
+        id="media-upload-input"
+        className="hidden"
+        multiple
+        accept="image/*,video/*"
+        onChange={(e) => {
+          const files = Array.from(e.target.files || []);
+          if (files.length > 0) handleAddMedia(files);
+        }}
+      />
+
+      <AIWriteModal
+        isOpen={isAIModalOpen}
+        onClose={() => setIsAIModalOpen(false)}
+        onInsert={(text) =>
+          setPost((prev) => ({ ...prev, text: prev.text + text }))
+        }
+        currentText={post.text}
+      />
+
+      <Modal
+        isOpen={isMediaModalOpen}
+        onClose={() => setIsMediaModalOpen(false)}
+        title={`Transmission Assets (${post.media.length})`}
+      >
+        <div className="p-8 max-w-4xl w-full">
+          <div className="grid grid-cols-3 gap-6 max-h-[60vh] pr-4 custom-scrollbar">
+            {post.media.map((m) => (
+              <div
+                key={m.id}
+                className="relative group aspect-square rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10"
+              >
+                <img
+                  src={m.preview || m.url}
+                  className="w-full h-full object-cover"
+                />
+                <button
+                  onClick={() => handleRemoveMedia(m.id)}
+                  className="absolute top-4 right-4 h-10 w-10 bg-slate-900/90 text-white rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                >
+                  <Zap size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+
+      <GiphyPicker
+        isOpen={isGiphyPickerOpen}
+        onClose={() => setIsGiphyPickerOpen(false)}
+        onSelect={handleSelectGif}
+      />
+
+      <ScheduleModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
+        onSchedule={handleSchedule}
+      />
+
+      <EmojiPicker
+        isOpen={isEmojiPickerOpen}
+        onClose={() => setIsEmojiPickerOpen(false)}
+        anchorEl={emojiAnchor}
+        onEmojiSelect={(emoji) => {
+          setPost((prev) => ({ ...prev, text: prev.text + emoji }));
+          setIsEmojiPickerOpen(false);
+        }}
+      />
     </div>
   );
 }

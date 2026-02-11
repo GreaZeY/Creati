@@ -186,16 +186,17 @@ export const Platforms = () => {
                   className="w-full"
                 >
                   <LensedCard
+                    key={platform.id}
                     className={cn(
-                      "p-4 relative flex flex-row items-center gap-4",
+                      "p-6 relative flex flex-col gap-6 bg-white/50 dark:bg-card/40 border-0 ring-1 ring-slate-200 dark:ring-glass-border hover:ring-neon-purple/50 dark:hover:ring-neon-purple/50 hover:bg-white dark:hover:bg-card/60 transition-all duration-300 shadow-sm hover:shadow-glass group rounded-[2rem]",
                       !platform.connected && "opacity-60",
                     )}
                   >
                     {/* Dropdown Menu - Absolute Top Right */}
-                    <div className="absolute top-2 right-2 z-20">
+                    <div className="absolute top-4 right-4 z-20">
                       <DropdownMenu
                         trigger={
-                          <button className="p-2 rounded-full text-muted-foreground/80 hover:text-foreground hover:bg-secondary/80 transition-all">
+                          <button className="p-2 rounded-full text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-all">
                             <MoreVertical size={16} />
                           </button>
                         }
@@ -234,49 +235,54 @@ export const Platforms = () => {
                       </DropdownMenu>
                     </div>
 
-                    {/* Watermark Logo Background */}
-                    <div className="absolute right-[20px] top-1/2 -translate-y-1/2 h-full aspect-square opacity-30 pointer-events-none select-none">
-                      <div
-                        className={cn(
-                          "w-full h-full flex items-center justify-center relative -right-10",
-                          accentClass.split(" ")[0],
-                        )}
-                        style={{
-                          maskImage:
-                            "linear-gradient(to right, transparent 20%, black)",
-                          WebkitMaskImage:
-                            "linear-gradient(to right, transparent 20%, black)",
-                        }}
-                      >
-                        <PlatformLogo
-                          platform={platform.platform}
-                          size={120}
-                          className="text-current"
-                        />
+                    <div className="flex items-center justify-between relative z-10">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center border border-slate-200 dark:border-white/10 shadow-sm group-hover:scale-110 transition-transform duration-500">
+                          <PlatformLogo
+                            platform={platform.platform}
+                            className="w-8 h-8 opacity-80 group-hover:opacity-100"
+                          />
+                        </div>
+                        <div>
+                          <h3 className="font-black text-lg tracking-tight text-slate-900 dark:text-white capitalize leading-none">
+                            {platform.platform}
+                          </h3>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <span
+                              className={cn(
+                                "w-2 h-2 rounded-full animate-pulse",
+                                platform.connected
+                                  ? "bg-emerald-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"
+                                  : "bg-slate-300 dark:bg-slate-600",
+                              )}
+                            />
+                            <span className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400 dark:text-muted-foreground/60">
+                              {platform.connected
+                                ? "Live Node"
+                                : "Disconnected"}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex-1 min-w-0 md:pl-2 relative z-10">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-3">
-                          <h3 className="text-base font-bold tracking-tight uppercase truncate leading-none">
-                            {platform.profileName || platform.name}
-                          </h3>
-                          {platform.connected ? (
-                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase tracking-widest ring-1 ring-emerald-500/20">
-                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-                              Active
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 text-[9px] font-black uppercase tracking-widest ring-1 ring-amber-500/20">
-                              <AlertTriangle size={10} />
-                              Offline
-                            </div>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-40 mt-1">
-                          {platform.platform}{" "}
-                          {platform.handle ? `// ${platform.handle}` : ""}
+                    <div className="grid grid-cols-2 gap-4 mt-auto relative z-10">
+                      <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
+                        <p className="text-[10px] font-black text-slate-400 dark:text-muted-foreground/40 uppercase tracking-widest mb-1">
+                          Account
+                        </p>
+                        <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                          {platform.profileName || platform.name}
+                        </p>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
+                        <p className="text-[10px] font-black text-slate-400 dark:text-muted-foreground/40 uppercase tracking-widest mb-1">
+                          Handle
+                        </p>
+                        <p className="text-sm font-bold text-neon-purple truncate">
+                          {platform.handle
+                            ? `@${platform.handle}`
+                            : "No Handle"}
                         </p>
                       </div>
                     </div>
@@ -288,9 +294,9 @@ export const Platforms = () => {
                           connectMutation.isPending &&
                           connectMutation.variables === platform.id
                         }
-                        className="h-9 px-5 rounded-lg bg-primary text-primary-foreground font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20 transition-all"
+                        className="mt-4 w-full h-11 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 font-black text-xs uppercase tracking-widest transition-all"
                       >
-                        Reconnect
+                        Initialize Reconnection
                       </Button>
                     )}
                   </LensedCard>

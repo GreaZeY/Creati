@@ -275,9 +275,9 @@ export const ConnectPlatforms = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05, type: "spring", stiffness: 100 }}
             >
-              <Card className="p-4 bg-card/40 backdrop-blur-xl border-border/40 hover:border-primary/50 transition-all duration-500 group relative overflow-hidden rounded-xl ring-1 ring-border/20 shadow-lg hover:shadow-primary/5">
+              <Card className="p-4 bg-white/40 dark:bg-card/40 backdrop-blur-xl border-border/40 hover:border-primary/50 transition-all duration-500 group relative overflow-hidden rounded-2xl ring-1 ring-border shadow-lg hover:shadow-primary/5">
                 <div className="flex items-start gap-4 relative z-10">
-                  <div className="w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 shadow-lg">
+                  <div className="w-12 h-12 rounded-lg flex items-center justify-center transition-all duration-700 bg-secondary/50 dark:bg-transparent group-hover:scale-110 group-hover:rotate-6 shadow-md border border-border/50">
                     <PlatformLogo platform={platform.id} size={28} />
                   </div>
 

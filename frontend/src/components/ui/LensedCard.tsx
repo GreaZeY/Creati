@@ -24,17 +24,23 @@ export function LensedCard({ children, className, onClick }: LensedCardProps) {
       ref={cardRef}
       onMouseMove={handleMouseMove}
       onClick={onClick}
-      className={cn("glass-card lens-effect rounded-xl p-6 group", className)}
+      className={cn(
+        "group relative overflow-hidden bg-white/80 dark:bg-card/40 border-0 ring-1 ring-border shadow-glass backdrop-blur-xl transition-all duration-500 rounded-[32px]",
+        className,
+      )}
     >
-      {/* Dynamic Glow Accent */}
+      {/* Dynamic Cinematic Lens Glow */}
       <div
-        className="absolute inset-0 pointer-events-none opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+        className="absolute inset-0 pointer-events-none opacity-0 transition-opacity duration-700 group-hover/card:opacity-100 mix-blend-screen"
         style={{
-          background: `radial-gradient(circle at ${mousePos.x}% ${mousePos.y}%, hsl(var(--primary) / 0.06) 0%, transparent 45%)`,
+          background: `radial-gradient(circle at ${mousePos.x}% ${mousePos.y}%, rgba(185, 70, 255, 0.08) 0%, rgba(0, 240, 255, 0.02) 25%, transparent 60%)`,
         }}
       />
 
-      {children}
+      {/* Atmospheric Inner Glimmer */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none z-0" />
+
+      <div className="relative z-10">{children}</div>
     </div>
   );
 }

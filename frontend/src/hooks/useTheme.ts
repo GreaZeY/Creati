@@ -13,9 +13,12 @@ export const useTheme = () => {
     });
 
     useEffect(() => {
-        // Apply theme to body
-        document.body.classList.remove('dark', 'light');
-        document.body.classList.add(theme);
+        // Apply theme to html element for Tailwind class strategy
+        if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
 
         // Persist to localStorage
         localStorage.setItem('theme', theme);
@@ -37,7 +40,7 @@ export const useTheme = () => {
         setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
 
         // Force repaint
-        const _ = window.getComputedStyle(css).opacity;
+        window.getComputedStyle(css).opacity;
 
         // Re-enable transitions
         setTimeout(() => {

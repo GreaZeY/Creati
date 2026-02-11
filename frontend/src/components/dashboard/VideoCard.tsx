@@ -28,52 +28,56 @@ export const VideoCard = ({ video }: VideoCardProps) => {
   });
 
   return (
-    <LensedCard className="flex flex-col group h-full relative p-0 overflow-hidden ring-white/5 hover:ring-primary/20 transition-all">
-      <div className="aspect-video bg-white/5 relative overflow-hidden border-b border-white/5">
+    <LensedCard className="flex flex-col group h-full relative p-0 overflow-hidden border-border/50 dark:border-white/5 hover:border-primary/20 dark:hover:border-white/20 transition-all duration-500 rounded-[32px]">
+      <div className="aspect-video bg-secondary/50 dark:bg-charcoal relative overflow-hidden border-b border-border/50 dark:border-white/5 group-hover:bg-secondary/80 dark:group-hover:bg-midnight transition-colors duration-500">
+        {/* Cinematic Thumbnail Mask */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-white/[0.02] to-transparent pointer-events-none z-10" />
+
         {/* Thumbnail placeholder with a subtle gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-cyan-500/5 flex items-center justify-center text-muted-foreground/10 group-hover:scale-105 transition-transform duration-700">
-          <span className="text-5xl font-black italic tracking-tighter uppercase select-none opacity-20 font-outfit">
+        <div className="absolute inset-0 bg-gradient-to-br from-neon-purple/5 to-neon-blue/5 flex items-center justify-center text-muted-foreground/10 group-hover:scale-110 transition-transform duration-1000">
+          <span className="text-5xl font-black italic tracking-tighter uppercase select-none opacity-20 font-display">
             Creati
           </span>
         </div>
 
-        <div className="absolute top-4 right-4 z-10">
+        <div className="absolute top-6 right-6 z-20">
           <StatusBadge status={video.jobStatus} />
         </div>
       </div>
 
-      <div className="p-5 flex flex-col flex-1 gap-4">
-        <div className="space-y-2">
-          <h3 className="font-bold text-lg line-clamp-1 group-hover:text-primary transition-colors tracking-tight font-outfit uppercase italic">
+      <div className="p-8 flex flex-col flex-1 gap-6">
+        <div className="space-y-3">
+          <h3 className="font-bold text-xl line-clamp-1 text-foreground dark:text-white transition-colors tracking-tight font-display uppercase italic">
             {video.title}
           </h3>
-          <p className="text-sm text-muted-foreground/60 line-clamp-2 min-h-[2.5rem] font-medium leading-relaxed">
-            {video.description || "No description provided."}
+          <p className="text-xs text-muted-foreground/40 line-clamp-2 min-h-[3rem] font-medium leading-relaxed uppercase tracking-wider">
+            {video.description ||
+              "System protocol initiated. Content distribution in progress."}
           </p>
         </div>
 
-        <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 mt-auto">
-          <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-white/5 rounded-lg border border-white/5">
-            <Calendar className="w-2.5 h-2.5 text-primary/60" />
+        <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40 mt-auto">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-secondary/30 dark:bg-white/5 rounded-full border border-border/50 dark:border-white/5">
+            <Calendar className="w-3 h-3 text-neon-purple/60" />
             {date}
           </div>
         </div>
 
-        <div className="flex items-center gap-3 pt-4 border-t border-white/5">
+        <div className="flex items-center gap-3 pt-6 border-t border-border/50 dark:border-white/5">
           <Button
             variant="ghost"
             size="sm"
-            className="flex-1 h-10 gap-2 rounded-xl font-bold transition-all hover:bg-primary/10 hover:text-primary text-[10px] uppercase tracking-widest"
+            className="flex-1 h-11 gap-2 rounded-2xl font-bold transition-all hover:bg-neon-purple/10 hover:text-neon-purple text-[10px] uppercase tracking-widest border border-transparent hover:border-neon-purple/30"
             onClick={() => setIsAnalyticsOpen(true)}
             disabled={video.jobStatus !== "completed"}
           >
-            <BarChart2 className="w-3.5 h-3.5" />
+            <BarChart2 className="w-4 h-4" />
             Intelligence
           </Button>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
-            className="w-10 h-10 p-0 rounded-xl bg-white/5 border-white/5 hover:border-primary/20 transition-all"
+            className="w-11 h-11 p-0 rounded-2xl bg-secondary/30 dark:bg-white/5 border border-border/50 dark:border-white/5 hover:border-primary/20 transition-all flex items-center justify-center shrink-0"
             asChild
           >
             <a href={video.s3URL} target="_blank" rel="noopener noreferrer">

@@ -73,19 +73,19 @@ export function DataTable<T extends { id: string | number }>({
   return (
     <div
       className={cn(
-        "w-full overflow-hidden rounded-xl border border-border/40 bg-card/30 backdrop-blur-sm",
+        "w-full overflow-hidden rounded-[32px] glass-panel shadow-glass",
         className,
       )}
     >
       <div className="overflow-auto flex-1 h-full min-h-0">
-        <table className="w-full text-left text-sm border-separate border-spacing-0">
-          <thead className="sticky top-0 z-10 bg-secondary/80 backdrop-blur-md">
+        <table className="premium-table">
+          <thead>
             <tr>
               {columns.map((col, i) => (
                 <th
                   key={i}
                   className={cn(
-                    "h-10 px-4 text-[10px] font-black uppercase text-muted-foreground tracking-widest select-none border-b border-border/40",
+                    "h-14 px-8 text-xs font-bold uppercase text-slate-500 dark:text-muted-foreground/60 tracking-widest select-none border-b border-slate-200 dark:border-white/5 bg-slate-50 dark:bg-black/20",
                     col.className,
                   )}
                 >
@@ -94,13 +94,13 @@ export function DataTable<T extends { id: string | number }>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-border/20">
+          <tbody>
             {data.map((item) => (
               <tr
                 key={item.id}
                 onClick={() => onRowClick && onRowClick(item)}
                 className={cn(
-                  "group transition-colors hover:bg-secondary/30",
+                  "hover:bg-white dark:hover:bg-white/[0.02] transition-all duration-300 group hover:shadow-sm dark:hover:shadow-none",
                   onRowClick && "cursor-pointer",
                 )}
               >
@@ -108,7 +108,7 @@ export function DataTable<T extends { id: string | number }>({
                   <td
                     key={i}
                     className={cn(
-                      "p-3 align-middle border-b border-border/10",
+                      "px-8 py-5 align-middle border-b border-slate-200/50 dark:border-white/5",
                       col.className,
                     )}
                   >

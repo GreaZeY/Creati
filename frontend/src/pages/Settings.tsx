@@ -65,6 +65,7 @@ export const Settings = () => {
           </Button>
         )}
         <PageHeader
+          title="Settings"
           description={
             activeSectionData
               ? activeSectionData.desc
@@ -128,7 +129,7 @@ export const SettingsMain = () => {
         >
           <Card
             onClick={() => navigate(`/settings/${section.id}`)}
-            className="p-4 flex items-center justify-between border-0 bg-card/40 backdrop-blur-xl hover:bg-card/60 transition-all cursor-pointer group rounded-xl ring-1 ring-border hover:ring-primary/30 shadow-lg relative overflow-hidden"
+            className="p-4 flex items-center justify-between border-0 bg-white/40 dark:bg-card/40 backdrop-blur-xl hover:bg-white/60 dark:hover:bg-card/60 transition-all cursor-pointer group rounded-2xl ring-1 ring-border hover:ring-primary/30 shadow-lg relative overflow-hidden"
           >
             <div className="absolute -top-20 -left-20 w-40 h-40 bg-primary/5 rounded-full blur-[60px] opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
 
@@ -137,7 +138,7 @@ export const SettingsMain = () => {
                 <section.icon className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
               <div>
-                <h3 className="font-bold text-base tracking-tight group-hover:text-primary transition-colors">
+                <h3 className="font-bold text-base tracking-tight group-hover:text-primary transition-colors text-foreground dark:text-white">
                   {section.label}
                 </h3>
                 <p className="text-xs text-muted-foreground font-medium">
@@ -151,7 +152,7 @@ export const SettingsMain = () => {
       ))}
 
       <div className="pt-6 mt-3 border-t border-border">
-        <Card className="p-4 border-0 bg-destructive/5 backdrop-blur-xl rounded-xl ring-1 ring-destructive/20 relative overflow-hidden group">
+        <Card className="p-4 border-0 bg-destructive/5 backdrop-blur-xl rounded-2xl ring-1 ring-destructive/20 relative overflow-hidden group">
           <div className="absolute inset-0 bg-destructive/[0.02] group-hover:bg-destructive/[0.05] transition-colors duration-700" />
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
             <div className="space-y-1">

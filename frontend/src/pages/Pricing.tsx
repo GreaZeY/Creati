@@ -122,7 +122,7 @@ export function Pricing() {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="p-5 rounded-2xl border border-input bg-card/50 h-[500px] flex flex-col"
+              className="p-5 rounded-2xl border border-border bg-secondary/50 dark:bg-card/50 h-[500px] flex flex-col"
             >
               <Skeleton className="h-6 w-1/3 mb-4" />
               <Skeleton className="h-4 w-2/3 mb-8" />
@@ -227,7 +227,7 @@ export function Pricing() {
             "p-5 rounded-2xl flex flex-col relative overflow-hidden transition-all hover:-translate-y-2 duration-300 ring-1",
             currentPlan === "creator"
               ? "ring-primary border-primary bg-primary/10"
-              : "bg-card border-input ring-border",
+              : "bg-white dark:bg-card border-border dark:border-input ring-border/50",
           )}
         >
           {currentPlan === "creator" && !isCancelled && (
@@ -292,7 +292,7 @@ export function Pricing() {
             "p-5 rounded-2xl flex flex-col relative overflow-hidden transition-all hover:-translate-y-2 duration-300",
             currentPlan === "pro"
               ? "border-purple-500/50 bg-purple-500/5"
-              : "bg-card/50 border-input",
+              : "bg-white/50 dark:bg-card/50 border-border dark:border-input",
           )}
         >
           {currentPlan === "pro" && !isCancelled && (

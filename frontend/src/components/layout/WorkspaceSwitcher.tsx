@@ -6,6 +6,7 @@ import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { Modal } from "../ui/Modal";
 import { Briefcase, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const WorkspaceSwitcher = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -45,10 +46,38 @@ const WorkspaceSwitcher = () => {
         placeholder="Select Workspace"
         emptyMessage="No Workspaces Found"
         persistent={true}
-        className="w-full"
-        size="sm"
+        className="w-auto"
+        size="md"
+        renderTrigger={(item, isOpen, toggle) => (
+          <button
+            onClick={toggle}
+            className={cn(
+              "flex items-center gap-3 px-4 py-2 rounded-full border border-border dark:border-white/10 transition-all duration-300",
+              "bg-secondary/50 dark:bg-white/[0.03] hover:bg-secondary/80 dark:hover:bg-white/[0.08] backdrop-blur-md",
+              "group focus:outline-none focus:border-primary/50",
+              isOpen && "border-primary/50 bg-secondary dark:bg-white/[0.08]",
+            )}
+          >
+            <div className="w-6 h-6 rounded-full bg-primary/20 dark:bg-neon-purple/20 flex items-center justify-center shrink-0 border border-primary/30 dark:border-neon-purple/30">
+              <Briefcase
+                size={12}
+                className="text-primary dark:text-neon-purple"
+              />
+            </div>
+            <span className="text-sm font-bold text-foreground dark:text-white tracking-tight font-display">
+              {item?.label || "Select Workspace"}
+            </span>
+            <Plus
+              size={14}
+              className={cn(
+                "text-muted-foreground/40 transition-transform duration-300",
+                isOpen ? "rotate-45" : "rotate-0",
+              )}
+            />
+          </button>
+        )}
         footerAction={{
-          label: "Create Workspace",
+          label: "Initialize New Node",
           icon: <Plus size={14} />,
           onClick: () => setShowCreateModal(true),
         }}

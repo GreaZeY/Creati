@@ -60,7 +60,7 @@ export const Dashboard = () => {
   };
 
   return (
-    <div className="h-full overflow-y-auto space-y-6 pb-8 max-w-7xl mx-auto px-4 w-full">
+    <div className="h-full overflow-y-auto space-y-8 pb-12 max-w-7xl mx-auto px-8 w-full relative z-0">
       <PageHeader
         title="Dashboard"
         description="Your global distribution engine is primed. Total control across all nodes."
@@ -74,115 +74,119 @@ export const Dashboard = () => {
       </PageHeader>
 
       {/* Hero Ecosystem Pulse */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 font-outfit">
-        <LensedCard className="lg:col-span-2 border-primary/20 flex flex-col justify-center p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
-              <Zap size={16} fill="currentColor" />
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 font-sans">
+        <LensedCard className="lg:col-span-2 flex flex-col justify-center p-8 bg-white/80 dark:bg-card/40 border-0 ring-1 ring-border shadow-glass rounded-[2rem]">
+          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-neon-purple/5 to-transparent pointer-events-none rounded-[2rem]" />
+          <div className="flex items-center gap-3 mb-6 relative z-10">
+            <div className="w-10 h-10 rounded-xl bg-neon-purple/20 flex items-center justify-center text-neon-purple border border-neon-purple/30 shadow-glow-purple">
+              <Zap size={20} className="fill-current" />
             </div>
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest opacity-80">
               Live Ecosystem Reach
             </span>
           </div>
-          <div className="flex items-baseline gap-3">
-            <h2 className="text-4xl font-black tracking-tighter">
+          <div className="flex items-baseline gap-4">
+            <h2 className="text-5xl font-black font-display tracking-tighter text-foreground dark:text-white">
               {analyticsLoading
                 ? "---"
                 : formatNumber(analytics?.totalViews || 0)}
             </h2>
-            <span className="text-[12px] font-black text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full uppercase tracking-tighter ring-1 ring-emerald-400/20">
-              +12.4% WEEKLY
+            <span className="flex items-center text-xs font-bold text-neon-lime bg-neon-lime/10 px-4 py-2 rounded-full border border-neon-lime/20 shadow-glow-lime">
+              <ArrowRight className="w-4 h-4 mr-1 -rotate-45" /> +12.4%
             </span>
           </div>
-          <p className="text-[10px] font-bold text-muted-foreground mt-3 opacity-40 uppercase tracking-widest">
-            Aggregated performance across {connectedPlatforms.length} nodes
+          <p className="text-[11px] font-bold text-muted-foreground/40 mt-6 uppercase tracking-[0.2em]">
+            Aggregated performance across {connectedPlatforms.length} active
+            nodes
           </p>
+          <div className="absolute -bottom-8 -right-8 w-40 h-40 bg-neon-purple/20 rounded-full blur-[80px] pointer-events-none" />
         </LensedCard>
 
-        <LensedCard className="border-cyan-500/20 p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
-              <Link2 size={16} />
+        <LensedCard className="lg:col-span-1 p-8 border-neon-blue/20 bg-gradient-to-br from-neon-blue/5 via-transparent to-transparent">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-neon-blue/20 flex items-center justify-center text-neon-blue border border-neon-blue/30 shadow-glow-blue">
+              <Link2 size={20} />
             </div>
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest opacity-80">
               Node Status
             </span>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 mb-6">
             {isLoading ? (
-              <Skeleton className="h-10 w-full rounded-xl bg-muted/50" />
+              <Skeleton className="h-10 w-full rounded-2xl bg-white/5" />
             ) : connectedPlatforms.length > 0 ? (
               connectedPlatforms.map((p: any) => (
                 <div
                   key={p.id}
-                  className="p-2 rounded-xl bg-muted/30 border border-border flex items-center gap-2 group hover:bg-accent/10 transition-all cursor-crosshair"
+                  className="px-3 py-2 rounded-xl bg-charcoal border border-white/5 flex items-center gap-2 group hover:border-neon-blue/40 transition-all cursor-pointer"
                 >
                   <PlatformLogo
                     platform={p.platform}
                     size={14}
-                    className="text-cyan-400"
+                    className="text-neon-blue"
                   />
-                  <span className="text-[9px] font-black tracking-widest uppercase opacity-60 group-hover:opacity-100">
-                    {p.platform}
-                  </span>
                 </div>
               ))
             ) : (
-              <span className="text-[10px] font-black opacity-40 uppercase tracking-widest">
-                No Platforms Connected
+              <span className="text-xs font-bold text-muted-foreground/40 uppercase tracking-widest">
+                Nodes Inactive
               </span>
             )}
           </div>
-          <div className="mt-auto pt-4">
+          <div className="mt-auto">
             <button
               onClick={() => navigate("/platforms")}
-              className="text-[10px] font-black text-cyan-400 uppercase tracking-widest hover:underline"
+              className="text-xs font-bold text-neon-blue uppercase tracking-widest hover:text-white transition-colors"
             >
-              Link New Nodes →
+              Configure Nodes →
             </button>
           </div>
         </LensedCard>
 
-        <LensedCard className="border-magenta-500/20 p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="p-1.5 rounded-lg bg-pink-500/10 text-pink-400">
-              <LayoutDashboard size={16} />
+        <LensedCard className="lg:col-span-1 p-8 border-neon-pink/20 bg-gradient-to-br from-neon-pink/5 via-transparent to-transparent">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-xl bg-neon-pink/20 flex items-center justify-center text-neon-pink border border-neon-pink/30 shadow-glow-pink">
+              <LayoutDashboard size={20} />
             </div>
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] opacity-60">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest opacity-80">
               Library Sync
             </span>
           </div>
-          <div className="flex items-baseline gap-2 mb-2">
-            <span className="text-3xl font-black">{videos.length}</span>
-            <span className="text-[10px] font-black opacity-40 uppercase tracking-widest">
-              Assets Distributed
+          <div className="flex items-baseline gap-3 mb-4">
+            <span className="text-4xl font-black font-display tracking-tight text-foreground dark:text-white">
+              {videos.length}
+            </span>
+            <span className="text-xs font-bold text-muted-foreground/40 uppercase tracking-widest">
+              Distributed
             </span>
           </div>
-          <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+          <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden relative">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: "78%" }}
-              className="h-full bg-pink-500/50 shadow-[0_0_15px_rgba(244,114,182,0.5)]"
-            />
+              className="h-full bg-neon-pink shadow-glow-pink rounded-full relative"
+            >
+              <div className="absolute right-0 top-0 bottom-0 w-2 bg-white/50 blur-[2px]" />
+            </motion.div>
           </div>
         </LensedCard>
       </div>
 
       {/* Recent Activity Section */}
-      <div className="pt-2">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-muted">
-              <BarChart className="w-5 h-5 text-muted-foreground/40" />
+      <div className="pt-8 space-y-6">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white border border-white/10">
+              <BarChart className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold tracking-tight uppercase italic font-outfit">
+            <h3 className="text-2xl font-black font-display tracking-tight text-foreground dark:text-white uppercase italic">
               Asset Feed
             </h3>
           </div>
           {videos.length > 3 && (
             <Button
               variant="ghost"
-              className="font-black text-primary hover:bg-primary/5 group uppercase tracking-widest text-[10px]"
+              className="font-bold text-neon-purple hover:bg-neon-purple/5 group uppercase tracking-widest text-[10px]"
               onClick={() => navigate("/videos")}
             >
               Analyze All

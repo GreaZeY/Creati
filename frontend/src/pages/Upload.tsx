@@ -93,8 +93,8 @@ export const Upload = () => {
     try {
       const resp = await uploadAPI.init({
         filename: file.name,
-        contentType: file.type,
         size: file.size,
+        contentTitle: title || file.name,
       });
 
       // Access nested data from SuccessResponse
@@ -147,10 +147,10 @@ export const Upload = () => {
               <div
                 {...getRootProps()}
                 className={cn(
-                  "rounded-xl bg-card/40 backdrop-blur-xl border-2 border-dashed flex flex-col items-center justify-center p-10 text-center cursor-pointer transition-all duration-500 relative overflow-hidden group shadow-lg ring-1 ring-border",
+                  "rounded-2xl bg-white/40 dark:bg-card/40 backdrop-blur-xl border-2 border-dashed flex flex-col items-center justify-center p-10 text-center cursor-pointer transition-all duration-500 relative overflow-hidden group shadow-lg ring-1 ring-border",
                   isDragActive
                     ? "border-primary bg-primary/[0.05] ring-4 ring-primary/20 scale-[1.02]"
-                    : "border-border hover:border-primary/50 hover:bg-card/60 hover:shadow-primary/5",
+                    : "border-border hover:border-primary/50 hover:bg-secondary/40 dark:hover:bg-card/60 hover:shadow-primary/5",
                 )}
               >
                 <input {...getInputProps()} />
@@ -174,9 +174,7 @@ export const Upload = () => {
                 <p className="text-muted-foreground mb-6 max-w-sm text-xs font-medium leading-relaxed relative z-10">
                   MP4, MOV, or AVI up to 2GB. We'll handle the rest.
                 </p>
-                <Button
-                  className="rounded-lg h-9 px-6 shadow-lg shadow-primary/30 font-bold text-sm bg-gradient-to-r from-primary to-cyan-500 hover:scale-105 active:scale-95 transition-all relative z-10"
-                >
+                <Button className="rounded-lg h-9 px-6 shadow-lg shadow-primary/30 font-bold text-sm bg-gradient-to-r from-primary to-cyan-500 hover:scale-105 active:scale-95 transition-all relative z-10">
                   Browse Files
                 </Button>
               </div>
@@ -189,7 +187,7 @@ export const Upload = () => {
               className="grid grid-cols-1 lg:grid-cols-3 gap-8"
             >
               <div className="lg:col-span-2 space-y-6">
-                <Card className="p-4 space-y-5 border-0 bg-card/40 backdrop-blur-xl rounded-xl shadow-lg ring-1 ring-border relative overflow-hidden">
+                <Card className="p-4 space-y-5 border-0 bg-white/40 dark:bg-card/40 backdrop-blur-xl rounded-2xl shadow-lg ring-1 ring-border relative overflow-hidden">
                   <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/5 rounded-full blur-[80px]" />
 
                   <div className="space-y-5 relative z-10">
@@ -203,7 +201,7 @@ export const Upload = () => {
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="Catchy title for your video"
-                        className="w-full h-9 px-3 rounded-lg bg-muted/30 border-border focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold text-xs placeholder:text-muted-foreground/30 ring-1 ring-border/50"
+                        className="w-full h-9 px-3 rounded-lg bg-secondary/30 dark:bg-muted/30 border-border focus:ring-2 focus:ring-primary/20 outline-none transition-all font-bold text-xs placeholder:text-muted-foreground/30 ring-1 ring-border/50"
                       />
                     </div>
                     <div className="space-y-2.5">
@@ -215,7 +213,7 @@ export const Upload = () => {
                         onChange={(e) => setDescription(e.target.value)}
                         placeholder="Tell your audience about this video..."
                         rows={5}
-                        className="w-full p-4 rounded-xl bg-muted/30 border-border focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none font-medium leading-relaxed placeholder:text-muted-foreground/30 ring-1 ring-border/50"
+                        className="w-full p-4 rounded-xl bg-secondary/30 dark:bg-muted/30 border-border focus:ring-2 focus:ring-primary/20 outline-none transition-all resize-none font-medium leading-relaxed placeholder:text-muted-foreground/30 ring-1 ring-border/50"
                       />
                     </div>
                   </div>
@@ -248,7 +246,7 @@ export const Upload = () => {
                                 "flex items-center gap-2 px-4 py-2 rounded-lg border-0 transition-all font-black text-xs uppercase tracking-wider ring-1 shadow-md",
                                 isSelected
                                   ? "bg-gradient-to-r from-primary to-cyan-500 text-primary-foreground ring-primary shadow-primary/20 scale-105"
-                                  : "bg-muted/50 text-muted-foreground/60 ring-border hover:bg-muted hover:text-muted-foreground hover:scale-105",
+                                  : "bg-secondary/50 dark:bg-muted/50 text-muted-foreground/60 ring-border hover:bg-secondary hover:text-muted-foreground hover:scale-105",
                               )}
                             >
                               <PlatformLogo
@@ -297,7 +295,7 @@ export const Upload = () => {
               </div>
 
               <div className="space-y-6">
-                <Card className="p-4 border-0 bg-card/40 backdrop-blur-xl rounded-xl shadow-lg ring-1 ring-border relative overflow-hidden group">
+                <Card className="p-4 border-0 bg-white/40 dark:bg-card/40 backdrop-blur-xl rounded-2xl shadow-lg ring-1 ring-border relative overflow-hidden group">
                   <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/5 rounded-full blur-[80px] group-hover:bg-primary/10 transition-all duration-700" />
 
                   <div className="flex items-center justify-between mb-5 relative z-10">
@@ -314,7 +312,7 @@ export const Upload = () => {
 
                   <div className="space-y-1 mb-6 relative z-10">
                     <h4
-                      className="font-bold text-base tracking-tight truncate group-hover:text-primary transition-colors"
+                      className="font-bold text-base tracking-tight truncate group-hover:text-primary transition-colors text-foreground dark:text-white"
                       title={file.name}
                     >
                       {file.name}
