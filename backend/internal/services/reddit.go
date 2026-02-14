@@ -102,9 +102,10 @@ func (r *RedditService) Authenticate(code string, userID int, clientID *int) err
 	defer resp.Body.Close()
 
 	var user struct {
-		Name string `json:"name"`
-		ID   string `json:"id"`
-		Sub  struct {
+		Name    string `json:"name"`
+		ID      string `json:"id"`
+		IconImg string `json:"icon_img"`
+		Sub     struct {
 			Title string `json:"title"`
 		} `json:"subreddit"`
 	}
@@ -138,6 +139,7 @@ func (r *RedditService) Authenticate(code string, userID int, clientID *int) err
 		Status:         "connected",
 		ProfileName:    displayName,
 		Handle:         "u/" + user.Name,
+		ProfilePicture: user.IconImg,
 	}
 
 	return r.repo.UpsertAccount(context.Background(), account)

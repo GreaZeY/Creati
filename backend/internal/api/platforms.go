@@ -120,6 +120,7 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 		Status         string `json:"status"`
 		Connected      bool   `json:"connected"`
 		ProfileName    string `json:"profileName,omitempty"`
+		ProfilePicture string `json:"profilePicture,omitempty"`
 		PlatformUserID string `json:"platformUserId,omitempty"`
 		Handle         string `json:"handle"`
 	}
@@ -165,6 +166,7 @@ func (h *PlatformHandler) ListPlatforms(c *fiber.Ctx) error {
 			Status:         acc.Status,
 			Connected:      isConnected,
 			ProfileName:    acc.ProfileName,
+			ProfilePicture: acc.ProfilePicture,
 			PlatformUserID: acc.PlatformUserID,
 			Handle:         acc.Handle,
 		})

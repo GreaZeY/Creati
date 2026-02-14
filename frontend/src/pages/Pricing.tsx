@@ -224,7 +224,7 @@ export function Pricing() {
         {/* CREATOR PLAN */}
         <Card
           className={cn(
-            "p-5 rounded-2xl flex flex-col relative overflow-hidden transition-all hover:-translate-y-2 duration-300 ring-1",
+            "rounded-2xl flex flex-col relative overflow-hidden transition-all hover:-translate-y-2 duration-300 ring-1",
             currentPlan === "creator"
               ? "ring-primary border-primary bg-primary/10"
               : "bg-white dark:bg-card border-border dark:border-input ring-border/50",
@@ -289,7 +289,7 @@ export function Pricing() {
         {/* PRO PLAN */}
         <Card
           className={cn(
-            "p-5 rounded-2xl flex flex-col relative overflow-hidden transition-all hover:-translate-y-2 duration-300",
+            "rounded-2xl flex flex-col relative overflow-hidden transition-all hover:-translate-y-2 duration-300",
             currentPlan === "pro"
               ? "border-purple-500/50 bg-purple-500/5"
               : "bg-white/50 dark:bg-card/50 border-border dark:border-input",

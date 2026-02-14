@@ -70,7 +70,7 @@ func (l *LinkedInService) GetAuthURLWithHint(state, prompt, loginHint string) st
 // Authenticate implements Platform interface
 func (l *LinkedInService) Authenticate(code string, userID int, clientID *int) error {
 	config := *l.oauthConfig
-	config.RedirectURL = fmt.Sprintf("%s/platforms/x/callback", os.Getenv("FRONTEND_URL"))
+	config.RedirectURL = fmt.Sprintf("%s/platforms/linkedin/callback", os.Getenv("FRONTEND_URL"))
 
 	// Exchange code for token
 	token, err := config.Exchange(context.Background(), code)
@@ -79,7 +79,7 @@ func (l *LinkedInService) Authenticate(code string, userID int, clientID *int) e
 	}
 
 	// Get user profile info
-	profileID, profileName, handle, err := l.getUserProfile(token.AccessToken)
+	profileID, profileName, handle, profilePic, err := l.getUserProfile(token.AccessToken)
 	if err != nil {
 		return fmt.Errorf("failed to get profile: %w", err)
 	}
@@ -109,38 +109,40 @@ func (l *LinkedInService) Authenticate(code string, userID int, clientID *int) e
 		Status:         "connected",
 		ProfileName:    profileName,
 		Handle:         handle,
+		ProfilePicture: profilePic,
 	}
 
 	return l.repo.UpsertAccount(context.Background(), account)
 }
 
 // getUserProfile retrieves the user's LinkedIn profile
-func (l *LinkedInService) getUserProfile(accessToken string) (string, string, string, error) {
+func (l *LinkedInService) getUserProfile(accessToken string) (string, string, string, string, error) {
 	req, err := http.NewRequest("GET", "https://api.linkedin.com/v2/userinfo", nil)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 	defer resp.Body.Close()
 
 	var profile struct {
-		Sub  string `json:"sub"`
-		Name string `json:"name"`
+		Sub     string `json:"sub"`
+		Name    string `json:"name"`
+		Picture string `json:"picture"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 
 	// Vanity name / handle is often not available via userinfo
 	// We'll use the sub ID as a fallback handle if empty
-	return profile.Sub, profile.Name, "", nil
+	return profile.Sub, profile.Name, "", profile.Picture, nil
 }
 
 // Upload implements Platform interface - uploads video to LinkedIn

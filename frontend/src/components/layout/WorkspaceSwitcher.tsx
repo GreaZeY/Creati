@@ -5,7 +5,7 @@ import { agencyAPI } from "@/lib/api";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { Modal } from "../ui/Modal";
-import { Briefcase, Plus } from "lucide-react";
+import { Briefcase, ChevronDown, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const WorkspaceSwitcher = () => {
@@ -67,11 +67,11 @@ const WorkspaceSwitcher = () => {
             <span className="text-sm font-bold text-foreground dark:text-white tracking-tight font-display">
               {item?.label || "Select Workspace"}
             </span>
-            <Plus
+            <ChevronDown
               size={14}
               className={cn(
                 "text-muted-foreground/40 transition-transform duration-300",
-                isOpen ? "rotate-45" : "rotate-0",
+                isOpen ? "rotate-180" : "rotate-0",
               )}
             />
           </button>

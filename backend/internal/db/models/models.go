@@ -50,18 +50,19 @@ type TeamMember struct {
 
 // PlatformAccount model
 type PlatformAccount struct {
-	ID             int       `json:"id" db:"id"`
-	UserID         int       `json:"user_id" db:"user_id"`
-	ClientID       *int      `json:"client_id,omitempty" db:"client_id"` // Nullable for personal workspace
-	Platform       string    `json:"platform" db:"platform"`
-	AccessToken    string    `json:"-" db:"access_token"`  // Encrypted, never expose
-	RefreshToken   string    `json:"-" db:"refresh_token"` // Encrypted, never expose
-	Status         string    `json:"status" db:"status"`
-	ProfileName    string    `json:"profile_name" db:"profile_name"`
-	Email          string    `json:"email" db:"email"`
-	WebhookURL     string    `json:"webhook_url,omitempty" db:"webhook_url"`
+	ID             int        `json:"id" db:"id"`
+	UserID         int        `json:"user_id" db:"user_id"`
+	ClientID       *int       `json:"client_id,omitempty" db:"client_id"` // Nullable for personal workspace
+	Platform       string     `json:"platform" db:"platform"`
+	AccessToken    string     `json:"-" db:"access_token"`  // Encrypted, never expose
+	RefreshToken   string     `json:"-" db:"refresh_token"` // Encrypted, never expose
+	Status         string     `json:"status" db:"status"`
+	ProfileName    string     `json:"profile_name" db:"profile_name"`
+	Email          string     `json:"email" db:"email"`
+	WebhookURL     string     `json:"webhook_url,omitempty" db:"webhook_url"`
 	PlatformUserID string     `json:"platform_user_id,omitempty" db:"platform_user_id"`
 	Handle         string     `json:"handle" db:"handle"`
+	ProfilePicture string     `json:"profile_picture" db:"profile_picture"`
 	ExpiresAt      *time.Time `json:"expires_at,omitempty" db:"expires_at"`
 	ConnectedAt    time.Time  `json:"connected_at" db:"connected_at"`
 }

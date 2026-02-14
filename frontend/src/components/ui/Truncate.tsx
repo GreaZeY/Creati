@@ -8,7 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 
 interface TextTruncateProps {
-  text: string;
+  text?: string;
   className?: string;
   as?: React.ElementType;
   width?: string | number;

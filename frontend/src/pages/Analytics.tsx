@@ -66,11 +66,6 @@ export const Analytics = () => {
 
   return (
     <div className="h-full overflow-y-auto space-y-8 pb-12 max-w-7xl mx-auto px-8 w-full relative z-0">
-      {/* Structural Depth - Atmospheric Blobs (v14 Parity) */}
-      <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-[var(--blob-1)] rounded-full blur-[100px] pointer-events-none mix-blend-screen dark:mix-blend-screen mix-blend-multiply z-0" />
-      <div className="absolute bottom-[-10%] left-[-10%] w-[600px] h-[600px] bg-[var(--blob-2)] rounded-full blur-[100px] pointer-events-none mix-blend-screen dark:mix-blend-screen mix-blend-multiply z-0" />
-      <div className="absolute top-[20%] left-[30%] w-[400px] h-[400px] bg-[var(--blob-3)] rounded-full blur-[80px] pointer-events-none mix-blend-screen dark:mix-blend-screen mix-blend-multiply z-0" />
-
       <PageHeader
         title="Creator Intelligence"
         description="Actionable intelligence across your entire creator footprint. Pure data, no noise."

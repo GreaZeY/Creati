@@ -20,8 +20,8 @@ func NewPlatformRepository(db *sql.DB) *PlatformRepository {
 // UpsertAccount inserts or updates a platform account
 func (r *PlatformRepository) UpsertAccount(ctx context.Context, account *models.PlatformAccount) error {
 	query := `
-		INSERT INTO platform_accounts (user_id, client_id, platform, access_token, refresh_token, platform_user_id, status, profile_name, handle, email, webhook_url, expires_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		INSERT INTO platform_accounts (user_id, client_id, platform, access_token, refresh_token, platform_user_id, status, profile_name, handle, profile_picture, email, webhook_url, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 		ON CONFLICT (user_id, platform, platform_user_id, (COALESCE(client_id, 0))) 
 		DO UPDATE SET 
 			access_token = $4, 
@@ -29,9 +29,10 @@ func (r *PlatformRepository) UpsertAccount(ctx context.Context, account *models.
 			status = $7, 
 			profile_name = $8, 
 			handle = $9,
-			email = $10,
-			webhook_url = $11,
-			expires_at = $12,
+			profile_picture = $10,
+			email = $11,
+			webhook_url = $12,
+			expires_at = $13,
 			connected_at = NOW()
 	`
 	_, err := r.db.ExecContext(ctx, query,
@@ -44,6 +45,7 @@ func (r *PlatformRepository) UpsertAccount(ctx context.Context, account *models.
 		account.Status,
 		account.ProfileName,
 		account.Handle,
+		account.ProfilePicture,
 		account.Email,
 		account.WebhookURL,
 		account.ExpiresAt,
@@ -69,6 +71,7 @@ func (r *PlatformRepository) ListAccounts(
             status,
             profile_name,
             handle,
+            profile_picture,
             email,
             expires_at
         FROM platform_accounts
@@ -108,8 +111,8 @@ func scanPlatformAccount(rows *sql.Rows) (models.PlatformAccount, error) {
 	var acc models.PlatformAccount
 
 	var (
-		clientID                   sql.NullInt64
-		profileName, handle, email sql.NullString
+		clientID                                   sql.NullInt64
+		profileName, handle, profilePicture, email sql.NullString
 	)
 
 	err := rows.Scan(
@@ -121,6 +124,7 @@ func scanPlatformAccount(rows *sql.Rows) (models.PlatformAccount, error) {
 		&acc.Status,
 		&profileName,
 		&handle,
+		&profilePicture,
 		&email,
 		&acc.ExpiresAt,
 	)
@@ -135,6 +139,7 @@ func scanPlatformAccount(rows *sql.Rows) (models.PlatformAccount, error) {
 
 	acc.ProfileName = profileName.String
 	acc.Handle = handle.String
+	acc.ProfilePicture = profilePicture.String
 	acc.Email = email.String
 
 	return acc, nil

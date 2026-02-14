@@ -6,15 +6,15 @@ import { AutomationsList } from "./AutomationsList";
 
 export function Automations() {
   return (
-    <div className="space-y-8 pb-12">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div className="h-full flex flex-col space-y-8">
+      <div className="shrink-0 flex flex-col md:flex-row md:items-end justify-between gap-4 px-24">
         <PageHeader
           title="Automations"
           description="Scale your reach without extra effort. One upload, infinite impact."
         />
 
         <div className="flex items-center gap-4">
-          <Link to={`/automations/new`}>
+          <Link to="new">
             <Button className="gap-2">
               <Plus size={18} />
               New Automation
@@ -23,7 +23,7 @@ export function Automations() {
         </div>
       </div>
 
-      <div className="animate-in fade-in duration-500">
+      <div className="flex-1 min-h-0 animate-in fade-in duration-500">
         <AutomationsList />
       </div>
     </div>

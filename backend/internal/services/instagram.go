@@ -85,7 +85,7 @@ func (i *InstagramService) Authenticate(code string, userID int, clientID *int) 
 	}
 
 	// Discover Instagram Account using graph.instagram.com
-	igUserID, username, profileName, err := i.discoverInstagramAccount(longLivedToken)
+	igUserID, username, profileName, profilePic, err := i.discoverInstagramAccount(longLivedToken)
 	status := "connected"
 
 	if err != nil {
@@ -98,6 +98,7 @@ func (i *InstagramService) Authenticate(code string, userID int, clientID *int) 
 		username = "ig_" + fbID
 		profileName = fbName + " (Action Required)"
 		status = "action_required"
+		profilePic = ""
 	}
 
 	// Encrypt tokens before storing
@@ -116,38 +117,40 @@ func (i *InstagramService) Authenticate(code string, userID int, clientID *int) 
 		Status:         status,
 		ProfileName:    profileName,
 		Handle:         username,
+		ProfilePicture: profilePic,
 	}
 
 	return i.repo.UpsertAccount(context.Background(), account)
 }
 
 // discoverInstagramAccount retrieves the IG User identity directly from graph.instagram.com
-func (i *InstagramService) discoverInstagramAccount(accessToken string) (string, string, string, error) {
-	reqURL := fmt.Sprintf("https://graph.instagram.com/v19.0/me?fields=id,username,name&access_token=%s", accessToken)
+func (i *InstagramService) discoverInstagramAccount(accessToken string) (string, string, string, string, error) {
+	reqURL := fmt.Sprintf("https://graph.instagram.com/v19.0/me?fields=id,username,name,profile_picture_url&access_token=%s", accessToken)
 	resp, err := http.Get(reqURL)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 	defer resp.Body.Close()
 
 	var result struct {
-		ID       string `json:"id"`
-		Username string `json:"username"`
-		Name     string `json:"name"`
-		Error    struct {
+		ID                string `json:"id"`
+		Username          string `json:"username"`
+		Name              string `json:"name"`
+		ProfilePictureURL string `json:"profile_picture_url"`
+		Error             struct {
 			Message string `json:"message"`
 		} `json:"error"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 
 	if result.Error.Message != "" {
-		return "", "", "", fmt.Errorf("discovery error: %s", result.Error.Message)
+		return "", "", "", "", fmt.Errorf("discovery error: %s", result.Error.Message)
 	}
 
-	return result.ID, result.Username, result.Name, nil
+	return result.ID, result.Username, result.Name, result.ProfilePictureURL, nil
 }
 
 // getIdentityProfile retrieves the basic identity as a fallback

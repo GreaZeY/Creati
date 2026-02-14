@@ -254,10 +254,14 @@ func (y *YouTubeService) Authenticate(code string, userID int, clientID *int) er
 	channelName := "Unknown Channel"
 	channelID := ""
 	handle := ""
+	profilePic := ""
 	if len(conn.Items) > 0 {
 		channelName = conn.Items[0].Snippet.Title
 		channelID = conn.Items[0].Id
 		handle = conn.Items[0].Snippet.CustomUrl
+		if conn.Items[0].Snippet.Thumbnails != nil && conn.Items[0].Snippet.Thumbnails.Default != nil {
+			profilePic = conn.Items[0].Snippet.Thumbnails.Default.Url
+		}
 	}
 
 	if channelID == "" {
@@ -298,6 +302,7 @@ func (y *YouTubeService) Authenticate(code string, userID int, clientID *int) er
 		Status:         "active",
 		ProfileName:    channelName,
 		Handle:         handle,
+		ProfilePicture: profilePic,
 		Email:          userEmail,
 		ExpiresAt:      &token.Expiry,
 	}

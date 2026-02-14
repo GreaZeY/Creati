@@ -99,7 +99,7 @@ func (t *TwitterService) Authenticate(code string, userID int, clientID *int) er
 	}
 
 	// Get user profile
-	twitterUserID, name, username, err := t.getUserProfile(token.AccessToken)
+	twitterUserID, name, username, profilePic, err := t.getUserProfile(token.AccessToken)
 	if err != nil {
 		return fmt.Errorf("failed to get profile: %w", err)
 	}
@@ -125,39 +125,41 @@ func (t *TwitterService) Authenticate(code string, userID int, clientID *int) er
 		Status:         "connected",
 		ProfileName:    name,
 		Handle:         "@" + username,
+		ProfilePicture: profilePic,
 	}
 
 	return t.repo.UpsertAccount(context.Background(), account)
 }
 
 // getUserProfile retrieves the user's Twitter profile
-func (t *TwitterService) getUserProfile(accessToken string) (string, string, string, error) {
-	req, err := http.NewRequest("GET", "https://api.twitter.com/2/users/me", nil)
+func (t *TwitterService) getUserProfile(accessToken string) (string, string, string, string, error) {
+	req, err := http.NewRequest("GET", "https://api.twitter.com/2/users/me?user.fields=profile_image_url", nil)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 	defer resp.Body.Close()
 
 	var profile struct {
 		Data struct {
-			ID       string `json:"id"`
-			Username string `json:"username"`
-			Name     string `json:"name"`
+			ID              string `json:"id"`
+			Username        string `json:"username"`
+			Name            string `json:"name"`
+			ProfileImageURL string `json:"profile_image_url"`
 		} `json:"data"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 
-	return profile.Data.ID, profile.Data.Name, profile.Data.Username, nil
+	return profile.Data.ID, profile.Data.Name, profile.Data.Username, profile.Data.ProfileImageURL, nil
 }
 
 // Upload implements Platform interface - uploads video to Twitter/X

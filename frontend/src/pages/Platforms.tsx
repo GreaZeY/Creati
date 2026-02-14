@@ -23,6 +23,7 @@ import { toast } from "@/lib/events";
 import { useEntitlement } from "@/hooks/useEntitlement";
 import { CAPABILITIES } from "@/lib/features";
 import { useClient } from "@/context/ClientContext";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 interface PlatformData {
   accountId?: number;
@@ -33,6 +34,7 @@ interface PlatformData {
   profileName?: string;
   platformUserId?: string;
   handle?: string;
+  profilePicture?: string;
 }
 
 const PLATFORM_ACCENTS: Record<string, string> = {
@@ -128,7 +130,7 @@ export const Platforms = () => {
   };
 
   return (
-    <div className="h-full overflow-y-auto space-y-6 pb-8 max-w-7xl mx-auto px-4 font-outfit w-full">
+    <div className="flex-1 overflow-y-auto space-y-8 pb-12 max-w-7xl mx-auto px-4 font-outfit w-full">
       <PageHeader
         title="My Platforms"
         description="Your connected neural pathways across the digital workspace."
@@ -159,13 +161,13 @@ export const Platforms = () => {
       </PageHeader>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {[1, 2, 3].map((i) => (
             <PlatformSkeleton key={i} />
           ))}
         </div>
       ) : platformStats.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <AnimatePresence mode="popLayout">
             {platformStats.map((platform: PlatformData, i: number) => {
               const accentClass =
@@ -186,18 +188,17 @@ export const Platforms = () => {
                   className="w-full"
                 >
                   <LensedCard
-                    key={platform.id}
                     className={cn(
-                      "p-6 relative flex flex-col gap-6 bg-white/50 dark:bg-card/40 border-0 ring-1 ring-slate-200 dark:ring-glass-border hover:ring-neon-purple/50 dark:hover:ring-neon-purple/50 hover:bg-white dark:hover:bg-card/60 transition-all duration-300 shadow-sm hover:shadow-glass group rounded-[2rem]",
+                      "p-5 relative flex flex-row items-center gap-6",
                       !platform.connected && "opacity-60",
                     )}
                   >
                     {/* Dropdown Menu - Absolute Top Right */}
-                    <div className="absolute top-4 right-4 z-20">
+                    <div className="absolute top-2 right-2 z-20">
                       <DropdownMenu
                         trigger={
-                          <button className="p-2 rounded-full text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-all">
-                            <MoreVertical size={16} />
+                          <button className="p-2.5 rounded-full text-muted-foreground/80 hover:text-foreground hover:bg-secondary/80 transition-all">
+                            <MoreVertical size={18} />
                           </button>
                         }
                       >
@@ -235,54 +236,58 @@ export const Platforms = () => {
                       </DropdownMenu>
                     </div>
 
-                    <div className="flex items-center justify-between relative z-10">
-                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-white/5 flex items-center justify-center border border-slate-200 dark:border-white/10 shadow-sm group-hover:scale-110 transition-transform duration-500">
-                          <PlatformLogo
-                            platform={platform.platform}
-                            className="w-8 h-8 opacity-80 group-hover:opacity-100"
-                          />
-                        </div>
-                        <div>
-                          <h3 className="font-black text-lg tracking-tight text-slate-900 dark:text-white capitalize leading-none">
-                            {platform.platform}
-                          </h3>
-                          <div className="flex items-center gap-2 mt-1.5">
-                            <span
-                              className={cn(
-                                "w-2 h-2 rounded-full animate-pulse",
-                                platform.connected
-                                  ? "bg-emerald-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]"
-                                  : "bg-slate-300 dark:bg-slate-600",
-                              )}
-                            />
-                            <span className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400 dark:text-muted-foreground/60">
-                              {platform.connected
-                                ? "Live Node"
-                                : "Disconnected"}
-                            </span>
-                          </div>
-                        </div>
+                    {/* Watermark Logo Background */}
+                    <div className="absolute right-[50px] top-1/2 -translate-y-1/2 h-full aspect-square opacity-30 pointer-events-none select-none">
+                      <div
+                        className={cn(
+                          "w-full h-full flex items-center justify-center relative -right-10",
+                          accentClass.split(" ")[0],
+                        )}
+                        style={{
+                          maskImage:
+                            "radial-gradient(circle, white 18%, transparent 60%)",
+                          WebkitMaskImage:
+                            "radial-gradient(circle, white 18%, transparent 60%)",
+                        }}
+                      >
+                        <PlatformLogo
+                          platform={platform.platform}
+                          size={140}
+                          className="text-current"
+                        />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 mt-auto relative z-10">
-                      <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
-                        <p className="text-[10px] font-black text-slate-400 dark:text-muted-foreground/40 uppercase tracking-widest mb-1">
-                          Account
-                        </p>
-                        <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                          {platform.profileName || platform.name}
-                        </p>
-                      </div>
-                      <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5">
-                        <p className="text-[10px] font-black text-slate-400 dark:text-muted-foreground/40 uppercase tracking-widest mb-1">
-                          Handle
-                        </p>
-                        <p className="text-sm font-bold text-neon-purple truncate">
-                          {platform.handle
-                            ? `@${platform.handle}`
-                            : "No Handle"}
+                    <div className="flex flex-1 flex-row min-w-0 gap-2 items-center relative z-10">
+                      {platform.profilePicture && (
+                        <img
+                          src={platform.profilePicture}
+                          alt="Profile Picture"
+                          width={50}
+                          // height={120}
+                          className="aspect-square rounded-full"
+                        />
+                      )}
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-lg font-bold tracking-tight uppercase truncate leading-none">
+                            {platform.profileName || platform.name}
+                          </h3>
+                          {platform.connected ? (
+                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase tracking-widest ring-1 ring-emerald-500/20">
+                              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                              Active
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 text-[9px] font-black uppercase tracking-widest ring-1 ring-amber-500/20">
+                              <AlertTriangle size={10} />
+                              Offline
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] opacity-40 mt-1">
+                          {platform.platform}{" "}
+                          {platform.handle ? `// ${platform.handle}` : ""}
                         </p>
                       </div>
                     </div>
@@ -294,9 +299,9 @@ export const Platforms = () => {
                           connectMutation.isPending &&
                           connectMutation.variables === platform.id
                         }
-                        className="mt-4 w-full h-11 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 font-black text-xs uppercase tracking-widest transition-all"
+                        className="h-10 px-6 rounded-xl bg-primary text-primary-foreground font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20 transition-all"
                       >
-                        Initialize Reconnection
+                        Reconnect
                       </Button>
                     )}
                   </LensedCard>
@@ -306,27 +311,11 @@ export const Platforms = () => {
           </AnimatePresence>
         </div>
       ) : (
-        <LensedCard className="py-16 flex flex-col items-center justify-center text-center border-dashed border-2 border-border">
-          <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-6 ring-1 ring-border transition-all duration-700">
-            <Link2 className="w-8 h-8 text-primary opacity-40" />
-          </div>
-
-          <h3 className="text-lg font-bold uppercase italic tracking-tight mb-2">
-            Ecosystem Standby
-          </h3>
-          <p className="text-muted-foreground mt-2 max-w-sm text-sm font-medium opacity-60">
-            Your distribution network is waiting for its first node. Connect a
-            platform to begin the blast.
-          </p>
-
-          <Button
-            asChild
-            size="lg"
-            className="mt-8 h-10 px-7 rounded-lg bg-primary text-primary-foreground font-bold text-sm transition-all"
-          >
-            <Link to="/platforms/connect">AUTH FIRST NODE</Link>
-          </Button>
-        </LensedCard>
+        <EmptyState
+          icon={Link2}
+          title="No Platforms Connected"
+          description="Connect a platform to begin the blast."
+        />
       )}
 
       <ConfirmDialog
@@ -355,11 +344,11 @@ export const Platforms = () => {
 
 const PlatformSkeleton = () => {
   return (
-    <LensedCard className="p-4 h-[100px] flex items-center gap-4">
-      <Skeleton className="w-16 h-16 rounded-xl bg-muted/50" />
-      <div className="flex-1 space-y-2">
-        <Skeleton className="h-6 w-2/3 rounded-lg bg-muted/50" />
-        <Skeleton className="h-3 w-1/3 rounded-md bg-muted/50 opacity-50" />
+    <LensedCard className="p-8 h-[140px] flex items-center gap-8">
+      <Skeleton className="w-20 h-20 rounded-2xl bg-muted/50" />
+      <div className="flex-1 space-y-4">
+        <Skeleton className="h-8 w-2/3 rounded-xl bg-muted/50" />
+        <Skeleton className="h-4 w-1/3 rounded-lg bg-muted/50 opacity-50" />
       </div>
     </LensedCard>
   );

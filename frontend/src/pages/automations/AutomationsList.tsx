@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { Zap, Bell, Pause, Play, Trash2, ArrowRight } from "lucide-react";
 import { automationAPI } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useClient } from "@/context/ClientContext";
 import { Modal } from "@/components/ui/Modal";
 import { TemplateEditor } from "@/components/automation/TemplateEditor";
+import { VirtualList } from "@/components/ui/VirtualList";
 
 export function AutomationsList() {
   const queryClient = useQueryClient();
@@ -92,152 +93,156 @@ export function AutomationsList() {
     return (
       <EmptyState
         icon={Zap}
-        title="NO AUTOMATIONS YET"
+        title="No Automations Yet"
         description="Sync uploads or send announcements automatically."
-        actionLabel="GET STARTED"
-        actionLink="/automations/new"
+        actionLabel="Get Started"
+        actionLink="new"
       />
     );
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4">
-      <AnimatePresence mode="popLayout">
-        {rules.map((rule: any) => (
-          <motion.div
-            key={rule.id}
-            layout
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-          >
-            <Card
-              className={cn(
-                "group relative p-6 transition-all duration-300 overflow-hidden",
-                !rule.isActive && "opacity-60 grayscale-[0.4]",
-              )}
+    <div className="h-full px-24 overflow-y-auto scrollbar-subtle">
+      <VirtualList
+        items={rules}
+        estimateSize={140}
+        overscan={10}
+        renderItem={(rule) => (
+          <div className="px-1 py-2">
+            <motion.div
+              layout
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
             >
-              <div className="flex flex-col md:flex-row md:items-center gap-6">
-                <div className="relative">
-                  <div
-                    className={cn(
-                      "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-                      rule.isActive
-                        ? "bg-primary/10 text-primary"
-                        : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    {rule.action === "sync" ? (
-                      <Zap
-                        size={24}
-                        fill={rule.isActive ? "currentColor" : "none"}
-                      />
-                    ) : (
-                      <Bell
-                        size={24}
-                        fill={rule.isActive ? "currentColor" : "none"}
-                      />
-                    )}
-                  </div>
-                  {rule.isActive && (
-                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full ring-2 ring-white dark:ring-background animate-pulse" />
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-lg truncate">
-                      {rule.name}
-                    </h3>
-                    <span
+              <Card
+                className={cn(
+                  "group relative p-2 transition-all duration-300 overflow-hidden",
+                  !rule.isActive && "opacity-60 grayscale-[0.4]",
+                )}
+              >
+                <div className="flex flex-col md:flex-row md:items-center gap-6">
+                  <div className="relative">
+                    <div
                       className={cn(
-                        "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                        "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors",
                         rule.isActive
-                          ? "bg-emerald-500/10 text-emerald-500"
+                          ? "bg-primary/10 text-primary"
                           : "bg-muted text-muted-foreground",
                       )}
                     >
-                      {rule.isActive ? "Active" : "Paused"}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-secondary text-secondary-foreground">
-                      {rule.action === "sync" ? "Sync" : "Announcement"}
-                    </span>
+                      {rule.action === "sync" ? (
+                        <Zap
+                          size={24}
+                          fill={rule.isActive ? "currentColor" : "none"}
+                        />
+                      ) : (
+                        <Bell
+                          size={24}
+                          fill={rule.isActive ? "currentColor" : "none"}
+                        />
+                      )}
+                    </div>
+                    {rule.isActive && (
+                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full ring-2 ring-white dark:ring-background animate-pulse" />
+                    )}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-y-2 gap-x-3 mt-3 text-sm">
-                    <div className="flex items-center gap-2 bg-secondary/50 dark:bg-secondary/30 px-3 py-1 rounded-lg border border-border/20">
-                      <PlatformLogo
-                        platform={rule.sourceAccount?.platform || "youtube"}
-                        size={14}
-                        className="text-primary"
-                      />
-                      <span className="text-xs font-semibold uppercase tracking-wider text-foreground dark:text-white">
-                        {rule.sourceAccount?.profileName ||
-                          rule.sourceAccount?.platform}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-sm truncate">
+                        {rule.name}
+                      </h3>
+                      <span
+                        className={cn(
+                          "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                          rule.isActive
+                            ? "bg-emerald-500/10 text-emerald-500"
+                            : "bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {rule.isActive ? "Active" : "Paused"}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-secondary text-secondary-foreground">
+                        {rule.action === "sync" ? "Sync" : "Announcement"}
                       </span>
                     </div>
 
-                    <ArrowRight size={16} className="text-muted-foreground" />
+                    <div className="flex flex-wrap items-center gap-y-2 gap-x-3 mt-3 text-sm">
+                      <div className="flex items-center gap-2 bg-secondary/50 dark:bg-secondary/30 px-3 py-1 rounded-lg border border-border/20">
+                        <PlatformLogo
+                          platform={rule.sourceAccount?.platform || "youtube"}
+                          size={14}
+                          className="text-primary"
+                        />
+                        <span className="text-xs font-semibold uppercase tracking-wider text-foreground dark:text-white">
+                          {rule.sourceAccount?.profileName ||
+                            rule.sourceAccount?.platform}
+                        </span>
+                      </div>
 
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {rule.targets?.map((target: any) => (
-                        <div
-                          key={target.accountId}
-                          className="flex items-center gap-1.5"
-                        >
-                          <div className="flex items-center gap-1.5 bg-secondary/50 dark:bg-secondary/30 px-3 py-1 rounded-lg border border-border/20 text-foreground dark:text-muted-foreground">
-                            <PlatformLogo
-                              platform={target?.platform}
-                              size={14}
-                              className="text-muted-foreground"
-                            />
-                            <span className="text-xs font-medium truncate max-w-[120px]">
-                              {target?.profileName ||
-                                target?.handle ||
-                                target?.platform}
-                            </span>
+                      <ArrowRight size={16} className="text-muted-foreground" />
+
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {rule.targets?.map((target: any) => (
+                          <div
+                            key={target.accountId}
+                            className="flex items-center gap-1.5"
+                          >
+                            <div className="flex items-center gap-1.5 bg-secondary/50 dark:bg-secondary/30 px-3 py-1 rounded-lg border border-border/20 text-foreground dark:text-muted-foreground">
+                              <PlatformLogo
+                                platform={target?.platform}
+                                size={14}
+                                className="text-muted-foreground"
+                              />
+                              <span className="text-xs font-medium truncate max-w-[120px]">
+                                {target?.profileName ||
+                                  target?.handle ||
+                                  target?.platform}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    className="h-9 px-3"
-                    onClick={() =>
-                      toggleMutation.mutate({
-                        id: rule.id,
-                        isActive: rule.isActive,
-                      })
-                    }
-                  >
-                    {rule.isActive ? (
-                      <>
-                        <Pause size={16} className="mr-2" /> Pause
-                      </>
-                    ) : (
-                      <>
-                        <Play size={16} className="mr-2" /> Resume
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={() =>
+                        toggleMutation.mutate({
+                          id: rule.id,
+                          isActive: rule.isActive,
+                        })
+                      }
+                    >
+                      {rule.isActive ? (
+                        <>
+                          <Pause size={16} className="mr-2" /> Pause
+                        </>
+                      ) : (
+                        <>
+                          <Play size={16} className="mr-2" /> Resume
+                        </>
+                      )}
+                    </Button>
 
-                  <button
-                    onClick={() => setRuleToDelete(rule.id)}
-                    className="p-2 text-muted-foreground hover:text-destructive transition-colors rounded-lg hover:bg-destructive/5"
-                  >
-                    <Trash2 size={20} />
-                  </button>
+                    <button
+                      onClick={() => setRuleToDelete(rule.id)}
+                      className="p-2 text-muted-foreground hover:text-destructive transition-colors rounded-lg hover:bg-destructive/5"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          </motion.div>
-        ))}
-      </AnimatePresence>
+              </Card>
+            </motion.div>
+          </div>
+        )}
+      />
 
       <Modal
         isOpen={!!editingTemplate}

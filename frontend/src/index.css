@@ -39,7 +39,7 @@
     --radius: 0.75rem;
 
     /* v14 Specific Effects */
-    --glass-opacity: 0.75;
+    --glass-opacity: 0.4;
     --glass-border: rgba(255, 255, 255, 0.8);
     --glass-blur: 20px;
     --inner-glow: rgba(255, 255, 255, 0.8);
@@ -214,25 +214,25 @@
 
 /* Custom Scrollbar & Layout Stability */
 html {
-  scrollbar-gutter: stable;
+  /* scrollbar-gutter: stable; */
   scroll-behavior: smooth;
 }
 
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+
+/* Subtle Scrollbar - Visible only on hover */
+*::-webkit-scrollbar {
+  width: 8px;
 }
 
-::-webkit-scrollbar-track {
+*::-webkit-scrollbar-thumb {
   background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted) / 0.5);
   border-radius: 9999px;
-  border: 2px solid hsl(var(--background));
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted));
+*::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted) / 0.4);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted) / 0.8) !important;
 }

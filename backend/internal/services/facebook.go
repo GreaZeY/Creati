@@ -87,10 +87,16 @@ func (f *FacebookService) Authenticate(code string, userID int, clientID *int) e
 		longLivedToken = token.AccessToken
 	}
 
-	// Get user's Facebook Page info
-	pageID, pageName, pageToken, username, err := f.getPageInfo(longLivedToken)
+	// Get user's Facebook Page info (picture included)
+	pageID, pageName, pageToken, username, profilePic, err := f.getPageInfo(longLivedToken)
 	if err != nil {
 		return fmt.Errorf("failed to get page info: %w", err)
+	}
+
+	// Handle fallback if username is missing
+	finalHandle := username
+	if finalHandle == "" {
+		finalHandle = pageID // Fallback to Page ID if no username
 	}
 
 	// Encrypt tokens before storing
@@ -113,7 +119,8 @@ func (f *FacebookService) Authenticate(code string, userID int, clientID *int) e
 		PlatformUserID: pageID,
 		Status:         "connected",
 		ProfileName:    pageName,
-		Handle:         username,
+		Handle:         finalHandle,
+		ProfilePicture: profilePic,
 	}
 
 	return f.repo.UpsertAccount(context.Background(), account)
@@ -146,11 +153,11 @@ func (f *FacebookService) exchangeForLongLivedToken(shortLivedToken string) (str
 }
 
 // getPageInfo retrieves the user's Facebook Page
-func (f *FacebookService) getPageInfo(accessToken string) (string, string, string, string, error) {
-	pagesURL := fmt.Sprintf("https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,username&access_token=%s", accessToken)
+func (f *FacebookService) getPageInfo(accessToken string) (string, string, string, string, string, error) {
+	pagesURL := fmt.Sprintf("https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,username,picture{url}&access_token=%s", accessToken)
 	resp, err := http.Get(pagesURL)
 	if err != nil {
-		return "", "", "", "", err
+		return "", "", "", "", "", err
 	}
 	defer resp.Body.Close()
 
@@ -160,20 +167,25 @@ func (f *FacebookService) getPageInfo(accessToken string) (string, string, strin
 			Name        string `json:"name"`
 			AccessToken string `json:"access_token"`
 			Username    string `json:"username"`
+			Picture     struct {
+				Data struct {
+					URL string `json:"url"`
+				} `json:"data"`
+			} `json:"picture"`
 		} `json:"data"`
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&pagesResult); err != nil {
-		return "", "", "", "", err
+		return "", "", "", "", "", err
 	}
 
 	if len(pagesResult.Data) == 0 {
-		return "", "", "", "", fmt.Errorf("no Facebook Pages found. Please create a Facebook Page first")
+		return "", "", "", "", "", fmt.Errorf("no Facebook Pages found. Please create a Facebook Page first")
 	}
 
 	// Return first page info
 	page := pagesResult.Data[0]
-	return page.ID, page.Name, page.AccessToken, page.Username, nil
+	return page.ID, page.Name, page.AccessToken, page.Username, page.Picture.Data.URL, nil
 }
 
 // Upload implements Platform interface - uploads video to Facebook Page

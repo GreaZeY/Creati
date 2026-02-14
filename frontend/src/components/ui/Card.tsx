@@ -23,7 +23,7 @@ export const Card: React.FC<CardProps> = ({
     <motion.div
       whileHover={hover ? { y: -4, borderColor: "rgba(255,255,255,0.2)" } : {}}
       className={`
-                relative rounded-[32px] overflow-hidden glass-panel p-6
+                relative rounded-md overflow-hidden glass-panel p-2
                 transition-colors duration-500 shadow-glass group/card
                 ${className}
             `}

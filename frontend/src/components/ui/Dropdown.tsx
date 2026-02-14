@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronsUpDown, Check, Search } from "lucide-react";
+import { Check, Search, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Popper } from "./Popper";
 import { Button } from "./Button";
@@ -120,9 +120,12 @@ export function Dropdown<T = any>({
           className="text-xs font-bold tracking-tight"
         />
       </div>
-      <ChevronsUpDown
+      <ChevronDown
         size={14}
-        className="opacity-40 group-hover:opacity-100 transition-opacity"
+        className={cn(
+          "text-muted-foreground/40 transition-transform duration-300",
+          isOpen ? "rotate-180" : "rotate-0",
+        )}
       />
     </button>
   );

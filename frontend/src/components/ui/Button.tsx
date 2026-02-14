@@ -51,6 +51,7 @@ export interface ButtonProps
   loadingText?: string;
   successText?: string;
   errorText?: string;
+  sheen?: boolean;
 }
 
 // Custom forwardRef for motion button
@@ -68,6 +69,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       successText = "Done",
       errorText = "Try again",
       children,
+      sheen = false,
       ...props
     },
     ref,
@@ -196,7 +198,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         </span>
 
         {/* Premium Sheen Animation */}
-        {!isLoading &&
+        {sheen &&
+          !isLoading &&
           !isSuccess &&
           !isError &&
           variant !== "ghost" &&

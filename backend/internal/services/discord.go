@@ -133,6 +133,12 @@ func (d *DiscordService) Authenticate(code string, userID int, clientID *int) er
 		return fmt.Errorf("failed to encrypt refresh token: %w", err)
 	}
 
+	// Construct Discord Avatar URL
+	profilePic := ""
+	if user.Avatar != "" {
+		profilePic = fmt.Sprintf("https://cdn.discordapp.com/avatars/%s/%s.png", user.ID, user.Avatar)
+	}
+
 	// Use Repository to persist account
 	account := &models.PlatformAccount{
 		UserID:         userID,
@@ -144,6 +150,7 @@ func (d *DiscordService) Authenticate(code string, userID int, clientID *int) er
 		Status:         "connected",
 		ProfileName:    profileName,
 		Handle:         handle,
+		ProfilePicture: profilePic,
 		Email:          user.Email,
 		WebhookURL:     webhookURL,
 	}
@@ -167,7 +174,7 @@ func (d *DiscordService) Upload(video *models.Video, accountID int) (string, err
 			"content": fmt.Sprintf("**%s**\n%s", video.Title, video.Description),
 		}
 		payloadJSON, _ := json.Marshal(payload)
-		
+
 		resp, err := http.Post(webhookURL, "application/json", bytes.NewBuffer(payloadJSON))
 		if err != nil {
 			return "", fmt.Errorf("failed to send text-only message to discord: %w", err)
