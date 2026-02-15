@@ -236,3 +236,32 @@ html {
 *::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted) / 0.8) !important;
 }
+
+/* Slider Thumbs - Added for Video Editor */
+@layer components {
+  .slider-thumb-solid::-webkit-slider-thumb {
+    pointer-events: auto;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: white;
+    cursor: pointer;
+    -webkit-appearance: none;
+    margin-top: -6px;
+    box-shadow: 0 0 4px rgba(0,0,0,0.3);
+    position: relative;
+    z-index: 30;
+  }
+  .slider-thumb-solid::-moz-range-thumb {
+    pointer-events: auto;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: white;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 0 4px rgba(0,0,0,0.3);
+    position: relative;
+    z-index: 30;
+  }
+}

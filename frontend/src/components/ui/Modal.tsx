@@ -3,14 +3,23 @@ import { X } from "lucide-react";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
+import { cn } from "@/lib/utils";
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  className?: string;
 }
 
-export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
+export const Modal = ({
+  isOpen,
+  onClose,
+  title,
+  children,
+  className,
+}: ModalProps) => {
   // Prevent scrolling when modal is open
   useEffect(() => {
     if (isOpen) {
@@ -41,7 +50,10 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl overflow-hidden font-outfit"
+            className={cn(
+              "relative w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl overflow-hidden font-outfit",
+              className,
+            )}
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-white/5">
