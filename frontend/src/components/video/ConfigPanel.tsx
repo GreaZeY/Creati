@@ -363,15 +363,16 @@ export function ConfigPanel({
             {(selected.type === "image" || selected.type === "sticker") && (
               <div>
                 <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">
-                  Scale: {selected.width}%
+                  Scale: {selected.width.toFixed(2)}%
                 </label>
                 <input
                   type="range"
                   min={5}
                   max={80}
+                  step={0.5}
                   value={selected.width}
                   onChange={(e) => {
-                    const val = parseInt(e.target.value);
+                    const val = parseFloat(e.target.value);
                     onUpdateOverlay(selected.id, {
                       width: val,
                       height: val,

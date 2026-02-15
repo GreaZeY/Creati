@@ -182,9 +182,30 @@ Every DB call, external API call, worker dispatch, and Redis operation **MUST** 
 
 - **Size Limit**: No component should exceed 300 lines. If it does, break it down into sub-components or hooks.
 - **Layer Separation**: Separate UI (JSX), logic (Custom Hooks), and data fetching (React Query).
-- **Library-First Design**: Design complex features (like the `VideoEditor`) as self-contained modules/libraries with clear interfaces, prioritizing composition over props explosion.
+- **Reusable logic**
+  - If logic is reusable across multiple components, it **must be placed in the designated reusable directory** (e.g., `shared/`, `utils/`, `hooks/`, etc.).
+  - Do not duplicate reusable logic inside view components.
 
----
+2. **View-specific logic**
+   - Even if the logic is **not reusable**, it **must still be extracted into a custom hook**.
+   - This hook should live alongside the component (e.g., in the same folder).
+   - Purpose: maintain separation of concerns and reduce file length/complexity.
+
+3. **Separation principle**
+   - View components should focus strictly on:
+     - Rendering (JSX/template)
+     - Layout
+     - UI composition
+
+   - All business logic, state management, and side effects must be handled in hooks.
+
+4. **Goal**
+   - Keep component files clean and readable.
+   - Reduce lines of code inside view files.
+   - Improve maintainability and testability.
+   - Enforce consistent architectural structure.
+
+- **Library-First Design**: Design complex features as self-contained modules/libraries with clear interfaces, prioritizing composition over props explosion.
 
 ## 3.2 TypeScript Standards
 
