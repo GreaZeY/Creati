@@ -245,9 +245,9 @@ export const Platforms = () => {
                         )}
                         style={{
                           maskImage:
-                            "radial-gradient(circle, white 18%, transparent 60%)",
+                            "radial-gradient(circle at center, black 0%, black 35%, transparent 100%)",
                           WebkitMaskImage:
-                            "radial-gradient(circle, white 18%, transparent 60%)",
+                            "radial-gradient(circle at center, black 0%, black 35%, transparent 100%)",
                         }}
                       >
                         <PlatformLogo

@@ -2,52 +2,41 @@
 trigger: always_on
 ---
 
-# GLOBAL ENGINEERING RULES (Permanent System Contract)
+# 🤖 GLOBAL ENGINEERING RULES & AI AGENT GUIDELINES (Creati Project)
+
+This document serves as the **Permanent System Contract** for all development within the Creati ecosystem. It combines global engineering excellence with project-specific architectural standards.
+
+---
 
 ## 1. Core Development Philosophy
 
 - **Think Before Coding**: Never jump straight into implementation. Analyze existing architecture and abstractions first.
 - **Zero Duplication (DRY)**: Absolutely no copy-paste logic. Extract, generalize, and extend existing code. Prefer **composition over duplication**.
-- **SOLID Methodology**:
-  - **S**ingle Responsibility: One reason to change.
-  - **O**pen for extension, closed for modification.
-  - **L**iskov substitution: No surprises in derived logic.
-  - **I**nterface segregation: Small, focused interfaces.
-  - **D**ependency inversion: Depend on abstractions.
-- **Search-First**: Always search for existing utilities/helpers before creating new ones.
-- **Framework-First Design**: Always design features as a framework or library whenever possible. Never repeat code; build reusable primitives that can be extended.
-- **Scalability First**: Design for 10,000+ concurrent users from day one. Assume horizontal scaling and high traffic.
+- **SOLID Methodology**: Implement Single Responsibility (S), Open/Closed (O), Liskov Substitution (L), Interface Segregation (I), and Dependency Inversion (D).
+- **Search-First**: Always search for existing utilities, components, or services (e.g., the `Platform` interface) before creating new ones.
+- **Framework-First Design**: Design features as a framework or library whenever possible. Build reusable primitives that can be extended.
+- **Scalability First**: Design for **10,000+ concurrent users** from day one. Assume horizontal scaling and high traffic.
 
 ---
 
-## ⚙️ BACKEND RULES (Go & Node.js)
+## ⚙️ BACKEND RULES (Go & Hexagonal Architecture)
 
-### Architecture
+### Architecture Patterns
 
-- Use **Clean/Hexagonal Architecture** patterns.
-- **Mandatory Layers**:
-  - `/domain`: Business entities and logic.
-  - `/application`: Use cases and orchestration.
-  - `/infrastructure`: Adapters, DB, and external service clients.
-  - `/interfaces`: Controllers, Handlers, and API definitions.
+Follow the established layer structure in `backend/internal/`:
 
-### Business Logic
+- **`/api` (Interfaces)**: HTTP transport layer (routers, handlers). Orchestration only; no business logic.
+- **`/services` (Application)**: Business logic layer. Must be stateless and inject dependencies.
+- **`/db/repositories` (Infrastructure)**: Adapters for data access. Handles SQL and mapping.
+- **`/db/models` (Domain)**: Business entities and logic.
+- **`/workers`**: CPU-heavy or long-running work (video processing/bulk uploads) MUST be offloaded here.
+
+### Business Logic & Concurrency
 
 - Business logic **never** lives in Controllers, Handlers, or DB queries.
-- Controllers are for orchestration and transport only.
-- Services must be **stateless** and inject dependencies.
-
-### Concurrency & Go
-
-- Use **Context** (`context.Context`) for all DB and network calls.
-- Utilize worker pools for concurrency; control goroutine lifecycles.
-- No global state.
-
-### Node.js (TypeScript)
-
-- Type safety is mandatory.
-- Async/await only (no raw promises).
-- CPU-heavy work must be offloaded to workers or separate services.
+- **Context Management**: Use `context.Context` for all DB and network calls to handle timeouts/cancellations.
+- **Error Handling**: Use `fmt.Errorf("context: %w", err)` for meaningful traces.
+- **No Global State**: Ensure services are stateless.
 
 ---
 
@@ -57,18 +46,13 @@ trigger: always_on
 
 - **Normalize by default**. Denormalize only with measured justification.
 - **Explicit Constraints**: Use PKs, FKs, and Unique constraints rigorously.
-- **No `SELECT *`**: Always limit result sets and use pagination for lists.
-- **Avoid N+1 queries** at all costs.
+- **No `SELECT *`**: Always specify columns. Use pagination for all lists.
+- **Avoid N+1 queries** at all costs. Use batching or JOINs.
 
-### Indexing
+### Indexing & Load Strategy
 
 - Every query path must be indexed based on `WHERE`, `JOIN`, and `ORDER BY` usage.
 - Use **GIN/B-Tree** appropriately for JSONB data.
-
-### Heavy Load Strategy
-
-- Use **Read Replicas** for scaling reads.
-- Connection pooling and query timeouts are mandatory.
 - **Transactions**: Keep them short; never mix business logic inside.
 
 ---
@@ -77,85 +61,68 @@ trigger: always_on
 
 ### Architecture & Components
 
-- **Feature-based folder structure**.
-- **Small, Focused Components**: One responsibility per component. Never dump everything in one single component/file.
-- **Decoupled Logic**: Business logic and UI must never be tightly coupled.
+- **Feature-based folder structure**: Group related logic within `frontend/src/components`.
+- **Small, Focused Components**: One responsibility per component. Never dump everything in one single component/file. Use atomic UI patterns in `/components/ui`.
+- **Decoupled Logic**: Business logic and UI must never be tightly coupled. Extract transitions and API calls into custom hooks or services.
 - Prefer **composition over props explosion**.
-- **Modern Patterns**: Always use the latest and most standard-compliant patterns of TypeScript, JavaScript, and React.
+- **Modern Patterns**: Always use the latest and most standard-compliant patterns of TypeScript and React 19.
 
 ### State & Logic
 
-- **Local state by default**. Lift state only when truly needed.
+- **Local state by default**: Lift state only when truly needed.
 - **Hooks & Services**: Extract logic, API calls, and transitions into custom Hooks (`src/hooks`) or Utility Services (`src/lib`).
 - **Main Thread Preservation**: Long-running or CPU-heavy logic must never block the main thread. Offload to workers or optimize.
-- **Normalized Server Data**: Cache server state and handle loading/error/retry states gracefully.
+- **Normalized Server Data**: Cache server state using `@tanstack/react-query` and handle loading/error/retry states gracefully.
 
-### UI & UX
+### UI & UX (Cyber-Premium)
 
-- Maintain the Project's UI/UX design and aesthetic defined.
-- **Standard Sizing**: Use consistent, standard sizing tokens for text, padding, borders, and margins.
-- Adopt the project's **existing styling patterns** (e.g., Tailwind, CSS-in-JS, or Vanilla CSS).
-- **Keyboard Navigation**: All interactive elements (inputs, menus, buttons) must be fully keyboard navigable.
-- Prioritize **Accessibility (ARIA)** and semantic HTML.
-- Implement **Optimistic UI** where safe.
+- **Glassmorphism**: Use the `.glass-panel` and `shadow-glass` tokens from `index.css`.
+- **Standard Sizing**: Use consistent, standard sizing tokens. Sidebar/Header height is `3.5rem` (56px).
+- **Accessibility (ARIA)**: Prioritize semantic HTML and ARIA labels. Ensure all interactive elements are fully keyboard navigable.
+- **Performance**: Use `DataTable` or `VirtualList` (powered by `@tanstack/react-virtual`) for large datasets.
+- **Optimistic UI**: Implement optimistic updates where safe to enhance perceived speed.
 
 ---
 
-## 🔒 SECURITY RULES (Critical - Non-Negotiable)
+## 🔒 SECURITY RULES (Non-Negotiable)
 
-### Authentication & Authorization
+### Auth & Data Protection
 
-- **Never** trust client-side data. Always validate and sanitize on the server.
-- Use **JWT** or session-based authentication with short expiration times.
-- Implement **role-based access control (RBAC)** for all protected resources.
-- Verify user permissions at the **service layer**, not just at the API layer.
-- Use **HTTP-only, Secure, SameSite cookies** for session management.
+- **Zero Trust**: Always validate and sanitize client-side data on the server.
+- **JWT**: Use for authentication with short expiration. Use HTTP-only, Secure, SameSite cookies.
+- **Hashing**: Use **bcrypt** or **Argon2** for passwords.
+- **Encryption**: Encrypt sensitive data (tokens) at rest and in transit.
 
-### Data Protection
+### API & External Integrations
 
-- **Encrypt** all sensitive data (tokens, passwords, personal information) at rest and in transit.
-- Use **bcrypt** or **Argon2** for password hashing (never store plain-text passwords).
-- Implement **rate limiting** on all public endpoints to prevent abuse.
-- **Never log** sensitive information (passwords, tokens, credit cards).
-- Use **parameterized queries** or ORMs to prevent SQL injection.
+- **Rate Limiting**: Implement on all public endpoints.
+- **Validation**: Validate all inputs (length, type, format) before processing.
+- **Secrets**: NEVER expose API keys in code or logs. Use environment variables via `os.Getenv`.
+- **Webhook Security**: Validate payloads and use signature verification.
 
-### API Security
+---
 
-- Validate **all inputs** (type, length, format) before processing.
-- Implement **CORS** with strict origin whitelisting.
-- Use **HTTPS** everywhere in production.
-- Set appropriate **security headers** (CSP, X-Frame-Options, X-Content-Type-Options).
-- Implement **CSRF protection** for state-changing operations.
+## �️ CLI & DEVOPS
 
-### External Integrations
-
-- **Never expose** API keys, secrets, or credentials in code or logs.
-- Use **environment variables** for all sensitive configuration.
-- Implement **OAuth 2.0** for third-party integrations with proper scope management.
-- Validate and sanitize **webhook payloads** before processing.
-- Use **signature verification** for webhooks (HMAC, JWT).
-
-### Frontend Security
-
-- **Sanitize** all user-generated content before rendering (prevent XSS).
-- Use **Content Security Policy (CSP)** to prevent script injection.
-- Never store **sensitive data** in localStorage or sessionStorage.
-- Implement **secure redirect** handling (validate URLs before redirecting).
-- Use **DOMPurify** or similar for rendering untrusted HTML.
-
-### Error Handling
-
-- **Never expose** internal errors, stack traces, or system details to clients.
-- Log errors with **correlation IDs** for debugging without exposing sensitive info.
-- Return **generic error messages** to users while logging detailed errors internally.
-- Implement **circuit breakers** for external service calls.
+- **The `creati` Tool**: AI agents should use the CLI (`creati start`, `creati doctor`, `creati migrate`) for orchestration and environment health.
+- **Smart Rebuilds**: Ensure `creati self-update` is called after modifying CLI source code.
 
 ---
 
 ## 🤖 AI OPERATING INSTRUCTIONS
 
 - **Phase-Based Workflow**: Always: **Research -> Planning -> Implementation -> Verification**.
-- **Least Code Possible**: Minimize codebase bloat by using existing sub-logic.
+- **Least Code Possible**: Minimize codebase bloat by using existing sub-logic and patterns.
 - **Documentation First**: Update `task.md` and Implementation Plans before making changes.
 - **Production-Ready Assets**: Generate real UI assets (images/icons) using tools; no placeholders.
-- Never use emoji and anything that makes obvious that app was built using AI
+- **Standard Output**: Never use emojis or language that identifies the app as AI-built.
+
+---
+
+## ⚖️ Scalability Checklist
+
+- [ ] Is this query indexed and free of N+1?
+- [ ] Is the frontend list virtualized?
+- [ ] Is heavy work offloaded to a worker pool?
+- [ ] Are external API calls context-aware with timeouts?
+- [ ] Does the UI maintain "Cyber-Premium" design parity?
