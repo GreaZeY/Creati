@@ -1,10 +1,11 @@
-import Moveable from "react-moveable";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Play, Pause, Check } from "lucide-react";
 import { TrimSlider } from "./TrimSlider";
 import { ConfigPanel } from "./ConfigPanel";
 import { useVideoEditor } from "./useVideoEditor";
+import { MoveableController } from "./MoveableController";
+import { OverlayElement } from "./OverlayElement";
 
 export interface OverlayItem {
   id: string;
@@ -154,161 +155,9 @@ export function VideoEditorModal({
           onAddImage={editor.addImage}
           onUpdateOverlay={editor.updateOverlay}
           onDeleteOverlay={editor.deleteOverlay}
+          onSelectOverlay={editor.selectOverlay}
         />
       </div>
     </Modal>
-  );
-}
-
-// ── Sub-components ──
-
-function OverlayElement({
-  overlay: ov,
-  isSelected,
-  containerSize,
-  pctToPx,
-  onSelect,
-}: {
-  overlay: OverlayItem;
-  isSelected: boolean;
-  containerSize: { width: number; height: number };
-  pctToPx: (pct: number, dim: number) => number;
-  onSelect: (id: string) => void;
-}) {
-  const hasExplicitSize = ov.type === "sticker" || ov.type === "image";
-
-  return (
-    <div
-      id={`overlay-${ov.id}`}
-      className={`absolute cursor-move ${isSelected ? "outline outline-2 outline-primary outline-offset-2" : ""}`}
-      style={{
-        left: `${pctToPx(ov.x, containerSize.width)}px`,
-        top: `${pctToPx(ov.y, containerSize.height)}px`,
-        transform: `rotate(${ov.rotation}deg)`,
-        userSelect: "none",
-        ...(hasExplicitSize
-          ? {
-              width: `${Math.max(40, (ov.width / 100) * containerSize.width)}px`,
-              height: `${Math.max(40, (ov.height / 100) * containerSize.height)}px`,
-              containerType: "inline-size" as any,
-            }
-          : {}),
-      }}
-      onPointerDown={(e) => {
-        e.stopPropagation();
-        onSelect(ov.id);
-      }}
-    >
-      {ov.type === "text" && (
-        <div
-          className="px-3 py-1.5 whitespace-nowrap font-bold drop-shadow-lg"
-          style={{
-            fontSize: `${ov.fontSize || 24}px`,
-            color: ov.fontColor,
-            backgroundColor: ov.bgColor,
-            fontFamily: ov.fontFamily,
-            borderRadius: ov.bgColor !== "transparent" ? "6px" : undefined,
-            textShadow:
-              ov.bgColor === "transparent"
-                ? "0 2px 8px rgba(0,0,0,0.8)"
-                : undefined,
-          }}
-        >
-          {ov.text || "Text"}
-        </div>
-      )}
-
-      {ov.type === "sticker" && (
-        <div
-          className="w-full h-full flex items-center justify-center select-none"
-          style={{ fontSize: "70cqi", lineHeight: 1 }}
-        >
-          {ov.src}
-        </div>
-      )}
-
-      {ov.type === "image" && ov.src && (
-        <img
-          src={ov.src}
-          alt="overlay"
-          className="w-full h-full rounded-md pointer-events-none"
-          style={{ objectFit: "contain" }}
-          draggable={false}
-        />
-      )}
-    </div>
-  );
-}
-
-function MoveableController({
-  moveableRef,
-  target,
-  container,
-  containerSize,
-  selectedId,
-  onUpdate,
-}: {
-  moveableRef: React.RefObject<Moveable | null>;
-  target: HTMLElement;
-  container: HTMLElement | null;
-  containerSize: { width: number; height: number };
-  selectedId: string;
-  onUpdate: (id: string, updates: Partial<OverlayItem>) => void;
-}) {
-  return (
-    <Moveable
-      ref={moveableRef}
-      target={target}
-      container={container}
-      draggable
-      resizable
-      rotatable
-      throttleDrag={1}
-      throttleResize={1}
-      throttleRotate={1}
-      renderDirections={["nw", "ne", "sw", "se"]}
-      rotationPosition="top"
-      origin={false}
-      padding={{ left: 0, top: 0, right: 0, bottom: 0 }}
-      onDrag={({ target: t, left, top }) => {
-        t.style.left = `${left}px`;
-        t.style.top = `${top}px`;
-      }}
-      onDragEnd={({ target: t }) => {
-        if (!containerSize.width) return;
-        onUpdate(selectedId, {
-          x: ((parseFloat(t.style.left) || 0) / containerSize.width) * 100,
-          y: ((parseFloat(t.style.top) || 0) / containerSize.height) * 100,
-        });
-      }}
-      onResize={({ target: t, width, height, drag }) => {
-        t.style.width = `${width}px`;
-        t.style.height = `${height}px`;
-        t.style.left = `${drag.left}px`;
-        t.style.top = `${drag.top}px`;
-      }}
-      onResizeEnd={({ target: t }) => {
-        if (!containerSize.width) return;
-        const left = parseFloat(t.style.left) || 0;
-        const top = parseFloat(t.style.top) || 0;
-        const w = parseFloat(t.style.width) || 0;
-        const h = parseFloat(t.style.height) || 0;
-        onUpdate(selectedId, {
-          x: (left / containerSize.width) * 100,
-          y: (top / containerSize.height) * 100,
-          width: (w / containerSize.width) * 100,
-          height: (h / containerSize.height) * 100,
-        });
-      }}
-      onRotate={({ target: t, rotate }) => {
-        t.style.transform = `rotate(${rotate}deg)`;
-      }}
-      onRotateEnd={({ target: t }) => {
-        const match = t.style.transform.match(/rotate\(([-\d.]+)deg\)/);
-        if (match) {
-          onUpdate(selectedId, { rotation: parseFloat(match[1]) });
-        }
-      }}
-    />
   );
 }

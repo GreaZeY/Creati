@@ -117,7 +117,7 @@ export function useVideoEditor({
     if (videoRef.current) {
       const curr = videoRef.current.currentTime;
       setCurrentTime(curr);
-      if (curr > trimEnd) {
+      if (trimEnd > 0 && curr > trimEnd) {
         videoRef.current.currentTime = trimStart;
       }
     }
@@ -129,8 +129,9 @@ export function useVideoEditor({
       videoRef.current.pause();
     } else {
       if (
-        videoRef.current.currentTime < trimStart ||
-        videoRef.current.currentTime >= trimEnd
+        trimEnd > 0 &&
+        (videoRef.current.currentTime < trimStart ||
+          videoRef.current.currentTime >= trimEnd)
       ) {
         videoRef.current.currentTime = trimStart;
       }
