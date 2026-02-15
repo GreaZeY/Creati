@@ -546,6 +546,169 @@ func (y *YouTubeService) GetStream(ctx context.Context, vidID string) (io.ReadCl
 	return stream, "video/mp4", nil
 }
 
+// DownloadHighQuality implements HighQualityDownloader interface
+// It attempts to download the best available quality (1080p, 4K) by merging video and audio streams if necessary
+func (y *YouTubeService) DownloadHighQuality(ctx context.Context, vidID string, destPath string) error {
+	client := youtube_dl.Client{}
+	video, err := client.GetVideoContext(ctx, vidID)
+	if err != nil {
+		return fmt.Errorf("failed to get video info: %w", err)
+	}
+
+	// 1. Find best video format
+	formats := video.Formats
+	// Sort by height descending
+	sort.Slice(formats, func(i, j int) bool { return formats[i].Height > formats[j].Height })
+
+	var bestVideo *youtube_dl.Format
+	if len(formats) > 0 {
+		bestVideo = &formats[0]
+	}
+
+	if bestVideo == nil {
+		return fmt.Errorf("no formats found for video %s", vidID)
+	}
+
+	logger.Get("youtube").WithFields(logrus.Fields{
+		"vid":    vidID,
+		"height": bestVideo.Height,
+		"itag":   bestVideo.ItagNo,
+		"audio":  bestVideo.AudioChannels > 0,
+	}).Info("Selected best video format for HQ download")
+
+	// 2. Check if it needs audio merging
+	if bestVideo.AudioChannels > 0 {
+		// It has audio, direct download
+		stream, _, err := client.GetStreamContext(ctx, video, bestVideo)
+		if err != nil {
+			return err
+		}
+		defer stream.Close()
+
+		file, err := os.Create(destPath)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		_, err = io.Copy(file, stream)
+		return err
+	}
+
+	// 3. Needs merging - Find best audio
+	audioFormats := video.Formats.Type("audio/mp4") // Prefer mp4 container audio
+	if len(audioFormats) == 0 {
+		// Fallback to any audio
+		audioFormats = video.Formats.Type("audio")
+	}
+
+	if len(audioFormats) == 0 {
+		// Panic fallback: try to find any format with audio channels
+		audioFormats = video.Formats.WithAudioChannels()
+	}
+
+	if len(audioFormats) == 0 {
+		return fmt.Errorf("no audio formats found for video %s", vidID)
+	}
+
+	// Sort by bitrate if available? Assuming first is best or sort by logic
+	// Usually higher itag or AudioBitrate
+	sort.Slice(audioFormats, func(i, j int) bool { return audioFormats[i].Bitrate > audioFormats[j].Bitrate })
+	bestAudio := &audioFormats[0]
+
+	// 4. Download Video Track
+	videoTemp, err := os.CreateTemp("", fmt.Sprintf("yt_video_%s_*.mp4", vidID))
+	if err != nil {
+		return err
+	}
+	videoTempPath := videoTemp.Name()
+	defer os.Remove(videoTempPath) // Clean up temp file
+
+	// We need to close the file handle before ffmpeg reads it
+	videoTemp.Close()
+
+	if err := downloadStreamToFile(ctx, client, video, bestVideo, videoTempPath); err != nil {
+		return fmt.Errorf("failed to download video track: %w", err)
+	}
+
+	// 5. Download Audio Track
+	audioTemp, err := os.CreateTemp("", fmt.Sprintf("yt_audio_%s_*.m4a", vidID))
+	if err != nil {
+		return err
+	}
+	audioTempPath := audioTemp.Name()
+	defer os.Remove(audioTempPath)
+	audioTemp.Close()
+
+	if err := downloadStreamToFile(ctx, client, video, bestAudio, audioTempPath); err != nil {
+		return fmt.Errorf("failed to download audio track: %w", err)
+	}
+
+	// 6. Merge using VideoProcessor
+	vp := utils.NewVideoProcessor()
+	mergedPath, err := vp.MergeStreams(ctx, videoTempPath, audioTempPath)
+	if err != nil {
+		return fmt.Errorf("merge failed: %w", err)
+	}
+
+	// VP.MergeStreams returns a new path (usually with "merged_" prefix or similar).
+	// We need to move it to destPath.
+	// But wait, VideoProcessor.MergeStreams logic:
+	// outputPath := filepath.Dir(videoPath) + string(filepath.Separator) + "merged_" + filepath.Base(videoPath)
+	// Since videoPath is in temp dir, outputPath is also in temp dir.
+	// We should move/copy it to destPath.
+
+	err = moveFile(mergedPath, destPath)
+	if err != nil {
+		// If move fails (cross-device), copy and delete
+		if copyErr := copyFile(mergedPath, destPath); copyErr != nil {
+			// clean up merged file
+			os.Remove(mergedPath)
+			return fmt.Errorf("failed to move merged file to dest: %v (copy attempt: %v)", err, copyErr)
+		}
+	}
+	// Clean up merged file
+	os.Remove(mergedPath)
+
+	return nil
+}
+
+func downloadStreamToFile(ctx context.Context, client youtube_dl.Client, video *youtube_dl.Video, format *youtube_dl.Format, path string) error {
+	stream, _, err := client.GetStreamContext(ctx, video, format)
+	if err != nil {
+		return err
+	}
+	defer stream.Close()
+
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = io.Copy(file, stream)
+	return err
+}
+
+func moveFile(src, dst string) error {
+	return os.Rename(src, dst)
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	_, err = io.Copy(out, in)
+	return err
+}
+
 // Notify implements Platform interface - targets YouTube Community Posts for announcements
 func (y *YouTubeService) Notify(ctx context.Context, target models.UnifiedTarget, content models.Video) error {
 	// Render content

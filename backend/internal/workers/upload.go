@@ -12,6 +12,7 @@ import (
 	"creati.in/creati/backend/internal/db/models"
 	"creati.in/creati/backend/internal/logger"
 	"creati.in/creati/backend/internal/services"
+	"creati.in/creati/backend/internal/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -81,9 +82,21 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 	// 1. Update Execution Status
 	w.DB.ExecContext(ctx, "UPDATE automation_executions SET status = 'processing' WHERE id = $1", job.ExecutionID)
 
+	// Fetch Processing Settings
+	var settingsJSON []byte
+	var settings *utils.ProcessingSettings
+	err := w.DB.QueryRowContext(ctx, "SELECT processing_settings FROM automation_executions WHERE id = $1", job.ExecutionID).Scan(&settingsJSON)
+	if err == nil && len(settingsJSON) > 0 {
+		_ = json.Unmarshal(settingsJSON, &settings)
+		// Check if empty settings
+		if settings != nil && settings.TrimStart == nil && settings.TrimEnd == nil && len(settings.Overlays) == 0 {
+			settings = nil
+		}
+	}
+
 	// 2. Fetch Content Details
 	var originPlatform, originID, title, description string
-	err := w.DB.QueryRowContext(ctx, `
+	err = w.DB.QueryRowContext(ctx, `
 		SELECT origin_platform, origin_platform_content_id, title, description 
 		FROM contents WHERE id = $1
 	`, job.ContentID).Scan(&originPlatform, &originID, &title, &description)
@@ -104,7 +117,7 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 		SELECT s3_key FROM platform_contents 
 		WHERE content_id = $1 AND platform = $2
 	`, job.ContentID, originPlatform).Scan(&sourceS3URL)
-	
+
 	if err != nil && err != sql.ErrNoRows {
 		return w.fail(ctx, job, payload, fmt.Errorf("failed to fetch platform content: %w", err))
 	}
@@ -112,13 +125,24 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 	finalS3URL := ""
 	if sourceS3URL.Valid && sourceS3URL.String != "" {
 		finalS3URL = sourceS3URL.String
-		
+
 		// If it's an external platform, we might need to download it to our storage first
-		if originPlatform != "creati" {
+		if originPlatform != "creati" || settings != nil {
 			s3Key := fmt.Sprintf("automation/v2/source/%s.mp4", job.ContentID)
+
+			// If we process, we use a different key to avoid overwriting source if desired,
+			// BUT for simplicity in V1 we might just use a different key if we actually CHANGE it.
+			// However, downloadToStorage downloads to temp then uploads to s3Key.
+			// If we edit, we want the FINAL s3Key to point to the edited version?
+			// Video model uses finalS3URL.
+			// If we edit, we should probably upload to a new key.
+			if settings != nil {
+				s3Key = fmt.Sprintf("automation/v2/processed/%s_%s.mp4", job.ContentID, job.ExecutionID)
+			}
+
 			exists, _ := w.Storage.Exists(ctx, s3Key)
-			if !exists {
-				err = w.downloadToStorage(ctx, originPlatform, originID, s3Key, title)
+			if !exists || settings != nil {
+				err = w.downloadToStorage(ctx, originPlatform, originID, s3Key, title, settings)
 				if err != nil {
 					return w.fail(ctx, job, payload, err)
 				}
@@ -177,8 +201,8 @@ func (w *UploadWorker) fail(ctx context.Context, job UploadJob, payload []byte, 
 	return w.SendToDLQ(ctx, services.QueueUploadDLQ, payload, err)
 }
 
-func (w *UploadWorker) downloadToStorage(ctx context.Context, platform, vidID, s3Key, title string) error {
-	if platform == "creati" {
+func (w *UploadWorker) downloadToStorage(ctx context.Context, platform, vidID, s3Key, title string, settings *utils.ProcessingSettings) error {
+	if platform == "creati" && settings == nil {
 		// Already in S3 or local storage, no download needed
 		return nil
 	}
@@ -189,24 +213,95 @@ func (w *UploadWorker) downloadToStorage(ctx context.Context, platform, vidID, s
 		return err
 	}
 
-	stream, contentType, err := platformSvc.GetStream(ctx, vidID)
-	if err != nil {
-		return fmt.Errorf("failed to get stream from %s: %w", platform, err)
-	}
-	defer stream.Close()
-
-	temp, err := os.CreateTemp("", fmt.Sprintf("v2-upload-%s-*.mp4", platform))
+	// Prepare temp file for raw download
+	// Use slightly different naming to avoid conflicts
+	rawTemp, err := os.CreateTemp("", fmt.Sprintf("v2-upload-raw-%s-*.mp4", platform))
 	if err != nil {
 		return err
 	}
-	defer os.Remove(temp.Name())
-	defer temp.Close()
+	rawTempPath := rawTemp.Name()
+	rawTemp.Close() // Close handle, we'll reopen or let downloaders handle it
 
-	_, err = io.Copy(temp, stream)
+	// Ensure cleanup of raw file
+	defer os.Remove(rawTempPath)
+
+	// 1. Download (High Quality if available, else Standard)
+	downloaded := false
+
+	if hqDownloader, ok := platformSvc.(services.HighQualityDownloader); ok {
+		logger.Get("worker").WithField("platform", platform).Info("Attempting High Quality Download")
+		err := hqDownloader.DownloadHighQuality(ctx, vidID, rawTempPath)
+		if err == nil {
+			downloaded = true
+		} else {
+			logger.Get("worker").WithError(err).Warn("HQ download failed, falling back to standard stream")
+		}
+	}
+
+	if !downloaded {
+		stream, contentType, err := platformSvc.GetStream(ctx, vidID)
+		if err != nil {
+			return fmt.Errorf("failed to get stream from %s: %w", platform, err)
+		}
+		defer stream.Close()
+		_ = contentType // We assume mp4 for now or stream content type
+
+		f, err := os.OpenFile(rawTempPath, os.O_WRONLY|os.O_TRUNC, 0644)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		_, err = io.Copy(f, stream)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 2. Processing (Trim / Overlays)
+	currentPath := rawTempPath
+
+	// Track intermediate files to clean up
+	intermediateFiles := []string{}
+	defer func() {
+		for _, p := range intermediateFiles {
+			os.Remove(p)
+		}
+	}()
+
+	if settings != nil {
+		vp := utils.NewVideoProcessor()
+
+		// Trim
+		if settings.TrimStart != nil && settings.TrimEnd != nil {
+			trimmedPath, err := vp.Trim(ctx, currentPath, *settings.TrimStart, *settings.TrimEnd)
+			if err != nil {
+				return fmt.Errorf("trim failed: %w", err)
+			}
+			intermediateFiles = append(intermediateFiles, trimmedPath)
+			currentPath = trimmedPath
+		}
+
+		// Overlays
+		if len(settings.Overlays) > 0 {
+			overlaidPath, err := vp.ApplyOverlays(ctx, currentPath, settings.Overlays)
+			if err != nil {
+				return fmt.Errorf("overlay failed: %w", err)
+			}
+			intermediateFiles = append(intermediateFiles, overlaidPath)
+			currentPath = overlaidPath
+		}
+	}
+
+	// 3. Upload to S3
+	uploadFile, err := os.Open(currentPath)
 	if err != nil {
 		return err
 	}
+	defer uploadFile.Close()
 
-	temp.Seek(0, 0)
-	return w.Storage.Upload(ctx, s3Key, temp, contentType)
+	// Reset seek just in case
+	uploadFile.Seek(0, 0)
+
+	return w.Storage.Upload(ctx, s3Key, uploadFile, "video/mp4")
 }

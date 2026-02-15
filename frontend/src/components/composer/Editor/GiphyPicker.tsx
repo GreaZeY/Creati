@@ -32,7 +32,7 @@ export function GiphyPicker({ isOpen, onClose, onSelect }: GiphyPickerProps) {
   const [gifs, setGifs] = useState<GiphyGif[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Auto-search trending on open
   useEffect(() => {

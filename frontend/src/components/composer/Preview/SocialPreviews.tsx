@@ -1,15 +1,12 @@
-import { cn } from "@/lib/utils";
-
 interface PlatformPreviewProps {
   name: string;
   handle: string;
   text: string;
   media: Array<{ url: string; type: "image" | "video" }>;
-  platform: string;
+  // platform: string; // Removed as per instruction (unused in existing components)
 }
 
 export function InstagramPreview({
-  name,
   handle,
   text,
   media,
@@ -139,9 +136,10 @@ export function InstagramPreview({
 
 export function DiscordPreview({
   name,
-  handle,
+  // handle, // Removed as per instruction (unused)
   text,
   media,
+  // platform, // Removed as per instruction (unused)
 }: PlatformPreviewProps) {
   return (
     <div className="bg-[#36393f] rounded-lg p-4 max-w-[590px] text-[#dcddde]">
@@ -183,12 +181,7 @@ export function DiscordPreview({
   );
 }
 
-export function RedditPreview({
-  name,
-  handle,
-  text,
-  media,
-}: PlatformPreviewProps) {
+export function RedditPreview({ handle, text, media }: PlatformPreviewProps) {
   return (
     <div className="bg-card rounded border border-border/40 max-w-[590px]">
       {/* Vote Column */}

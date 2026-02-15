@@ -32,7 +32,7 @@ export const PageTransition = ({ children }: { children: ReactNode }) => {
       initial="initial"
       animate="animate"
       exit="exit"
-      variants={pageVariants}
+      variants={pageVariants as any}
       className="w-full h-full flex flex-col flex-1 min-h-0"
     >
       {children}

@@ -1,5 +1,3 @@
-import { useState } from "react";
-import { type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PostTextEditorProps {
@@ -19,19 +17,6 @@ export function PostTextEditor({
 }: PostTextEditorProps) {
   const remaining = maxLength - value.length;
   const isNearLimit = remaining < 100;
-
-  // Simple hashtag highlighting via regex
-  const highlightHashtags = (text: string) => {
-    return text.split(/(#\w+)/g).map((part, i) =>
-      part.startsWith("#") ? (
-        <span key={i} className="text-primary font-bold">
-          {part}
-        </span>
-      ) : (
-        part
-      ),
-    );
-  };
 
   return (
     <div className={cn("space-y-2", className)}>

@@ -198,7 +198,7 @@ export function PostComposer() {
         selectedClient?.id,
       );
     },
-    onSuccess: (response, scheduledAt) => {
+    onSuccess: (_, scheduledAt) => {
       const message = scheduledAt
         ? `Scheduled for ${scheduledAt.toLocaleString()}! 📅`
         : "Post published! 🚀";

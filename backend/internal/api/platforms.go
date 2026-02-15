@@ -26,12 +26,13 @@ import (
  */
 
 type PlatformHandler struct {
-	db    *sql.DB
-	cache *services.CacheService
+	db      *sql.DB
+	cache   *services.CacheService
+	storage *services.StorageService
 }
 
-func NewPlatformHandler(db *sql.DB, cache *services.CacheService) *PlatformHandler {
-	return &PlatformHandler{db: db, cache: cache}
+func NewPlatformHandler(db *sql.DB, cache *services.CacheService, storage *services.StorageService) *PlatformHandler {
+	return &PlatformHandler{db: db, cache: cache, storage: storage}
 }
 
 func (h *PlatformHandler) invalidateUserCache(ctx context.Context, userID int, clientID *int) {
@@ -413,6 +414,26 @@ func (h *PlatformHandler) GetRecentVideos(c *fiber.Ctx) error {
 	videos, err := svc.FetchRecentVideos(accountID)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to fetch recent videos", err)
+	}
+
+	// Enrichment: Check if we have these videos in S3 (playable for editor)
+	for i := range videos {
+		var s3Key sql.NullString
+		// Check platform_contents for this external ID
+		// note: platformName matches what we passed to GetPlatformService
+		err := h.db.QueryRow(`
+			SELECT s3_key FROM platform_contents 
+			WHERE platform = $1 AND platform_content_id = $2
+		`, platformName, videos[i].ID).Scan(&s3Key)
+
+		if err == nil && s3Key.Valid && s3Key.String != "" {
+			// Found in S3! Replace URL with playable S3 URL
+			videos[i].URL = h.storage.GetObjectURL(s3Key.String)
+			// We might want to keep original URL somewhere if needed, but for now this enables the editor.
+			// Or we could add a new field 'PreviewURL' to ExternalVideo if we change the struct.
+			// But modifying the struct in services/platform.go might break other things if looking for strict JSON.
+			// Re-using URL is safest for now as the frontend likely uses it for display/player.
+		}
 	}
 
 	return utils.SuccessResponse(c, videos, "Videos fetched successfully")

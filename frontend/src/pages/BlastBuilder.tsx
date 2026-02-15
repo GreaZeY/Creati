@@ -20,6 +20,11 @@ import { cn } from "@/lib/utils";
 import { useClient } from "@/context/ClientContext";
 import { PlatformChips } from "@/components/composer/Editor/PlatformChips";
 import { usePlatforms } from "@/hooks/usePlatforms";
+import {
+  VideoEditorModal,
+  type ProcessingSettings,
+} from "@/components/video/VideoEditorModal";
+import { Edit2 } from "lucide-react";
 
 export function BlastBuilder() {
   const navigate = useNavigate();
@@ -27,6 +32,13 @@ export function BlastBuilder() {
   const [selectedVideos, setSelectedVideos] = useState<any[]>([]);
   const [selectedTargets, setSelectedTargets] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Editor State
+  const [editingVideo, setEditingVideo] = useState<any | null>(null);
+  const [videoSettings, setVideoSettings] = useState<
+    Record<string, ProcessingSettings>
+  >({});
+
   const { selectedClient } = useClient();
 
   const { connectedAccounts, platformOptions } = usePlatforms();
@@ -108,11 +120,19 @@ export function BlastBuilder() {
     pushMutation.mutate({
       sourceAccountId,
       videoIds: selectedVideos.map((v) => v.id),
+      videos: selectedVideos.map((v) => ({
+        id: v.id,
+        settings: videoSettings[v.id],
+      })),
       targets: selectedTargets.map((id) => ({
         accountId: id,
         captionTemplate: "{title}",
       })),
     });
+  };
+
+  const handleSaveSettings = (id: string, settings: ProcessingSettings) => {
+    setVideoSettings((prev) => ({ ...prev, [id]: settings }));
   };
 
   return (
@@ -285,6 +305,26 @@ export function BlastBuilder() {
                             <Check size={10} className="stroke-[4]" />
                           </div>
                         )}
+
+                        {/* Edit Button */}
+                        <div className="absolute top-1.5 left-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingVideo(video);
+                            }}
+                            className={cn(
+                              "p-1.5 rounded-md bg-black/50 hover:bg-black/80 text-white backdrop-blur-sm transition-colors",
+                              videoSettings[video.id] &&
+                                "text-primary bg-primary/20",
+                            )}
+                          >
+                            <Edit2 size={12} />
+                            {videoSettings[video.id] && (
+                              <div className="absolute top-0 right-0 w-1.5 h-1.5 bg-primary rounded-full border border-black" />
+                            )}
+                          </button>
+                        </div>
                       </motion.div>
                     );
                   })}
@@ -385,6 +425,22 @@ export function BlastBuilder() {
           </Card>
         </div>
       </div>
+
+      {editingVideo && (
+        <VideoEditorModal
+          isOpen={!!editingVideo}
+          onClose={() => setEditingVideo(null)}
+          video={{
+            id: editingVideo.id,
+            title: editingVideo.title,
+            url: editingVideo.url || editingVideo.downloadUrl, // Need to ensure URL is available
+            // If not available, we might need to fetch it or use a proxy.
+            // Assuming `platformsAPI.getVideos` returns usable URLs for previews.
+          }}
+          initialSettings={videoSettings[editingVideo.id]}
+          onSave={handleSaveSettings}
+        />
+      )}
     </div>
   );
 }

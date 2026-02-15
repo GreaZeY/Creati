@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"creati.in/creati/backend/internal/utils"
 	"github.com/google/uuid"
 )
 
@@ -119,7 +120,7 @@ func (s *AutomationService) ProcessYouTubeEvent(payload []byte) error {
 		} else {
 			// Default to sync
 			for _, target := range targets {
-				s.createAutomationJob(ruleID, videoID, target.AccountID, title, traceID)
+				s.createAutomationJob(ruleID, videoID, target.AccountID, title, traceID, nil)
 			}
 		}
 
@@ -150,7 +151,7 @@ func (s *AutomationService) matchFilters(title string, filters map[string]interf
 	return true
 }
 
-func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string, targetAccountID int, title string, traceID string) {
+func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string, targetAccountID int, title string, traceID string, settings *utils.ProcessingSettings) {
 	ctx := context.Background()
 
 	// 1. Fetch source platform/account details for normalization
@@ -177,12 +178,19 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 
 	// 4. Create Automation Execution (V2) - Early Insertion for accurate "Total" tracking
 	var executionID string
+
+	// Prepare settings JSON
+	var settingsJSON []byte
+	if settings != nil {
+		settingsJSON, _ = json.Marshal(settings)
+	}
+
 	err = s.db.QueryRow(`
 		INSERT INTO automation_executions 
-		(rule_id, source_platform, target_platform, target_account_id, status, trace_id)
-		VALUES ($1, $2, $3, $4, 'queued', $5)
+		(rule_id, source_platform, target_platform, target_account_id, status, trace_id, processing_settings)
+		VALUES ($1, $2, $3, $4, 'queued', $5, $6)
 		RETURNING id
-	`, ruleID, sourcePlatform, targetPlatform, targetAccountID, traceID).Scan(&executionID)
+	`, ruleID, sourcePlatform, targetPlatform, targetAccountID, traceID, settingsJSON).Scan(&executionID)
 
 	if err != nil {
 		log.Printf("Failed to create automation execution skeleton: %v", err)
@@ -225,7 +233,7 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 }
 
 // BlastVideos initiates a one-off distribution of multiple past videos
-func (s *AutomationService) BlastVideos(userID int, clientID *int, sourceAccountID int, videoIDs []string, targets []RuleTarget) (int, error) {
+func (s *AutomationService) BlastVideos(userID int, clientID *int, sourceAccountID int, videoIDs []string, targets []RuleTarget, videoSettings map[string]*utils.ProcessingSettings) (int, error) {
 	// 1. Create a "Manual" rule to link these jobs (unique for each blast)
 	var ruleID int
 	name := fmt.Sprintf("Quick Blast - %s", time.Now().Format("Jan 02, 15:04"))
@@ -263,7 +271,8 @@ func (s *AutomationService) BlastVideos(userID int, clientID *int, sourceAccount
 
 		// Use the same trace_id for the entire blast
 		for _, target := range targets {
-			s.createAutomationJob(ruleID, videoID, target.AccountID, title, traceID)
+			settings := videoSettings[videoID]
+			s.createAutomationJob(ruleID, videoID, target.AccountID, title, traceID, settings)
 		}
 	}
 

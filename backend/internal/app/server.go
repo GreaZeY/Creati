@@ -86,7 +86,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 
 	// Initialize handlers
 	authHandler := api.NewAuthHandler(db)
-	platformHandler := api.NewPlatformHandler(db, cacheService)
+	platformHandler := api.NewPlatformHandler(db, cacheService, storageService)
 	uploadHandler := api.NewUploadHandler(storageService, queueService, db)
 	videosHandler := api.NewVideosHandler(db, cacheService)
 	analyticsHandler := api.NewAnalyticsHandler(db, queueService, cacheService)

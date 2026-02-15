@@ -3,9 +3,9 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"strconv"
-	"fmt"
 
 	"creati.in/creati/backend/internal/middleware"
 	"creati.in/creati/backend/internal/services"
@@ -22,7 +22,6 @@ type AutomationHandler struct {
 func NewAutomationHandler(db *sql.DB, service *services.AutomationService) *AutomationHandler {
 	return &AutomationHandler{db: db, service: service}
 }
-
 
 type RuleTarget struct {
 	AccountID       int    `json:"accountId"`
@@ -270,10 +269,16 @@ func (h *AutomationHandler) DeleteRule(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, nil, "rule deleted")
 }
 
+type BlastVideoItem struct {
+	ID       string                    `json:"id"`
+	Settings *utils.ProcessingSettings `json:"settings"`
+}
+
 type BlastRequest struct {
 	Name            string                `json:"name"`
 	SourceAccountID int                   `json:"sourceAccountId"`
-	VideoIDs        []string              `json:"videoIds"`
+	VideoIDs        []string              `json:"videoIds"` // Legacy support
+	Videos          []BlastVideoItem      `json:"videos"`   // New format with settings
 	Targets         []services.RuleTarget `json:"targets"`
 }
 
@@ -284,7 +289,7 @@ func (h *AutomationHandler) HandleBlast(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request")
 	}
 
-	if len(req.VideoIDs) == 0 {
+	if len(req.VideoIDs) == 0 && len(req.Videos) == 0 {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no videos selected")
 	}
 
@@ -300,7 +305,20 @@ func (h *AutomationHandler) HandleBlast(c *fiber.Ctx) error {
 		}
 	}
 
-	ruleID, err := h.service.BlastVideos(userID, clientID, req.SourceAccountID, req.VideoIDs, req.Targets)
+	var videoIds []string
+	videoSettings := make(map[string]*utils.ProcessingSettings)
+
+	if len(req.Videos) > 0 {
+		videoIds = make([]string, len(req.Videos))
+		for i, v := range req.Videos {
+			videoIds[i] = v.ID
+			videoSettings[v.ID] = v.Settings
+		}
+	} else {
+		videoIds = req.VideoIDs
+	}
+
+	ruleID, err := h.service.BlastVideos(userID, clientID, req.SourceAccountID, videoIds, req.Targets, videoSettings)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to initiate blast", err)
 	}
@@ -353,7 +371,6 @@ func (h *AutomationHandler) RetryRule(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, nil, "Operational sectors re-primed for dispatch! ⚡")
 }
 
-
 // HandleYouTubeWebhook handles PubSubHubbub verification and notifications
 func (h *AutomationHandler) HandleYouTubeWebhook(c *fiber.Ctx) error {
 	// 1. Subscription Verification (GET)
@@ -374,58 +391,58 @@ func (h *AutomationHandler) HandleYouTubeWebhook(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-	type JobContent struct {
-		ID    string `json:"id"`
-		Title string `json:"title"`
-	}
+type JobContent struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+}
 
-	type JobTarget struct {
-		Handle       string `json:"handle"`
-		Platform     string `json:"platform"`
-		Status       string `json:"status"`
-		Error        string `json:"error,omitempty"`
-		ContentTitle string `json:"contentTitle"` // Associated content for this specific execution
-	}
+type JobTarget struct {
+	Handle       string `json:"handle"`
+	Platform     string `json:"platform"`
+	Status       string `json:"status"`
+	Error        string `json:"error,omitempty"`
+	ContentTitle string `json:"contentTitle"` // Associated content for this specific execution
+}
 
-	type UnifiedJob struct {
-		ID            string       `json:"id"`
-		JobType       string       `json:"jobType"`
-		RuleID        int          `json:"ruleId"`
-		RuleName      string       `json:"ruleName"`
-		Status        string       `json:"status"`
-		Progress      string       `json:"progress"`
-		Sources       []JobTarget  `json:"sources"` // Changed to array for extensibility
-		Targets       []JobTarget  `json:"targets"`
-		Contents      []JobContent `json:"contents"` // Changed from single fields to array
-		ErrorMessage  string       `json:"errorMessage,omitempty"`
-		CreatedAt     string       `json:"createdAt"`
-	}
+type UnifiedJob struct {
+	ID           string       `json:"id"`
+	JobType      string       `json:"jobType"`
+	RuleID       int          `json:"ruleId"`
+	RuleName     string       `json:"ruleName"`
+	Status       string       `json:"status"`
+	Progress     string       `json:"progress"`
+	Sources      []JobTarget  `json:"sources"` // Changed to array for extensibility
+	Targets      []JobTarget  `json:"targets"`
+	Contents     []JobContent `json:"contents"` // Changed from single fields to array
+	ErrorMessage string       `json:"errorMessage,omitempty"`
+	CreatedAt    string       `json:"createdAt"`
+}
 
-	func (h *AutomationHandler) ListJobs(c *fiber.Ctx) error {
-		userID := middleware.GetUserID(c)
-		limit := c.QueryInt("limit", 20)
-		offset := c.QueryInt("offset", 0)
+func (h *AutomationHandler) ListJobs(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	limit := c.QueryInt("limit", 20)
+	offset := c.QueryInt("offset", 0)
 
-		// Determine if client-specific query
-		clientIDStr := c.Query("clientId")
-		var clientID *int
-		if clientIDStr != "" {
-			if cid, err := strconv.Atoi(clientIDStr); err == nil {
-				clientID = &cid
-			}
+	// Determine if client-specific query
+	clientIDStr := c.Query("clientId")
+	var clientID *int
+	if clientIDStr != "" {
+		if cid, err := strconv.Atoi(clientIDStr); err == nil {
+			clientID = &cid
 		}
+	}
 
-		// Base filter
-		ruleFilter := "r.user_id = $1"
-		args := []interface{}{userID}
-		if clientID != nil {
-			ruleFilter += " AND r.client_id = $2"
-			args = append(args, *clientID)
-		} else {
-			ruleFilter += " AND r.client_id IS NULL"
-		}
+	// Base filter
+	ruleFilter := "r.user_id = $1"
+	args := []interface{}{userID}
+	if clientID != nil {
+		ruleFilter += " AND r.client_id = $2"
+		args = append(args, *clientID)
+	} else {
+		ruleFilter += " AND r.client_id IS NULL"
+	}
 
-		query := fmt.Sprintf(`
+	query := fmt.Sprintf(`
 			WITH raw_jobs AS (
 				SELECT 
 					COALESCE(e.trace_id::text, e.id::text) as display_id,
@@ -506,53 +523,53 @@ func (h *AutomationHandler) HandleYouTubeWebhook(c *fiber.Ctx) error {
 			LIMIT $%d OFFSET $%d
 		`, ruleFilter, ruleFilter, len(args)+1, len(args)+2)
 
-		// Add pagination args
-		args = append(args, limit, offset)
+	// Add pagination args
+	args = append(args, limit, offset)
 
-		rows, err := h.db.Query(query, args...)
-		if err != nil {
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
-		}
-		defer rows.Close()
+	rows, err := h.db.Query(query, args...)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
+	}
+	defer rows.Close()
 
-		jobs := make([]UnifiedJob, 0)
-		for rows.Next() {
-			var j UnifiedJob
-			var sourcesJSON, targetsJSON, contentsJSON []byte
-			
-			if err := rows.Scan(
-				&j.ID, &j.JobType, &j.RuleID, &j.RuleName, &j.Status,
-				&j.Progress,
-				&sourcesJSON,
-				&targetsJSON,
-				&contentsJSON,
-				&j.CreatedAt,
-			); err != nil {
-				continue
-			}
+	jobs := make([]UnifiedJob, 0)
+	for rows.Next() {
+		var j UnifiedJob
+		var sourcesJSON, targetsJSON, contentsJSON []byte
 
-			if err := json.Unmarshal(sourcesJSON, &j.Sources); err != nil {
-				j.Sources = []JobTarget{}
-			}
-			if err := json.Unmarshal(targetsJSON, &j.Targets); err != nil {
-				j.Targets = []JobTarget{}
-			}
-			if err := json.Unmarshal(contentsJSON, &j.Contents); err != nil {
-				j.Contents = []JobContent{}
-			}
-
-			jobs = append(jobs, j)
+		if err := rows.Scan(
+			&j.ID, &j.JobType, &j.RuleID, &j.RuleName, &j.Status,
+			&j.Progress,
+			&sourcesJSON,
+			&targetsJSON,
+			&contentsJSON,
+			&j.CreatedAt,
+		); err != nil {
+			continue
 		}
 
-		return utils.SuccessResponse(c, jobs, "")
+		if err := json.Unmarshal(sourcesJSON, &j.Sources); err != nil {
+			j.Sources = []JobTarget{}
+		}
+		if err := json.Unmarshal(targetsJSON, &j.Targets); err != nil {
+			j.Targets = []JobTarget{}
+		}
+		if err := json.Unmarshal(contentsJSON, &j.Contents); err != nil {
+			j.Contents = []JobContent{}
+		}
+
+		jobs = append(jobs, j)
 	}
 
-	func (h *AutomationHandler) GetJobDetails(c *fiber.Ctx) error {
-		userID := middleware.GetUserID(c)
-		id := c.Params("id")
+	return utils.SuccessResponse(c, jobs, "")
+}
 
-		// Query both executions and logs for this trace_id or singular id
-		query := `
+func (h *AutomationHandler) GetJobDetails(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	id := c.Params("id")
+
+	// Query both executions and logs for this trace_id or singular id
+	query := `
 			WITH raw_details AS (
 				SELECT 
 					COALESCE(e.trace_id::text, e.id::text) as display_id,
@@ -585,28 +602,28 @@ func (h *AutomationHandler) HandleYouTubeWebhook(c *fiber.Ctx) error {
 			FROM raw_details
 		`
 
-		rows, err := h.db.Query(query, userID, id)
-		if err != nil {
-			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
-		}
-		defer rows.Close()
-
-		type DetailedTarget struct {
-			Handle       string `json:"handle"`
-			Platform     string `json:"platform"`
-			Status       string `json:"status"`
-			Error        string `json:"error"`
-			ContentTitle string `json:"contentTitle"`
-		}
-
-		details := make([]DetailedTarget, 0)
-		for rows.Next() {
-			var dt DetailedTarget
-			if err := rows.Scan(&dt.Handle, &dt.Platform, &dt.Status, &dt.Error, &dt.ContentTitle); err != nil {
-				continue
-			}
-			details = append(details, dt)
-		}
-
-		return utils.SuccessResponse(c, details, "")
+	rows, err := h.db.Query(query, userID, id)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
 	}
+	defer rows.Close()
+
+	type DetailedTarget struct {
+		Handle       string `json:"handle"`
+		Platform     string `json:"platform"`
+		Status       string `json:"status"`
+		Error        string `json:"error"`
+		ContentTitle string `json:"contentTitle"`
+	}
+
+	details := make([]DetailedTarget, 0)
+	for rows.Next() {
+		var dt DetailedTarget
+		if err := rows.Scan(&dt.Handle, &dt.Platform, &dt.Status, &dt.Error, &dt.ContentTitle); err != nil {
+			continue
+		}
+		details = append(details, dt)
+	}
+
+	return utils.SuccessResponse(c, details, "")
+}

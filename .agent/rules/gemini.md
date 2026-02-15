@@ -246,6 +246,7 @@ type UploadStatus =
 - **Documentation First**: Update `task.md` and Implementation Plans before making changes.
 - **Zero Placeholders**: Generate real UI assets (images/icons) using tools.
 - **Standard Output**: Maintain professional language; do not identify as AI-built.
+- **No AI-Style Formatting Policy**: Avoid emojis, special characters, overly formal phrasing, repetitive structures, or robotic language. Ensure the writing sounds natural and human. Human-Like Writing Requirement, Natural Writing Guidelines, Anti-AI Writing Instructions, Authentic Human Tone Requirement, Plain Human Writing Standard
 
 ---
 

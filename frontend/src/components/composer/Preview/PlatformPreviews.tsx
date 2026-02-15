@@ -267,12 +267,7 @@ export function LinkedInPreview({
   );
 }
 
-export function FacebookPreview({
-  name,
-  handle,
-  text,
-  media,
-}: PlatformPreviewProps) {
+export function FacebookPreview({ name, text, media }: PlatformPreviewProps) {
   return (
     <div className="bg-card rounded-xl border border-border/40 p-4 max-w-[590px]">
       {/* Header */}

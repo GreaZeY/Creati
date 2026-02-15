@@ -48,6 +48,12 @@ type Platform interface {
 	Notify(ctx context.Context, target models.UnifiedTarget, content models.Video) error
 }
 
+// HighQualityDownloader is an optional interface for platforms that support
+// downloading higher quality streams that might require merging (e.g. YouTube DASH)
+type HighQualityDownloader interface {
+	DownloadHighQuality(ctx context.Context, platformVideoID string, destPath string) error
+}
+
 // ExternalVideo - standardized past video info
 type ExternalVideo struct {
 	ID          string    `json:"id"`

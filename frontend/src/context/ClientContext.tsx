@@ -1,15 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { agencyAPI } from "@/lib/api";
+import { agencyAPI, type Client } from "@/lib/api";
 
 // Define types locally for now, ideally in a types file
-export interface AgencyClient {
-  id: number;
-  name: string;
-  color: string;
-  logoUrl?: string;
-  orgName?: string;
-  createdAt: string;
-}
+export type AgencyClient = Client; // Alias for backward compatibility or clarity
 
 interface ClientContextType {
   clients: AgencyClient[];

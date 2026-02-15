@@ -46,9 +46,11 @@ export interface ApiResponse<T = any> {
 export interface Client {
   id: number;
   name: string;
-  color?: string;
-  orgId?: number;
+  color: string;
+  logoUrl?: string;
+  orgName?: string;
   displayOrder?: number;
+  createdAt: string;
 }
 
 // Create axios instance with defaults
@@ -232,6 +234,7 @@ export const automationAPI = {
     data: {
       sourceAccountId: number;
       videoIds: string[];
+      videos?: Array<{ id: string; settings?: any }>;
       targets: { accountId: number; captionTemplate: string }[];
     },
     clientId?: number,
