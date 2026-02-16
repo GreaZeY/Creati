@@ -188,9 +188,11 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 	var executionID string
 
 	// Prepare settings JSON
-	var settingsJSON []byte
+	settingsJSON := []byte("{}")
 	if settings != nil {
-		settingsJSON, _ = json.Marshal(settings)
+		if marshaled, err := json.Marshal(settings); err == nil {
+			settingsJSON = marshaled
+		}
 	}
 
 	err = s.db.QueryRow(`
