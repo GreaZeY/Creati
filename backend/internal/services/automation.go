@@ -305,35 +305,54 @@ func (s *AutomationService) BlastVideos(userID int, clientID *int, sourceAccount
 
 	return ruleID, nil
 }
-func (s *AutomationService) RetryExecution(ctx context.Context, executionID string) error {
-	// 1. Fetch details for re-queueing
-	var contentID, targetPlatform, traceID string
-	var targetAccountID int
-	err := s.db.QueryRow(`
-		SELECT content_id, target_platform, target_account_id, trace_id
-		FROM automation_executions WHERE id = $1
-	`, executionID).Scan(&contentID, &targetPlatform, &targetAccountID, &traceID)
-
+func (s *AutomationService) RetryExecution(ctx context.Context, idOrTraceID string) error {
+	// 1. Fetch all failed executions matching singular ID or Trace ID
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, content_id, target_platform, target_account_id
+		FROM automation_executions 
+		WHERE (id::text = $1 OR trace_id::text = $1) AND status = 'failed'
+	`, idOrTraceID)
 	if err != nil {
 		return err
 	}
+	defer rows.Close()
 
-	// 2. Update status to queued
-	_, err = s.db.ExecContext(ctx, "UPDATE automation_executions SET status = 'queued', error = NULL WHERE id = $1", executionID)
-	if err != nil {
-		return err
+	var count int
+	for rows.Next() {
+		var executionID, contentID, targetPlatform string
+		var targetAccountID int
+		if err := rows.Scan(&executionID, &contentID, &targetPlatform, &targetAccountID); err != nil {
+			continue
+		}
+
+		// 2. Update status to queued
+		_, err = s.db.ExecContext(ctx, "UPDATE automation_executions SET status = 'queued', error = NULL WHERE id = $1", executionID)
+		if err != nil {
+			logger.Get("automation").WithError(err).Error("Failed to update status for retry")
+			continue
+		}
+
+		// 3. Enqueue to V2 Upload Queue
+		payload, _ := json.Marshal(map[string]interface{}{
+			"content_id":      contentID,
+			"target_platform": targetPlatform,
+			"account_id":      targetAccountID,
+			"execution_id":    executionID,
+			"enqueued_at":     time.Now(),
+		})
+
+		if err := s.queue.Client.LPush(ctx, QueueUpload, payload).Err(); err != nil {
+			logger.Get("automation").WithError(err).Error("Failed to enqueue execution for retry")
+		} else {
+			count++
+		}
 	}
 
-	// 3. Enqueue to V2 Upload Queue
-	payload, _ := json.Marshal(map[string]interface{}{
-		"content_id":      contentID,
-		"target_platform": targetPlatform,
-		"account_id":      targetAccountID,
-		"execution_id":    executionID,
-		"enqueued_at":     time.Now(),
-	})
+	if count == 0 {
+		return fmt.Errorf("no failed executions found to retry for ID/Trace: %s", idOrTraceID)
+	}
 
-	return s.queue.Client.LPush(ctx, QueueUpload, payload).Err()
+	return nil
 }
 
 func (s *AutomationService) RetryRule(ctx context.Context, ruleID int) error {

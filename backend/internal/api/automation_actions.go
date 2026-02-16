@@ -16,7 +16,7 @@ func (h *AutomationHandler) CancelExecution(c *fiber.Ctx) error {
 		SET status = 'cancelled', updated_at = NOW()
 		FROM automation_rules r
 		WHERE e.rule_id = r.id 
-		AND e.id = $1 
+		AND (e.id::text = $1 OR e.trace_id::text = $1) 
 		AND r.user_id = $2
 		AND e.status = 'queued'
 	`, executionID, userID)
@@ -43,7 +43,7 @@ func (h *AutomationHandler) PauseExecution(c *fiber.Ctx) error {
 		SET status = 'paused', updated_at = NOW()
 		FROM automation_rules r
 		WHERE e.rule_id = r.id 
-		AND e.id = $1 
+		AND (e.id::text = $1 OR e.trace_id::text = $1) 
 		AND r.user_id = $2
 		AND e.status = 'queued'
 	`, executionID, userID)

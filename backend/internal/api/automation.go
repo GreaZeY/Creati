@@ -338,7 +338,7 @@ func (h *AutomationHandler) RetryExecution(c *fiber.Ctx) error {
 		SELECT EXISTS(
 			SELECT 1 FROM automation_executions e
 			JOIN automation_rules r ON e.rule_id = r.id
-			WHERE e.id = $1 AND r.user_id = $2
+			WHERE (e.id::text = $1 OR e.trace_id::text = $1) AND r.user_id = $2
 		)
 	`, executionID, userID).Scan(&exists)
 
