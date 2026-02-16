@@ -422,8 +422,8 @@ func (h *PlatformHandler) GetRecentVideos(c *fiber.Ctx) error {
 		// Check platform_contents for this external ID
 		// note: platformName matches what we passed to GetPlatformService
 		err := h.db.QueryRow(`
-			SELECT s3_key FROM platform_contents 
-			WHERE platform = $1 AND platform_content_id = $2
+			SELECT storage_key FROM platform_contents 
+			WHERE platform = $1 AND platform_content_id = ANY($2)
 		`, platformName, videos[i].ID).Scan(&s3Key)
 
 		if err == nil && s3Key.Valid && s3Key.String != "" {

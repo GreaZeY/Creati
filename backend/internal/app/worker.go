@@ -42,12 +42,13 @@ func RunWorker(ctx context.Context, db *sql.DB, throttle *services.ThrottleServi
 
 	// 1. Initial	// Audience Service
 	audienceService := services.NewAudienceService(db, queueService)
+	mediaService := services.NewMediaService(db, storageService)
 
 	// 1. Define the worker pipeline stages (in order)
 	pipeline := []workers.Worker{
 		workers.NewIngestionWorker(db, queueService),
 		workers.NewOrchestrationWorker(db, queueService, audienceService),
-		workers.NewUploadWorker(db, queueService, storageService, throttle),
+		workers.NewUploadWorker(db, queueService, storageService, throttle, mediaService),
 		workers.NewPostProcessWorker(db, queueService),
 		workers.NewNotificationWorker(db, queueService),
 		workers.NewAudienceNotificationWorker(audienceService, db, queueService),
@@ -121,9 +122,9 @@ func ProcessJob(db *sql.DB, storage *services.StorageService, throttle *services
 	// 1. Get Video details
 	video := &models.Video{}
 	err := db.QueryRow(`
-		SELECT id, user_id, title, description, s3_url, status 
+		SELECT id, user_id, title, description, storage_url, status 
 		FROM videos WHERE id = $1
-	`, job.VideoID).Scan(&video.ID, &video.UserID, &video.Title, &video.Description, &video.S3URL, &video.Status)
+	`, job.VideoID).Scan(&video.ID, &video.UserID, &video.Title, &video.Description, &video.StorageURL, &video.Status)
 
 	if err != nil {
 		return fmt.Errorf("failed to fetch video: %w", err)
@@ -176,7 +177,6 @@ func ProcessJob(db *sql.DB, storage *services.StorageService, throttle *services
 
 	return tx.Commit()
 }
-
 
 func updateJobError(db *sql.DB, jobID int, errMsg string) {
 	_, _ = db.Exec(`

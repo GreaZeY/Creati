@@ -205,7 +205,7 @@ func (l *LinkedInService) Upload(video *models.Video, accountID int) (string, er
 	videoURN := registerResult.Value.Video
 
 	// Step 2: Download video to temp file and upload to LinkedIn
-	tmpFile, err := utils.DownloadToTempFile(video.S3URL)
+	tmpFile, err := utils.DownloadToTempFile(video.StorageURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to download video to temp file: %w", err)
 	}
@@ -506,7 +506,7 @@ func (l *LinkedInService) Notify(ctx context.Context, target models.UnifiedTarge
 						"description": map[string]interface{}{
 							"text": content.Description,
 						},
-						"originalUrl": content.S3URL, // Best to use final platform URL
+						"originalUrl": content.StorageURL, // Best to use final platform URL
 						"title": map[string]interface{}{
 							"text": title,
 						},

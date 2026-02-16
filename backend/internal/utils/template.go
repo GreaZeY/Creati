@@ -12,7 +12,7 @@ func RenderNotificationTemplate(tmplStr string, content models.Video, platform s
 	replacements := map[string]string{
 		"{{title}}":       content.Title,
 		"{{description}}": content.Description,
-		"{{url}}":         content.S3URL, // Ideally this would be the final platform URL if known
+		"{{url}}":         content.StorageURL, // Ideally this would be the final platform URL if known
 		"{{platform}}":    platform,
 	}
 

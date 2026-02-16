@@ -74,7 +74,7 @@ type Video struct {
 	ClientID    *int      `json:"client_id,omitempty" db:"client_id"` // Nullable for personal workspace
 	Title       string    `json:"title" db:"title"`
 	Description string    `json:"description" db:"description"`
-	S3URL       string    `json:"s3_url" db:"s3_url"`
+	StorageURL  string    `json:"storage_url" db:"storage_url"`
 	Status      string    `json:"status" db:"status"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 }

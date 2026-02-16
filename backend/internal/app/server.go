@@ -84,6 +84,9 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	// Initialize RealtimeService (SSE)
 	realtimeService := services.NewRealtimeService()
 
+	// Initialize Services
+	mediaService := services.NewMediaService(db, storageService)
+
 	// Initialize handlers
 	authHandler := api.NewAuthHandler(db)
 	platformHandler := api.NewPlatformHandler(db, cacheService, storageService)
@@ -97,6 +100,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	agencyHandler := api.NewAgencyHandler(db)
 	aiHandler := api.NewAiHandler(db)
 	postsHandler := api.NewPostsHandler(db, storageService, queueService)
+	proxyHandler := api.NewProxyHandler(db, mediaService)
 	// audienceHandler := api.NewAudienceHandler(db)
 
 	// Events
@@ -114,6 +118,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	apiRoutes.Post("/auth/login", authHandler.Login)
 	apiRoutes.Post("/auth/logout", authHandler.Logout)
 	apiRoutes.Post("/platforms/:platform/callback", platformHandler.HandleCallback)
+	apiRoutes.Get("/proxy/video", proxyHandler.HandleProxyVideo)
 
 	webhooks := app.Group("/webhooks")
 	webhooks.Get("/youtube", webhookHandler.YouTubeWebhookVerification)
@@ -144,6 +149,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	protected.Put("/platforms/:platform/disconnect", platformHandler.DeactivatePlatform)
 	protected.Delete("/platforms/:platform", platformHandler.RemovePlatform)
 	protected.Get("/platforms/:platform/videos", platformHandler.GetRecentVideos)
+	// protected.Get("/proxy/video", proxyHandler.HandleProxyVideo) // Moved to public to support <video> tag
 	protected.Get("/videos", videosHandler.ListVideos)
 	protected.Get("/videos/:id/status", videosHandler.GetVideoStatus)
 	protected.Get("/videos/:id/analytics", videosHandler.GetVideoAnalytics)

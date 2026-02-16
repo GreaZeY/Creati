@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"os"
 	"time"
 
 	"creati.in/creati/backend/internal/middleware"
@@ -113,13 +112,6 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusBadRequest, "No connected accounts found for selected platforms")
 	}
 
-	// Construct full S3 URL
-	bucket := os.Getenv("AWS_S3_BUCKET")
-	if bucket == "" {
-		bucket = "creati-uploads-dev"
-	}
-	s3URL := fmt.Sprintf("https://%s.s3.amazonaws.com/%s", bucket, req.Key)
-
 	// Start transaction
 	tx, err := h.db.Begin()
 	if err != nil {
@@ -129,11 +121,13 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 
 	// 1. Create Video record
 	var videoID int
+	storageURL := h.Storage.GetObjectURL(req.Key)
+
 	err = tx.QueryRow(`
-		INSERT INTO videos (user_id, client_id, title, description, s3_url, status)
+		INSERT INTO videos (user_id, client_id, title, description, storage_url, status)
 		VALUES ($1, $2, $3, $4, $5, 'uploaded')
 		RETURNING id
-	`, userID, req.ClientID, req.Title, req.Description, s3URL).Scan(&videoID)
+	`, userID, req.ClientID, req.Title, req.Description, storageURL).Scan(&videoID)
 
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to save video metadata", err)
@@ -147,8 +141,8 @@ func (h *UploadHandler) ConfirmUpload(c *fiber.Ctx) error {
 		fmt.Sprintf("%d", videoID),
 		req.Title,
 		req.Description,
-		0,     // Duration not known yet
-		s3URL, // Staged S3 URL
+		0,       // Duration not known yet
+		req.Key, // Staged Storage Key
 	)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to normalize content", err)

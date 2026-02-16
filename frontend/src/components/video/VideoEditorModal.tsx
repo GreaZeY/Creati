@@ -54,7 +54,7 @@ export function VideoEditorModal({
   const editor = useVideoEditor({
     isOpen,
     initialSettings,
-    videoId: video.id,
+    video, // Pass full video object
     onSave,
     onClose,
   });
@@ -78,7 +78,7 @@ export function VideoEditorModal({
           >
             <video
               ref={editor.videoRef}
-              src={video.previewUrl || video.url}
+              src={editor.videoSrc}
               className="w-full h-full object-contain"
               onLoadedMetadata={editor.handleLoadedMetadata}
               onTimeUpdate={editor.handleTimeUpdate}

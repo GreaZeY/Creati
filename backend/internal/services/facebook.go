@@ -208,7 +208,7 @@ func (f *FacebookService) Upload(video *models.Video, accountID int) (string, er
 	// Since we provide an S3/Local public URL, we don't need resumable upload phases
 	uploadURL := fmt.Sprintf("https://graph.facebook.com/v19.0/%s/videos", pageID)
 	data := url.Values{}
-	data.Set("file_url", video.S3URL)
+	data.Set("file_url", video.StorageURL)
 	data.Set("title", video.Title)
 	data.Set("description", video.Description)
 	data.Set("access_token", pageToken)
@@ -436,7 +436,58 @@ func (f *FacebookService) FetchRecentVideos(accountID int) ([]ExternalVideo, err
 
 // GetStream implements Platform interface
 func (f *FacebookService) GetStream(ctx context.Context, platformVideoID string) (io.ReadCloser, string, error) {
-	return nil, "", fmt.Errorf("GetStream not implemented for Facebook")
+	// 1. Get a token (any valid page token will do for public videos usually, or we need the specific one)
+	// For now, let's grab the most recent token
+	var encPageToken string
+	err := f.db.QueryRowContext(ctx,
+		"SELECT access_token FROM platform_accounts WHERE platform = 'facebook' ORDER BY updated_at DESC LIMIT 1",
+	).Scan(&encPageToken)
+	if err != nil {
+		return nil, "", fmt.Errorf("no facebook account available to fetch video: %w", err)
+	}
+
+	pageToken, err := utils.Decrypt(encPageToken)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to decrypt page token: %w", err)
+	}
+
+	// 2. Fetch video 'source' (mp4 url)
+	fields := "source"
+	reqURL := fmt.Sprintf("https://graph.facebook.com/v19.0/%s?fields=%s&access_token=%s", platformVideoID, fields, pageToken)
+
+	resp, err := http.Get(reqURL)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to call facebook api: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, "", fmt.Errorf("facebook api returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Source string `json:"source"`
+		ID     string `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, "", fmt.Errorf("failed to decode facebook response: %w", err)
+	}
+
+	if result.Source == "" {
+		return nil, "", fmt.Errorf("facebook video has no source url (maybe restricted?)")
+	}
+
+	// 3. Stream the content from the source URL
+	// We return the body directly. The caller must close it.
+	sourceResp, err := http.Get(result.Source)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to fetch video stream: %w", err)
+	}
+
+	// Check if it's actually video
+	contentType := sourceResp.Header.Get("Content-Type")
+
+	return sourceResp.Body, contentType, nil
 }
 
 // Notify implements Platform interface - posts to a Facebook Page or Profile
@@ -461,7 +512,7 @@ func (f *FacebookService) Notify(ctx context.Context, target models.UnifiedTarge
 
 	data := url.Values{}
 	data.Set("message", message)
-	data.Set("link", content.S3URL) // Should be final platform URL preferably
+	data.Set("link", content.StorageURL) // Should be final platform URL preferably
 	data.Set("access_token", accessToken)
 
 	reqURL := fmt.Sprintf("https://graph.facebook.com/v19.0/%s/feed", pageID)

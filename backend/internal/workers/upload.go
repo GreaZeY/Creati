@@ -34,14 +34,16 @@ type UploadWorker struct {
 	DB       *sql.DB
 	Storage  *services.StorageService
 	Throttle *services.ThrottleService
+	MediaSvc *services.MediaService
 }
 
-func NewUploadWorker(db *sql.DB, queueSvc *services.QueueService, storage *services.StorageService, throttle *services.ThrottleService) *UploadWorker {
+func NewUploadWorker(db *sql.DB, queueSvc *services.QueueService, storage *services.StorageService, throttle *services.ThrottleService, mediaSvc *services.MediaService) *UploadWorker {
 	return &UploadWorker{
 		BaseWorker: BaseWorker{QueueSvc: queueSvc},
 		DB:         db,
 		Storage:    storage,
 		Throttle:   throttle,
+		MediaSvc:   mediaSvc,
 	}
 }
 
@@ -112,43 +114,100 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 	}
 
 	// 3. Source Media Resolution
-	var sourceS3URL sql.NullString
-	err = w.DB.QueryRowContext(ctx, `
-		SELECT s3_key FROM platform_contents 
-		WHERE content_id = $1 AND platform = $2
-	`, job.ContentID, originPlatform).Scan(&sourceS3URL)
+	finalStorageURL := ""
+	var sourceKey string
 
-	if err != nil && err != sql.ErrNoRows {
-		return w.fail(ctx, job, payload, fmt.Errorf("failed to fetch platform content: %w", err))
+	// If it's an external platform, allow MediaService to handle caching/downloading
+	if originPlatform != "creati" {
+		var err error
+		sourceKey, err = w.MediaSvc.EnsureCached(ctx, originPlatform, originID)
+		if err != nil {
+			return w.fail(ctx, job, payload, fmt.Errorf("failed to cache source media: %w", err))
+		}
+		finalStorageURL = w.Storage.GetObjectURL(sourceKey)
+	} else {
+		// Internal content
+		var sourceStorageURL sql.NullString
+		err = w.DB.QueryRowContext(ctx, `
+			SELECT storage_key FROM platform_contents 
+			WHERE content_id = $1 AND platform = 'creati'
+		`, job.ContentID).Scan(&sourceStorageURL)
+
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return w.fail(ctx, job, payload, fmt.Errorf("content source not found"))
+			}
+			return w.fail(ctx, job, payload, err)
+		}
+		sourceKey = sourceStorageURL.String
+		finalStorageURL = w.Storage.GetObjectURL(sourceKey)
 	}
 
-	finalS3URL := ""
-	if sourceS3URL.Valid && sourceS3URL.String != "" {
-		finalS3URL = sourceS3URL.String
-
-		// If it's an external platform, we might need to download it to our storage first
-		if originPlatform != "creati" || settings != nil {
-			s3Key := fmt.Sprintf("automation/v2/source/%s.mp4", job.ContentID)
-
-			// If we process, we use a different key to avoid overwriting source if desired,
-			// BUT for simplicity in V1 we might just use a different key if we actually CHANGE it.
-			// However, downloadToStorage downloads to temp then uploads to s3Key.
-			// If we edit, we want the FINAL s3Key to point to the edited version?
-			// Video model uses finalS3URL.
-			// If we edit, we should probably upload to a new key.
-			if settings != nil {
-				s3Key = fmt.Sprintf("automation/v2/processed/%s_%s.mp4", job.ContentID, job.ExecutionID)
-			}
-
-			exists, _ := w.Storage.Exists(ctx, s3Key)
-			if !exists || settings != nil {
-				err = w.downloadToStorage(ctx, originPlatform, originID, s3Key, title, settings)
-				if err != nil {
-					return w.fail(ctx, job, payload, err)
-				}
-			}
-			finalS3URL = w.Storage.GetObjectURL(s3Key)
+	// If processing is required, we need to download source, process, and re-upload
+	if settings != nil {
+		// Download source to temp
+		stream, err := w.Storage.GetStream(ctx, sourceKey)
+		if err != nil {
+			return w.fail(ctx, job, payload, fmt.Errorf("failed to get source stream: %w", err))
 		}
+		defer stream.Close()
+
+		rawTemp, err := os.CreateTemp("", fmt.Sprintf("processing-source-%s-*.mp4", job.ContentID))
+		if err != nil {
+			return w.fail(ctx, job, payload, err)
+		}
+		defer os.Remove(rawTemp.Name())
+		defer rawTemp.Close()
+
+		if _, err := io.Copy(rawTemp, stream); err != nil {
+			return w.fail(ctx, job, payload, fmt.Errorf("failed to download source for processing: %w", err))
+		}
+
+		// Proceed with processing
+		// 2. Processing (Trim / Overlays)
+		currentPath := rawTemp.Name()
+		// Track intermediate files to clean up
+		intermediateFiles := []string{}
+		defer func() {
+			for _, p := range intermediateFiles {
+				os.Remove(p)
+			}
+		}()
+
+		vp := utils.NewVideoProcessor()
+
+		// Trim
+		if settings.TrimStart != nil && settings.TrimEnd != nil {
+			trimmedPath, err := vp.Trim(ctx, currentPath, *settings.TrimStart, *settings.TrimEnd)
+			if err != nil {
+				return w.fail(ctx, job, payload, fmt.Errorf("trim failed: %w", err))
+			}
+			intermediateFiles = append(intermediateFiles, trimmedPath)
+			currentPath = trimmedPath
+		}
+
+		// Overlays
+		if len(settings.Overlays) > 0 {
+			overlaidPath, err := vp.ApplyOverlays(ctx, currentPath, settings.Overlays)
+			if err != nil {
+				return w.fail(ctx, job, payload, fmt.Errorf("overlay failed: %w", err))
+			}
+			intermediateFiles = append(intermediateFiles, overlaidPath)
+			currentPath = overlaidPath
+		}
+
+		// Upload Processed Result
+		processedKey := fmt.Sprintf("automation/v2/processed/%s_%s.mp4", job.ContentID, job.ExecutionID)
+		uploadFile, err := os.Open(currentPath)
+		if err != nil {
+			return w.fail(ctx, job, payload, err)
+		}
+		defer uploadFile.Close()
+
+		if err := w.Storage.Upload(ctx, processedKey, uploadFile, "video/mp4"); err != nil {
+			return w.fail(ctx, job, payload, fmt.Errorf("failed to upload processed video: %w", err))
+		}
+		finalStorageURL = w.Storage.GetObjectURL(processedKey)
 	}
 
 	// 4. Rate Limiting via Throttle
@@ -157,30 +216,53 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 		return w.fail(ctx, job, payload, fmt.Errorf("throttle failed: %w", err))
 	}
 
-	// 5. Build Video Model for Platform Service
-	v := &models.Video{
-		Title:       title,
-		Description: description,
-		S3URL:       finalS3URL,
-	}
+	// 5. Upload to Destination Platform
+	logger.Get("worker").WithFields(logrus.Fields{
+		"platform": job.TargetPlatform,
+		"url":      finalStorageURL,
+	}).Info("Starting platform upload")
 
-	// Call Platform Service
+	// Create a temporary Video object for the uploader
+	// We might need to fetch the original video metadata if not present in job
+	// But job has VideoID.
+
+	// Fetch Video Metadata
+	video := &models.Video{}
+	// Use the 'title' and 'description' fetched earlier from 'contents' table
+	video.Title = title
+	video.Description = description
+
+	// Override with payload title/desc if present (for blasts)
+	// This part of the instruction seems to refer to a different 'payload' structure
+	// or a different job type. For UploadJob, title/description are not directly in payload.
+	// Keeping the original logic for now, assuming 'title' and 'description' are the final ones.
+
+	video.StorageURL = finalStorageURL
+
 	platformSvc, err := services.GetPlatformService(job.TargetPlatform, w.DB)
 	if err != nil {
 		return w.fail(ctx, job, payload, err)
 	}
 
-	platformVideoID, err := platformSvc.Upload(v, job.AccountID)
+	platformVideoID, err := platformSvc.Upload(video, job.AccountID)
 	if err != nil {
-		return w.fail(ctx, job, payload, err)
+		return w.fail(ctx, job, payload, fmt.Errorf("platform upload failed: %w", err))
 	}
+
+	// 6. Update Job Status & Cleanup
+	// If we created a processed file, we might want to delete it if it's ephemeral?
+	// But for "blast", maybe we keep it?
+	// Current logic keeps it.
+
+	// If settings != nil, we created a processed file.
+	// We might want to store specific metadata about it.
 
 	// 6. Record Platform Content
 	_, err = w.DB.ExecContext(ctx, `
-		INSERT INTO platform_contents (content_id, platform, platform_content_id, account_id, s3_key)
+		INSERT INTO platform_contents (content_id, platform, platform_content_id, account_id, storage_key)
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (content_id, platform) DO NOTHING
-	`, job.ContentID, job.TargetPlatform, platformVideoID, job.AccountID, finalS3URL)
+	`, job.ContentID, job.TargetPlatform, platformVideoID, job.AccountID, finalStorageURL)
 
 	// 7. Enqueue Post Processing
 	postPayload, _ := json.Marshal(map[string]interface{}{
@@ -199,109 +281,4 @@ func (w *UploadWorker) fail(ctx context.Context, job UploadJob, payload []byte, 
 
 	// Send to DLQ
 	return w.SendToDLQ(ctx, services.QueueUploadDLQ, payload, err)
-}
-
-func (w *UploadWorker) downloadToStorage(ctx context.Context, platform, vidID, s3Key, title string, settings *utils.ProcessingSettings) error {
-	if platform == "creati" && settings == nil {
-		// Already in S3 or local storage, no download needed
-		return nil
-	}
-
-	// Dynamic platform resolution via factory
-	platformSvc, err := services.GetPlatformService(platform, w.DB)
-	if err != nil {
-		return err
-	}
-
-	// Prepare temp file for raw download
-	// Use slightly different naming to avoid conflicts
-	rawTemp, err := os.CreateTemp("", fmt.Sprintf("v2-upload-raw-%s-*.mp4", platform))
-	if err != nil {
-		return err
-	}
-	rawTempPath := rawTemp.Name()
-	rawTemp.Close() // Close handle, we'll reopen or let downloaders handle it
-
-	// Ensure cleanup of raw file
-	defer os.Remove(rawTempPath)
-
-	// 1. Download (High Quality if available, else Standard)
-	downloaded := false
-
-	if hqDownloader, ok := platformSvc.(services.HighQualityDownloader); ok {
-		logger.Get("worker").WithField("platform", platform).Info("Attempting High Quality Download")
-		err := hqDownloader.DownloadHighQuality(ctx, vidID, rawTempPath)
-		if err == nil {
-			downloaded = true
-		} else {
-			logger.Get("worker").WithError(err).Warn("HQ download failed, falling back to standard stream")
-		}
-	}
-
-	if !downloaded {
-		stream, contentType, err := platformSvc.GetStream(ctx, vidID)
-		if err != nil {
-			return fmt.Errorf("failed to get stream from %s: %w", platform, err)
-		}
-		defer stream.Close()
-		_ = contentType // We assume mp4 for now or stream content type
-
-		f, err := os.OpenFile(rawTempPath, os.O_WRONLY|os.O_TRUNC, 0644)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-
-		_, err = io.Copy(f, stream)
-		if err != nil {
-			return err
-		}
-	}
-
-	// 2. Processing (Trim / Overlays)
-	currentPath := rawTempPath
-
-	// Track intermediate files to clean up
-	intermediateFiles := []string{}
-	defer func() {
-		for _, p := range intermediateFiles {
-			os.Remove(p)
-		}
-	}()
-
-	if settings != nil {
-		vp := utils.NewVideoProcessor()
-
-		// Trim
-		if settings.TrimStart != nil && settings.TrimEnd != nil {
-			trimmedPath, err := vp.Trim(ctx, currentPath, *settings.TrimStart, *settings.TrimEnd)
-			if err != nil {
-				return fmt.Errorf("trim failed: %w", err)
-			}
-			intermediateFiles = append(intermediateFiles, trimmedPath)
-			currentPath = trimmedPath
-		}
-
-		// Overlays
-		if len(settings.Overlays) > 0 {
-			overlaidPath, err := vp.ApplyOverlays(ctx, currentPath, settings.Overlays)
-			if err != nil {
-				return fmt.Errorf("overlay failed: %w", err)
-			}
-			intermediateFiles = append(intermediateFiles, overlaidPath)
-			currentPath = overlaidPath
-		}
-	}
-
-	// 3. Upload to S3
-	uploadFile, err := os.Open(currentPath)
-	if err != nil {
-		return err
-	}
-	defer uploadFile.Close()
-
-	// Reset seek just in case
-	uploadFile.Seek(0, 0)
-
-	return w.Storage.Upload(ctx, s3Key, uploadFile, "video/mp4")
 }

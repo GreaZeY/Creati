@@ -10,7 +10,11 @@ function generateId() {
 interface UseVideoEditorArgs {
   isOpen: boolean;
   initialSettings?: ProcessingSettings;
-  videoId: string;
+  video: {
+    id: string;
+    url?: string;
+    previewUrl?: string;
+  };
   onSave: (id: string, settings: ProcessingSettings) => void;
   onClose: () => void;
 }
@@ -18,7 +22,7 @@ interface UseVideoEditorArgs {
 export function useVideoEditor({
   isOpen,
   initialSettings,
-  videoId,
+  video,
   onSave,
   onClose,
 }: UseVideoEditorArgs) {
@@ -232,22 +236,48 @@ export function useVideoEditor({
   }, []);
 
   const handleSave = useCallback(() => {
-    onSave(videoId, {
+    onSave(video.id, {
       trim_start: trimStart,
       trim_end: trimEnd,
       overlays,
     });
     onClose();
-  }, [videoId, trimStart, trimEnd, overlays, onSave, onClose]);
+  }, [video.id, trimStart, trimEnd, overlays, onSave, onClose]);
 
   const pctToPx = useCallback(
     (pct: number, dimension: number) => (pct / 100) * dimension,
     [],
   );
 
+  // Video Source with Proxy Logic
+  // If URL is external (not our storage), route through proxy to bypass CORS
+  const videoSrc = (() => {
+    const rawUrl = video.previewUrl || video.url;
+    if (!rawUrl) return "";
+    
+    // Check if it's a relative path or our own domain (safe)
+    if (rawUrl.startsWith("/") || rawUrl.includes("localhost") || rawUrl.includes("creati.in")) {
+      return rawUrl;
+    }
+
+    // It's external (e.g. Facebook, Instagram, AWS S3 direct), use proxy
+    // Assuming backend is at /api relative to frontend or configured base URL
+    // Since we are inside the app, we can use relative path if proxy set up in Vite
+    // But backend is on port 8080 usually. Let's assume standard API path.
+    // Ideally use an env var or a helper for API base URL.
+    // For now, hardcode or use relative if proxy is set up.
+    // Let's assume relative /api/proxy/video works via Vite proxy or direct if CORS allowed.
+    // Wait, backend is on 8080. Frontend on 5173.
+    // We added Access-Control-Allow-Origin: * to proxy response, so direct call to 8080 is fine.
+    const baseUrl = "http://localhost:8080"; // TODO: Use env
+    return `${baseUrl}/api/proxy/video?url=${encodeURIComponent(rawUrl)}`;
+  })();
+
   return {
     // Refs
     videoRef,
+    // ...
+    videoSrc,
     canvasRef,
     moveableRef,
     // Playback

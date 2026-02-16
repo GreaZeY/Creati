@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -64,4 +65,31 @@ func (s *S3Provider) Exists(ctx context.Context, key string) (bool, error) {
 		return false, nil
 	}
 	return true, nil
+}
+
+func (s *S3Provider) GeneratePresignedURL(key string, contentType string) (string, error) {
+	presignClient := s3.NewPresignClient(s.Client)
+	request, err := presignClient.PresignPutObject(context.TODO(), &s3.PutObjectInput{
+		Bucket:      aws.String(s.Bucket),
+		Key:         aws.String(key),
+		ContentType: aws.String(contentType),
+	}, func(opts *s3.PresignOptions) {
+		opts.Expires = time.Duration(15 * time.Minute)
+	})
+
+	if err != nil {
+		return "", err
+	}
+	return request.URL, nil
+}
+
+func (s *S3Provider) GetStream(ctx context.Context, key string) (io.ReadCloser, error) {
+	out, err := s.Client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.Bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out.Body, nil
 }

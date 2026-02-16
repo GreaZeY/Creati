@@ -70,3 +70,16 @@ func (l *LocalProvider) Exists(ctx context.Context, key string) (bool, error) {
 	}
 	return false, err
 }
+
+func (l *LocalProvider) GeneratePresignedURL(key string, contentType string) (string, error) {
+	// For local, we return a direct upload endpoint if we had one,
+	// or just a path that the frontend knows how to POST to.
+	// For now, since we have a single-node setup, we return the target URL
+	// and the frontend can use our UploadMedia handler.
+	return fmt.Sprintf("%s/%s", l.BaseURL, key), nil
+}
+
+func (l *LocalProvider) GetStream(ctx context.Context, key string) (io.ReadCloser, error) {
+	path := filepath.Join(l.BaseDir, key)
+	return os.Open(path)
+}

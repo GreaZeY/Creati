@@ -349,7 +349,7 @@ func (y *YouTubeService) Upload(video *models.Video, accountID int) (string, err
 	}
 
 	// Download video to a temp file for reliable upload
-	tmpFile, err := utils.DownloadToTempFile(video.S3URL)
+	tmpFile, err := utils.DownloadToTempFile(video.StorageURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to download video to temp file: %w", err)
 	}

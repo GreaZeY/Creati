@@ -179,7 +179,7 @@ func (t *TwitterService) Upload(video *models.Video, accountID int) (string, err
 	}
 
 	// Step 1: Initialize media upload
-	mediaID, err := t.uploadMedia(accessToken, video.S3URL)
+	mediaID, err := t.uploadMedia(accessToken, video)
 	if err != nil {
 		return "", fmt.Errorf("media upload failed: %w", err)
 	}
@@ -229,9 +229,9 @@ func (t *TwitterService) Upload(video *models.Video, accountID int) (string, err
 }
 
 // uploadMedia handles chunked video upload to Twitter
-func (t *TwitterService) uploadMedia(accessToken, videoURL string) (string, error) {
+func (t *TwitterService) uploadMedia(accessToken string, video *models.Video) (string, error) {
 	// Download video to temp file for reliable chunked upload
-	tmpFile, err := utils.DownloadToTempFile(videoURL)
+	tmpFile, err := utils.DownloadToTempFile(video.StorageURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to download video to temp file: %w", err)
 	}

@@ -47,12 +47,14 @@ func (s *StorageService) GetObjectURL(key string) string {
 	return s.Provider.GetObjectURL(key)
 }
 
-// Deprecated: Use Upload directly
 func (s *StorageService) GeneratePresignedURL(key string, contentType string) (string, error) {
-	// For now, return empty as Local doesn't support it, and S3 logic moved
-	return "", nil
+	return s.Provider.GeneratePresignedURL(key, contentType)
 }
 
 func (s *StorageService) Exists(ctx context.Context, key string) (bool, error) {
 	return s.Provider.Exists(ctx, key)
+}
+
+func (s *StorageService) GetStream(ctx context.Context, key string) (io.ReadCloser, error) {
+	return s.Provider.GetStream(ctx, key)
 }
