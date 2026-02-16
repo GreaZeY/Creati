@@ -236,6 +236,7 @@ export const automationAPI = {
       videoIds: string[];
       videos?: Array<{ id: string; settings?: any }>;
       targets: { accountId: number; captionTemplate: string }[];
+      scheduledAt?: Date;
     },
     clientId?: number,
   ) =>

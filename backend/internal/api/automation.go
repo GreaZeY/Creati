@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"time"
 
 	"creati.in/creati/backend/internal/middleware"
 	"creati.in/creati/backend/internal/services"
@@ -280,6 +281,7 @@ type BlastRequest struct {
 	VideoIDs        []string              `json:"videoIds"` // Legacy support
 	Videos          []BlastVideoItem      `json:"videos"`   // New format with settings
 	Targets         []services.RuleTarget `json:"targets"`
+	ScheduledAt     *time.Time            `json:"scheduledAt"`
 }
 
 func (h *AutomationHandler) HandleBlast(c *fiber.Ctx) error {
@@ -318,7 +320,7 @@ func (h *AutomationHandler) HandleBlast(c *fiber.Ctx) error {
 		videoIds = req.VideoIDs
 	}
 
-	ruleID, err := h.service.BlastVideos(userID, clientID, req.SourceAccountID, videoIds, req.Targets, videoSettings)
+	ruleID, err := h.service.BlastVideos(userID, clientID, req.SourceAccountID, videoIds, req.Targets, videoSettings, req.ScheduledAt)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to initiate blast", err)
 	}

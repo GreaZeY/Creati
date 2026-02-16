@@ -128,7 +128,7 @@ func (s *AutomationService) ProcessYouTubeEvent(payload []byte) error {
 		} else {
 			// Default to sync
 			for _, target := range targets {
-				s.createAutomationJob(ruleID, videoID, target.AccountID, title, traceID, nil)
+				s.createAutomationJob(ruleID, videoID, target.AccountID, title, traceID, nil, nil)
 			}
 		}
 
@@ -159,7 +159,7 @@ func (s *AutomationService) matchFilters(title string, filters map[string]interf
 	return true
 }
 
-func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string, targetAccountID int, title string, traceID string, settings *utils.ProcessingSettings) {
+func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string, targetAccountID int, title string, traceID string, settings *utils.ProcessingSettings, scheduledAt *time.Time) {
 	ctx := context.Background()
 
 	// 1. Fetch source platform/account details for normalization
@@ -187,6 +187,17 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 	// 4. Create Automation Execution (V2) - Early Insertion for accurate "Total" tracking
 	var executionID string
 
+	// Determine status based on scheduling
+	status := "queued"
+	var scheduledStatus sql.NullString
+	var scheduledAtNull sql.NullTime
+
+	if scheduledAt != nil {
+		status = "pending"
+		scheduledStatus = sql.NullString{String: "scheduled", Valid: true}
+		scheduledAtNull = sql.NullTime{Time: *scheduledAt, Valid: true}
+	}
+
 	// Prepare settings JSON
 	settingsJSON := []byte("{}")
 	if settings != nil {
@@ -197,10 +208,10 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 
 	err = s.db.QueryRow(`
 		INSERT INTO automation_executions 
-		(rule_id, source_platform, target_platform, target_account_id, status, trace_id, processing_settings)
-		VALUES ($1, $2, $3, $4, 'queued', $5, $6)
+		(rule_id, source_platform, target_platform, target_account_id, status, trace_id, processing_settings, scheduled_at, scheduled_status)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING id
-	`, ruleID, sourcePlatform, targetPlatform, targetAccountID, traceID, settingsJSON).Scan(&executionID)
+	`, ruleID, sourcePlatform, targetPlatform, targetAccountID, status, traceID, settingsJSON, scheduledAtNull, scheduledStatus).Scan(&executionID)
 
 	if err != nil {
 		logger.Get("automation").WithError(err).Error("Failed to create automation execution skeleton")
@@ -224,19 +235,21 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 		return
 	}
 
-	// 7. Enqueue V2 Payload
-	payload, _ := json.Marshal(map[string]interface{}{
-		"content_id":      normalized.ContentID,
-		"target_platform": targetPlatform,
-		"account_id":      targetAccountID,
-		"execution_id":    executionID,
-		"enqueued_at":     time.Now(),
-	})
+	// 7. Enqueue V2 Payload - Only if not scheduled
+	if scheduledAt == nil {
+		payload, _ := json.Marshal(map[string]interface{}{
+			"content_id":      normalized.ContentID,
+			"target_platform": targetPlatform,
+			"account_id":      targetAccountID,
+			"execution_id":    executionID,
+			"enqueued_at":     time.Now(),
+		})
 
-	err = s.queue.Client.LPush(ctx, QueueUpload, payload).Err()
-	if err != nil {
-		logger.Get("automation").WithField("execution_id", executionID).WithError(err).Error("Failed to enqueue V2 automation job")
-		s.db.Exec("UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", "failed to enqueue", executionID)
+		err = s.queue.Client.LPush(ctx, QueueUpload, payload).Err()
+		if err != nil {
+			logger.Get("automation").WithField("execution_id", executionID).WithError(err).Error("Failed to enqueue blast job")
+			s.db.Exec("UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", "failed to enqueue", executionID)
+		}
 	}
 
 	logger.Get("automation").WithFields(logrus.Fields{
@@ -247,7 +260,7 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 }
 
 // BlastVideos initiates a one-off distribution of multiple past videos
-func (s *AutomationService) BlastVideos(userID int, clientID *int, sourceAccountID int, videoIDs []string, targets []RuleTarget, videoSettings map[string]*utils.ProcessingSettings) (int, error) {
+func (s *AutomationService) BlastVideos(userID int, clientID *int, sourceAccountID int, videoIDs []string, targets []RuleTarget, videoSettings map[string]*utils.ProcessingSettings, scheduledAt *time.Time) (int, error) {
 	// 1. Create a "Manual" rule to link these jobs (unique for each blast)
 	var ruleID int
 	name := fmt.Sprintf("Quick Blast - %s", time.Now().Format("Jan 02, 15:04"))
@@ -286,7 +299,7 @@ func (s *AutomationService) BlastVideos(userID int, clientID *int, sourceAccount
 		// Use the same trace_id for the entire blast
 		for _, target := range targets {
 			settings := videoSettings[videoID]
-			s.createAutomationJob(ruleID, videoID, target.AccountID, title, traceID, settings)
+			s.createAutomationJob(ruleID, videoID, target.AccountID, title, traceID, settings, scheduledAt)
 		}
 	}
 

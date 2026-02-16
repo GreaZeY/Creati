@@ -9,12 +9,14 @@ interface PublishDropdownProps {
   onPublishNow: () => void;
   onSchedule: () => void;
   disabled?: boolean;
+  label?: string;
 }
 
 export function PublishDropdown({
   onPublishNow,
   onSchedule,
   disabled,
+  label = "Publish",
 }: PublishDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -39,7 +41,7 @@ export function PublishDropdown({
         onClick={() => setIsOpen(!isOpen)}
       >
         <Send size={14} />
-        Publish
+        {label}
         <ChevronDown size={14} />
       </Button>
 

@@ -25,6 +25,8 @@ import {
   type ProcessingSettings,
 } from "@/components/video/VideoEditorModal";
 import { Edit2 } from "lucide-react";
+import { PublishDropdown } from "@/components/composer/PublishBar/PublishDropdown";
+import { ScheduleModal } from "@/components/composer/PublishBar/ScheduleModal";
 
 export function BlastBuilder() {
   const navigate = useNavigate();
@@ -38,6 +40,7 @@ export function BlastBuilder() {
   const [videoSettings, setVideoSettings] = useState<
     Record<string, ProcessingSettings>
   >({});
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
   const { selectedClient } = useClient();
 
@@ -71,8 +74,11 @@ export function BlastBuilder() {
 
   const pushMutation = useMutation({
     mutationFn: (data: any) => automationAPI.blast(data, selectedClient?.id),
-    onSuccess: () => {
-      toast.success("Push initiated! 🚀 Videos syncing now.");
+    onSuccess: (_, variables) => {
+      const message = variables.scheduledAt
+        ? `Push scheduled for ${variables.scheduledAt.toLocaleString()}! 📅`
+        : "Push initiated! 🚀 Videos syncing now.";
+      toast.success(message);
       navigate("/push");
     },
   });
@@ -110,7 +116,7 @@ export function BlastBuilder() {
     }
   };
 
-  const handleLaunch = () => {
+  const handleLaunch = (scheduledAt?: Date) => {
     if (!sourceAccountId) return toast.error("Choose where to raid from!");
     if (selectedVideos.length === 0)
       return toast.error("Pick some bangers first!");
@@ -128,6 +134,7 @@ export function BlastBuilder() {
         accountId: id,
         captionTemplate: "{title}",
       })),
+      scheduledAt,
     });
   };
 
@@ -173,14 +180,17 @@ export function BlastBuilder() {
               </p>
             </motion.div>
           )}
-          <Button
-            size="sm"
-            className="px-6 h-9 text-sm font-black gap-2 shadow-[0_0_20px_rgba(var(--primary),0.3)] hover:scale-105 active:scale-95 transition-all"
-            onClick={handleLaunch}
-            disabled={pushMutation.isPending}
-          >
-            {pushMutation.isPending ? "PUSHING..." : "PUSH NOW 🚀"}
-          </Button>
+          <PublishDropdown
+            onPublishNow={() => handleLaunch()}
+            onSchedule={() => setIsScheduleModalOpen(true)}
+            disabled={
+              pushMutation.isPending ||
+              !sourceAccountId ||
+              selectedVideos.length === 0 ||
+              selectedTargets.length === 0
+            }
+            label={pushMutation.isPending ? "PUSHING..." : "DISPATCH"}
+          />
         </div>
       </div>
 
@@ -433,14 +443,18 @@ export function BlastBuilder() {
           video={{
             id: editingVideo.id,
             title: editingVideo.title,
-            url: editingVideo.url || editingVideo.downloadUrl, // Need to ensure URL is available
-            // If not available, we might need to fetch it or use a proxy.
-            // Assuming `platformsAPI.getVideos` returns usable URLs for previews.
+            url: editingVideo.url || editingVideo.downloadUrl,
           }}
           initialSettings={videoSettings[editingVideo.id]}
           onSave={handleSaveSettings}
         />
       )}
+
+      <ScheduleModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
+        onSchedule={handleLaunch}
+      />
     </div>
   );
 }
