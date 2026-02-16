@@ -86,11 +86,13 @@ CREATE TABLE IF NOT EXISTS platform_accounts (
     handle VARCHAR(255),
     webhook_url TEXT,
     status VARCHAR(20) DEFAULT 'active',
-    connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Ensure client_id exists for older schemas
+-- Ensure columns exist for older schemas
 ALTER TABLE platform_accounts ADD COLUMN IF NOT EXISTS client_id INT REFERENCES clients(id) ON DELETE SET NULL;
+ALTER TABLE platform_accounts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 
 -- REPLACEMENT: Use Unique Index with Coalesce to handle NULL client_id (Personal Workspace)
 -- This ensures ON CONFLICT works for both Personal (NULL) and Workspace (INT) accounts
@@ -255,8 +257,11 @@ CREATE TABLE IF NOT EXISTS automation_executions (
     UNIQUE(content_id, target_platform)  -- PREVENTS DUPLICATE POSTS
 );
 
--- Ensure client_id exists for older schemas
+-- Ensure columns exist for older schemas
 ALTER TABLE automation_executions ADD COLUMN IF NOT EXISTS client_id INT REFERENCES clients(id) ON DELETE SET NULL;
+ALTER TABLE automation_executions ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE automation_executions ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE automation_executions ADD COLUMN IF NOT EXISTS scheduled_status VARCHAR(50);
 
 CREATE INDEX IF NOT EXISTS idx_executions_status ON automation_executions(status);
 CREATE INDEX IF NOT EXISTS idx_executions_content ON automation_executions(content_id);

@@ -440,7 +440,7 @@ func (f *FacebookService) GetStream(ctx context.Context, platformVideoID string)
 	// For now, let's grab the most recent token
 	var encPageToken string
 	err := f.db.QueryRowContext(ctx,
-		"SELECT access_token FROM platform_accounts WHERE platform = 'facebook' ORDER BY updated_at DESC LIMIT 1",
+		"SELECT access_token FROM platform_accounts WHERE platform = 'facebook' AND status IN ('active', 'connected') ORDER BY COALESCE(updated_at, connected_at) DESC LIMIT 1",
 	).Scan(&encPageToken)
 	if err != nil {
 		return nil, "", fmt.Errorf("no facebook account available to fetch video: %w", err)

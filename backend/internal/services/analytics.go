@@ -320,7 +320,7 @@ func (s *AnalyticsService) DiscoverVideos(userID int) {
 	rows, err := s.db.Query(`
 		SELECT id, platform, platform_user_id 
 		FROM platform_accounts 
-		WHERE user_id = $1 AND status = 'connected'
+		WHERE user_id = $1 AND status IN ('active', 'connected')
 	`, userID)
 	if err != nil {
 		logger.Get("analytics").WithError(err).Error("Failed to list accounts for discovery")
