@@ -560,8 +560,13 @@ func (y *YouTubeService) DownloadHighQuality(ctx context.Context, vidID string, 
 
 	// 1. Find best video format
 	formats := video.Formats
-	// Sort by height descending
-	sort.Slice(formats, func(i, j int) bool { return formats[i].Height > formats[j].Height })
+	// Sort by height descending, then by bitrate descending for same height
+	sort.Slice(formats, func(i, j int) bool {
+		if formats[i].Height != formats[j].Height {
+			return formats[i].Height > formats[j].Height
+		}
+		return formats[i].Bitrate > formats[j].Bitrate
+	})
 
 	var bestVideo *youtube_dl.Format
 	if len(formats) > 0 {

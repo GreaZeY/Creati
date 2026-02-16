@@ -88,7 +88,13 @@ func (vp *VideoProcessor) ApplyOverlays(ctx context.Context, inputPath string, o
 	}
 
 	err := stream.
-		Output(outputPath, ffmpeg.KwArgs{"c:a": "copy"}). // Copy audio, re-encode video
+		Output(outputPath, ffmpeg.KwArgs{
+			"c:v":      "libx264",
+			"crf":      18,
+			"preset":   "medium",
+			"c:a":      "copy",
+			"movflags": "+faststart",
+		}). // High-quality re-encode with audio copy
 		OverWriteOutput().
 		Run()
 
