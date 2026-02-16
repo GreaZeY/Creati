@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"creati.in/creati/backend/internal/logger"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -51,7 +52,7 @@ func NewQueueService() (*QueueService, error) {
 
 	// Test connection
 	if err := client.Ping(context.Background()).Err(); err != nil {
-		fmt.Printf("  ⚠️  Redis Queue: Connection failed (%v). Continuing in limited mode.\n", err)
+		logger.Get("queue").WithError(err).Warn("Redis Queue: Connection failed. Continuing in limited mode.")
 		// Return client anyway, subsequent operations should handle errors
 	}
 

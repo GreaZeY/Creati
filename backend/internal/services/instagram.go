@@ -12,9 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"creati.in/creati/backend/internal/db/models"
+	"creati.in/creati/backend/internal/logger"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 
+	"creati.in/creati/backend/internal/db/models"
 	"creati.in/creati/backend/internal/db/repositories"
 	"creati.in/creati/backend/internal/utils"
 )
@@ -461,7 +463,10 @@ func (i *InstagramService) Notify(ctx context.Context, target models.UnifiedTarg
 	message := utils.RenderNotificationTemplate(target.CaptionTemplate, content, "YouTube")
 
 	// Log for now as it requires media processing
-	fmt.Printf("📸 Instagram announcement requested for %s: %s\n", target.TargetIdentifier, message)
+	logger.Get("instagram").WithFields(logrus.Fields{
+		"target":  target.TargetIdentifier,
+		"message": message,
+	}).Info("Instagram announcement requested")
 
 	return nil
 }

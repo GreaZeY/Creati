@@ -80,7 +80,7 @@ func (s *DBTokenSource) Token() (*oauth2.Token, error) {
 		// ... existing persistence logic ...
 		encAccess, err := utils.Encrypt(t.AccessToken)
 		if err != nil {
-			fmt.Printf("Failed to encrypt new access token: %v\n", err)
+			logger.Get("youtube").WithError(err).Error("Failed to encrypt new access token")
 			return t, nil
 		}
 
@@ -91,7 +91,7 @@ func (s *DBTokenSource) Token() (*oauth2.Token, error) {
 
 		encRefresh, err := utils.Encrypt(refreshToken)
 		if err != nil {
-			fmt.Printf("Failed to encrypt new refresh token: %v\n", err)
+			logger.Get("youtube").WithError(err).Error("Failed to encrypt new refresh token")
 			return t, nil
 		}
 
@@ -102,9 +102,9 @@ func (s *DBTokenSource) Token() (*oauth2.Token, error) {
 		`, encAccess, encRefresh, t.Expiry, s.accountID)
 
 		if err != nil {
-			fmt.Printf("Failed to persist refreshed token: %v\n", err)
+			logger.Get("youtube").WithError(err).Error("Failed to persist refreshed token")
 		} else {
-			fmt.Printf("🔄 Refreshed and saved new YouTube token for account %d\n", s.accountID)
+			logger.Get("youtube").WithField("account_id", s.accountID).Info("🔄 Refreshed and saved new YouTube token")
 			s.lastToken = t
 			if s.lastToken.RefreshToken == "" {
 				s.lastToken.RefreshToken = refreshToken
@@ -314,7 +314,7 @@ func (y *YouTubeService) Authenticate(code string, userID int, clientID *int) er
 
 	// Trigger real-time monitoring via webhooks
 	if subErr := y.SubscribeToChannel(channelID); subErr != nil {
-		fmt.Printf("⚠️  Failed to subscribe to YouTube webhooks for %s: %v\n", channelID, subErr)
+		logger.Get("youtube").WithField("channel_id", channelID).WithError(subErr).Warn("Failed to subscribe to YouTube webhooks")
 		// We don't fail the whole connection if only subscription fails,
 		// but notify user/log it.
 	}
@@ -424,7 +424,10 @@ func (y *YouTubeService) SubscribeToChannel(channelID string) error {
 	data.Set("hub.verify", "async")
 	data.Set("hub.mode", "subscribe")
 
-	fmt.Printf("🚀 Subscribing to YouTube Channel: %s (Callback: %s)\n", channelID, callbackURL)
+	logger.Get("youtube").WithFields(logrus.Fields{
+		"channel_id": channelID,
+		"callback":   callbackURL,
+	}).Info("Subscribing to YouTube Channel")
 
 	resp, err := http.PostForm(hubURL, data)
 	if err != nil {
@@ -442,7 +445,7 @@ func (y *YouTubeService) SubscribeToChannel(channelID string) error {
 // FetchRecentVideos retrieves the most recent uploads from the channel
 func (y *YouTubeService) FetchRecentVideos(accountID int) ([]ExternalVideo, error) {
 	ctx := context.Background()
-	fmt.Println("Fetching recent videos for account", accountID)
+	logger.Get("youtube").WithField("account_id", accountID).Debug("Fetching recent videos")
 	client, err := y.getClient(ctx, accountID)
 	if err != nil {
 		return nil, err
@@ -658,14 +661,9 @@ func (y *YouTubeService) DownloadHighQuality(ctx context.Context, vidID string, 
 	// Since videoPath is in temp dir, outputPath is also in temp dir.
 	// We should move/copy it to destPath.
 
-	err = moveFile(mergedPath, destPath)
+	err = utils.MoveFile(mergedPath, destPath)
 	if err != nil {
-		// If move fails (cross-device), copy and delete
-		if copyErr := copyFile(mergedPath, destPath); copyErr != nil {
-			// clean up merged file
-			os.Remove(mergedPath)
-			return fmt.Errorf("failed to move merged file to dest: %v (copy attempt: %v)", err, copyErr)
-		}
+		return fmt.Errorf("failed to move merged file to dest: %w", err)
 	}
 	// Clean up merged file
 	os.Remove(mergedPath)
@@ -687,25 +685,6 @@ func downloadStreamToFile(ctx context.Context, client youtube_dl.Client, video *
 	defer file.Close()
 
 	_, err = io.Copy(file, stream)
-	return err
-}
-
-func moveFile(src, dst string) error {
-	return os.Rename(src, dst)
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	_, err = io.Copy(out, in)
 	return err
 }
 

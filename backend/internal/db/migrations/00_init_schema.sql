@@ -89,6 +89,9 @@ CREATE TABLE IF NOT EXISTS platform_accounts (
     connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Ensure client_id exists for older schemas
+ALTER TABLE platform_accounts ADD COLUMN IF NOT EXISTS client_id INT REFERENCES clients(id) ON DELETE SET NULL;
+
 -- REPLACEMENT: Use Unique Index with Coalesce to handle NULL client_id (Personal Workspace)
 -- This ensures ON CONFLICT works for both Personal (NULL) and Workspace (INT) accounts
 CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_accounts_unique_logic
@@ -118,6 +121,9 @@ CREATE TABLE IF NOT EXISTS videos (
 );
 
 CREATE INDEX IF NOT EXISTS idx_videos_user ON videos(user_id);
+-- Ensure client_id exists for older schemas
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS client_id INT REFERENCES clients(id) ON DELETE SET NULL;
+
 CREATE INDEX IF NOT EXISTS idx_videos_client ON videos(client_id);
 CREATE INDEX IF NOT EXISTS idx_videos_created ON videos(created_at DESC);
 
@@ -136,6 +142,9 @@ CREATE TABLE IF NOT EXISTS video_analytics (
     fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(video_id, platform)
 );
+
+-- Ensure client_id exists for older schemas
+ALTER TABLE video_analytics ADD COLUMN IF NOT EXISTS client_id INT REFERENCES clients(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_analytics_video ON video_analytics(video_id);
 CREATE INDEX IF NOT EXISTS idx_analytics_account ON video_analytics(account_id);
@@ -220,6 +229,9 @@ CREATE TABLE IF NOT EXISTS automation_rules (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Ensure client_id exists for older schemas
+ALTER TABLE automation_rules ADD COLUMN IF NOT EXISTS client_id INT REFERENCES clients(id) ON DELETE SET NULL;
+
 CREATE INDEX IF NOT EXISTS idx_automation_rules_user_id ON automation_rules(user_id);
 CREATE INDEX IF NOT EXISTS idx_automation_rules_source_account ON automation_rules(source_account_id);
 
@@ -242,6 +254,9 @@ CREATE TABLE IF NOT EXISTS automation_executions (
     completed_at TIMESTAMP,
     UNIQUE(content_id, target_platform)  -- PREVENTS DUPLICATE POSTS
 );
+
+-- Ensure client_id exists for older schemas
+ALTER TABLE automation_executions ADD COLUMN IF NOT EXISTS client_id INT REFERENCES clients(id) ON DELETE SET NULL;
 
 CREATE INDEX IF NOT EXISTS idx_executions_status ON automation_executions(status);
 CREATE INDEX IF NOT EXISTS idx_executions_content ON automation_executions(content_id);
@@ -282,6 +297,10 @@ CREATE TABLE IF NOT EXISTS platform_events (
 
 CREATE INDEX IF NOT EXISTS idx_platform_events_account ON platform_events(account_id);
 CREATE INDEX IF NOT EXISTS idx_platform_events_type ON platform_events(event_type);
+-- Ensure columns exist for older schemas
+ALTER TABLE platform_events ADD COLUMN IF NOT EXISTS processed BOOLEAN DEFAULT false;
+ALTER TABLE platform_events ADD COLUMN IF NOT EXISTS external_id VARCHAR(255);
+
 CREATE INDEX IF NOT EXISTS idx_platform_events_processed ON platform_events(processed);
 CREATE INDEX IF NOT EXISTS idx_platform_events_external ON platform_events(external_id);
 

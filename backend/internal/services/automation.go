@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
+	"creati.in/creati/backend/internal/logger"
 	"creati.in/creati/backend/internal/utils"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 )
 
 type AutomationService struct {
@@ -57,7 +58,11 @@ func (s *AutomationService) ProcessYouTubeEvent(payload []byte) error {
 		return fmt.Errorf("missing videoId or channelId in payload")
 	}
 
-	log.Printf("Processing Automation for YouTube Video: %s (Channel: %s, Title: %s)", videoID, channelID, title)
+	logger.Get("automation").WithFields(logrus.Fields{
+		"video_id":   videoID,
+		"channel_id": channelID,
+		"title":      title,
+	}).Info("Processing Automation for YouTube Video")
 
 	// 1. Find active rules for this source account (ChannelID)
 	// We need to look up the platform_account ID using the platform_user_id (channelID)
@@ -69,7 +74,7 @@ func (s *AutomationService) ProcessYouTubeEvent(payload []byte) error {
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			log.Printf("No connected account found for channel: %s", channelID)
+			logger.Get("automation").WithField("channel_id", channelID).Warn("No connected account found for channel")
 			return nil
 		}
 		return err
@@ -100,7 +105,10 @@ func (s *AutomationService) ProcessYouTubeEvent(payload []byte) error {
 		json.Unmarshal(filtersRaw, &filters)
 
 		if !s.matchFilters(title, filters) {
-			log.Printf("Rule %d: Filters did not match for video %s", ruleID, videoID)
+			logger.Get("automation").WithFields(logrus.Fields{
+				"rule_id":  ruleID,
+				"video_id": videoID,
+			}).Debug("Filters did not match")
 			continue
 		}
 
@@ -164,7 +172,7 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 		WHERE ar.id = $1
 	`, ruleID).Scan(&sourcePlatform, &sourceAccountID)
 	if err != nil {
-		log.Printf("Failed to fetch source details for automation: %v", err)
+		logger.Get("automation").WithError(err).Error("Failed to fetch source details for automation")
 		return
 	}
 
@@ -172,7 +180,7 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 	var targetPlatform string
 	err = s.db.QueryRow("SELECT platform FROM platform_accounts WHERE id = $1", targetAccountID).Scan(&targetPlatform)
 	if err != nil {
-		log.Printf("Failed to fetch target platform: %v", err)
+		logger.Get("automation").WithError(err).Error("Failed to fetch target platform")
 		return
 	}
 
@@ -193,7 +201,7 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 	`, ruleID, sourcePlatform, targetPlatform, targetAccountID, traceID, settingsJSON).Scan(&executionID)
 
 	if err != nil {
-		log.Printf("Failed to create automation execution skeleton: %v", err)
+		logger.Get("automation").WithError(err).Error("Failed to create automation execution skeleton")
 		return
 	}
 
@@ -201,7 +209,7 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 	normalizer := NewContentNormalizer(s.db)
 	normalized, err := normalizer.NormalizeContent(ctx, sourcePlatform, sourceVideoID, title, "", 0, "")
 	if err != nil {
-		log.Printf("Failed to normalize content for automation %s: %v", executionID, err)
+		logger.Get("automation").WithField("execution_id", executionID).WithError(err).Error("Failed to normalize content for automation")
 		s.db.Exec("UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", err.Error(), executionID)
 		return
 	}
@@ -209,7 +217,7 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 	// 6. Update Execution with Content ID & Enqueue for Upload
 	_, err = s.db.ExecContext(ctx, "UPDATE automation_executions SET content_id = $1 WHERE id = $2", normalized.ContentID, executionID)
 	if err != nil {
-		log.Printf("Failed to link content to execution %s: %v", executionID, err)
+		logger.Get("automation").WithField("execution_id", executionID).WithError(err).Error("Failed to link content to execution")
 		s.db.Exec("UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", "db link error", executionID)
 		return
 	}
@@ -225,11 +233,15 @@ func (s *AutomationService) createAutomationJob(ruleID int, sourceVideoID string
 
 	err = s.queue.Client.LPush(ctx, QueueUpload, payload).Err()
 	if err != nil {
-		log.Printf("Failed to enqueue V2 automation job %s: %v", executionID, err)
+		logger.Get("automation").WithField("execution_id", executionID).WithError(err).Error("Failed to enqueue V2 automation job")
 		s.db.Exec("UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", "failed to enqueue", executionID)
 	}
 
-	log.Printf("V2 Automation %s primed and enqueued for content %s -> %s", executionID, normalized.ContentID, targetPlatform)
+	logger.Get("automation").WithFields(logrus.Fields{
+		"execution_id": executionID,
+		"content_id":   normalized.ContentID,
+		"target":       targetPlatform,
+	}).Info("V2 Automation primed and enqueued")
 }
 
 // BlastVideos initiates a one-off distribution of multiple past videos
@@ -353,7 +365,7 @@ func (s *AutomationService) createNotificationJob(ruleID int, sourceVideoID stri
 		WHERE ar.id = $1
 	`, ruleID).Scan(&sourcePlatform, &sourceAccountID)
 	if err != nil {
-		log.Printf("Failed to fetch source details for notification: %v", err)
+		logger.Get("automation").WithError(err).Error("Failed to fetch source details for notification")
 		return
 	}
 
@@ -367,7 +379,7 @@ func (s *AutomationService) createNotificationJob(ruleID int, sourceVideoID stri
 	`, ruleID, sourcePlatform, targetPlatform, targetAccountID, traceID).Scan(&executionID)
 
 	if err != nil {
-		log.Printf("Failed to create notification execution record: %v", err)
+		logger.Get("automation").WithError(err).Error("Failed to create notification execution record")
 		return
 	}
 
@@ -375,7 +387,7 @@ func (s *AutomationService) createNotificationJob(ruleID int, sourceVideoID stri
 	normalizer := NewContentNormalizer(s.db)
 	normalized, err := normalizer.NormalizeContent(ctx, sourcePlatform, sourceVideoID, title, "", 0, "")
 	if err != nil {
-		log.Printf("Failed to normalize content for notification %s: %v", executionID, err)
+		logger.Get("automation").WithField("execution_id", executionID).WithError(err).Error("Failed to normalize content for notification")
 		s.db.Exec("UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", err.Error(), executionID)
 		return
 	}
@@ -397,9 +409,12 @@ func (s *AutomationService) createNotificationJob(ruleID int, sourceVideoID stri
 
 	err = s.queue.Client.LPush(ctx, "audience_notification", payload).Err()
 	if err != nil {
-		log.Printf("Failed to enqueue notification job %s: %v", executionID, err)
+		logger.Get("automation").WithField("execution_id", executionID).WithError(err).Error("Failed to enqueue notification job")
 		s.db.Exec("UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", "failed to enqueue", executionID)
 	}
 
-	log.Printf("Unified Notification %s enqueued for %s", executionID, targetPlatform)
+	logger.Get("automation").WithFields(logrus.Fields{
+		"execution_id": executionID,
+		"target":       targetPlatform,
+	}).Info("Unified Notification enqueued")
 }

@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"time"
+
+	"creati.in/creati/backend/internal/logger"
+	"github.com/sirupsen/logrus"
 )
 
 // AnalyticsService handles efficient stats gathering and caching
@@ -76,7 +78,11 @@ func (s *AnalyticsService) GetUserStats(userID int, clientID *int) (*UserStats, 
 	)
 
 	if err != nil && err != sql.ErrNoRows {
-		log.Printf("[ERROR] GetUserStats failed: %v (userID: %d, clientID: %+v)", err, userID, clientID)
+		logger.Get("analytics").WithFields(logrus.Fields{
+			"error":     err,
+			"user_id":   userID,
+			"client_id": clientID,
+		}).Error("GetUserStats failed")
 		return nil, err
 	}
 
@@ -222,7 +228,7 @@ func (s *AnalyticsService) SyncUserAnalytics(userID int, clientID *int) {
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
-		log.Printf("Failed to list videos for sync: %v", err)
+		logger.Get("analytics").WithError(err).Error("Failed to list videos for sync")
 		return
 	}
 	defer rows.Close()
@@ -277,7 +283,12 @@ func (s *AnalyticsService) SyncVideoAnalytics(videoID int) {
 		// 4. Fetch from external API
 		stats, err := svc.FetchAnalytics(platformID, accountID)
 		if err != nil {
-			log.Printf("Failed to fetch analytics for %s video %s (account %d): %v", platform, platformID, accountID, err)
+			logger.Get("analytics").WithFields(logrus.Fields{
+				"platform":   platform,
+				"video_id":   platformID,
+				"account_id": accountID,
+				"error":      err,
+			}).Error("Failed to fetch analytics")
 			continue
 		}
 
@@ -288,7 +299,7 @@ func (s *AnalyticsService) SyncVideoAnalytics(videoID int) {
 		`, videoID, accountID, platform, stats.Views, stats.Likes, stats.Comments, stats.Shares)
 
 		if err != nil {
-			log.Printf("Failed to save analytics snapshot: %v", err)
+			logger.Get("analytics").WithError(err).Error("Failed to save analytics snapshot")
 		}
 	}
 }
@@ -300,7 +311,7 @@ func (s *AnalyticsService) DiscoverVideos(userID int) {
 	if s.cache != nil {
 		var last string
 		if err := s.cache.Get(context.Background(), discoveryKey, &last); err == nil {
-			log.Printf("Discovery throttle: Skipping for user %d (already ran recently)", userID)
+			logger.Get("analytics").WithField("user_id", userID).Debug("Discovery throttle: Skipping (already ran recently)")
 			return
 		}
 	}
@@ -312,7 +323,7 @@ func (s *AnalyticsService) DiscoverVideos(userID int) {
 		WHERE user_id = $1 AND status = 'connected'
 	`, userID)
 	if err != nil {
-		log.Printf("Failed to list accounts for discovery: %v", err)
+		logger.Get("analytics").WithError(err).Error("Failed to list accounts for discovery")
 		return
 	}
 	defer rows.Close()
@@ -333,7 +344,11 @@ func (s *AnalyticsService) DiscoverVideos(userID int) {
 		// Fetch recent videos from platform
 		externals, err := svc.FetchRecentVideos(accountID)
 		if err != nil {
-			log.Printf("Failed to fetch recent videos for %s account %d: %v", platform, accountID, err)
+			logger.Get("analytics").WithFields(logrus.Fields{
+				"platform":   platform,
+				"account_id": accountID,
+				"error":      err,
+			}).Error("Failed to fetch recent videos")
 			continue
 		}
 
@@ -366,7 +381,7 @@ func (s *AnalyticsService) DiscoverVideos(userID int) {
 
 			if err != nil {
 				tx.Rollback()
-				log.Printf("Failed to insert discovered video: %v", err)
+				logger.Get("analytics").WithError(err).Error("Failed to insert discovered video")
 				continue
 			}
 
@@ -377,12 +392,15 @@ func (s *AnalyticsService) DiscoverVideos(userID int) {
 
 			if err != nil {
 				tx.Rollback()
-				log.Printf("Failed to insert discovery job: %v", err)
+				logger.Get("analytics").WithError(err).Error("Failed to insert discovery job")
 				continue
 			}
 
 			tx.Commit()
-			log.Printf("Discovered and registered external video: %s (%s)", ev.Title, ev.ID)
+			logger.Get("analytics").WithFields(logrus.Fields{
+				"title": ev.Title,
+				"id":    ev.ID,
+			}).Info("Discovered and registered external video")
 		}
 	}
 
