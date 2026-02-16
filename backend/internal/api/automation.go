@@ -451,7 +451,10 @@ func (h *AutomationHandler) ListJobs(c *fiber.Ctx) error {
 					'sync' as job_type, 
 					e.rule_id, 
 					r.name, 
-					e.status,
+					CASE 
+						WHEN e.status = 'pending' AND e.scheduled_status = 'scheduled' THEN 'scheduled'
+						ELSE e.status 
+					END as status,
 					e.created_at,
 					COALESCE(spa.handle, spa.profile_name, e.source_platform) as source_handle,
 					e.source_platform as source_platform,
@@ -500,6 +503,7 @@ func (h *AutomationHandler) ListJobs(c *fiber.Ctx) error {
 					WHEN COUNT(*) = COUNT(*) FILTER (WHERE status IN ('completed', 'success', 'sent')) THEN 'success'
 					WHEN COUNT(*) = COUNT(*) FILTER (WHERE status = 'failed') THEN 'failed'
 					WHEN COUNT(*) = COUNT(*) FILTER (WHERE status = 'queued') THEN 'queued'
+					WHEN COUNT(*) = COUNT(*) FILTER (WHERE status = 'scheduled') THEN 'scheduled'
 					WHEN COUNT(*) FILTER (WHERE status = 'failed') > 0 THEN 'partial'
 					ELSE 'processing'
 				END as status,
@@ -577,7 +581,10 @@ func (h *AutomationHandler) GetJobDetails(c *fiber.Ctx) error {
 					COALESCE(e.trace_id::text, e.id::text) as display_id,
 					COALESCE(tpa.handle, tpa.profile_name, e.target_platform) as handle,
 					e.target_platform as platform,
-					e.status,
+					CASE 
+						WHEN e.status = 'pending' AND e.scheduled_status = 'scheduled' THEN 'scheduled'
+						ELSE e.status 
+					END as status,
 					COALESCE(e.error, '') as error,
 					COALESCE(c.title, 'Unknown') as content_title
 				FROM automation_executions e
