@@ -117,6 +117,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	apiRoutes.Post("/auth/register", authHandler.Register)
 	apiRoutes.Post("/auth/login", authHandler.Login)
 	apiRoutes.Post("/auth/logout", authHandler.Logout)
+	apiRoutes.Post("/auth/google", authHandler.GoogleLogin)
 	apiRoutes.Post("/platforms/:platform/callback", platformHandler.HandleCallback)
 	apiRoutes.Get("/proxy/video", proxyHandler.HandleProxyVideo)
 
@@ -127,6 +128,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 
 	protected := apiRoutes.Use(middleware.AuthMiddleware)
 	protected.Get("/auth/me", authHandler.CheckAuth)
+	protected.Put("/auth/profile", authHandler.UpdateProfile)
 
 	// Agency Routes
 	agencyRoutes := protected.Group("/agency")

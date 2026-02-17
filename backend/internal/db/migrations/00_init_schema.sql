@@ -14,12 +14,23 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255), -- Nullable for Google Auth users
+    name VARCHAR(255),
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    picture_url TEXT,
     ai_credits INTEGER DEFAULT 10,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+-- Ensure columns exist for older schemas
+ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS picture_url TEXT;
+ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
 
 -- Creator preferences
 CREATE TABLE IF NOT EXISTS creator_preferences (

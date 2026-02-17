@@ -10,6 +10,10 @@ type User struct {
 	ID           int       `json:"id" db:"id"`
 	Email        string    `json:"email" db:"email"`
 	PasswordHash string    `json:"-" db:"password_hash"` // Never expose in JSON
+	Name         string    `json:"name" db:"name"`
+	FirstName    string    `json:"first_name" db:"first_name"`
+	LastName     string    `json:"last_name" db:"last_name"`
+	PictureURL   string    `json:"picture_url" db:"picture_url"`
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 }
 

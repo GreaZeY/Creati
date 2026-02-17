@@ -6,6 +6,7 @@ import {
   Outlet,
 } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 import { Landing } from "./pages/Landing";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
@@ -18,6 +19,7 @@ import {
   SettingsMain,
   SettingsSectionPlaceholder,
 } from "./pages/Settings";
+import { ProfileManager } from "./components/settings/ProfileManager";
 import { WorkspaceManager } from "./components/settings/WorkspaceManager";
 import { Upload } from "./pages/Upload";
 import { Automations } from "./pages/automations/Automations";
@@ -145,6 +147,7 @@ const router = createBrowserRouter([
             ),
             children: [
               { index: true, element: <SettingsMain /> },
+              { path: "profile", element: <ProfileManager /> },
               { path: "workspaces", element: <WorkspaceManager /> },
               { path: "*", element: <SettingsSectionPlaceholder /> },
             ],
@@ -259,13 +262,17 @@ const router = createBrowserRouter([
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <UIProvider>
-          <ClientProvider>
-            <RouterProvider router={router} />
-          </ClientProvider>
-        </UIProvider>
-      </AuthProvider>
+      <GoogleOAuthProvider
+        clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ""}
+      >
+        <AuthProvider>
+          <UIProvider>
+            <ClientProvider>
+              <RouterProvider router={router} />
+            </ClientProvider>
+          </UIProvider>
+        </AuthProvider>
+      </GoogleOAuthProvider>
     </QueryClientProvider>
   );
 }

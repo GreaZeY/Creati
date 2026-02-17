@@ -12,6 +12,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"google.golang.org/api/idtoken"
 )
 
 /**
@@ -28,8 +29,10 @@ func NewAuthHandler(db *sql.DB) *AuthHandler {
 }
 
 type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
 }
 
 type AuthResponse struct {
@@ -64,9 +67,10 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 
 	// Insert user
 	var userID int
+	fullName := req.FirstName + " " + req.LastName
 	err = tx.QueryRow(
-		"INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id",
-		req.Email, string(hashedPassword),
+		"INSERT INTO users (email, password_hash, name, first_name, last_name, picture_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+		req.Email, string(hashedPassword), fullName, req.FirstName, req.LastName, "",
 	).Scan(&userID)
 
 	if err != nil {
@@ -109,6 +113,105 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	})
 }
 
+type GoogleLoginRequest struct {
+	IDToken   string `json:"idToken"`
+	FirstName string `json:"firstName,omitempty"`
+	LastName  string `json:"lastName,omitempty"`
+}
+
+// GoogleLogin handles Google OAuth login/registration
+func (h *AuthHandler) GoogleLogin(c *fiber.Ctx) error {
+	var req GoogleLoginRequest
+	if err := c.BodyParser(&req); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
+	}
+
+	// 1. Verify Google ID Token
+	// Using the client ID from environment
+	payload, err := idtoken.Validate(c.Context(), req.IDToken, os.Getenv("GOOGLE_CLIENT_ID"))
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "invalid google token", err)
+	}
+
+	email := payload.Claims["email"].(string)
+	name := payload.Claims["name"].(string)
+	firstName, _ := payload.Claims["given_name"].(string)
+	lastName, _ := payload.Claims["family_name"].(string)
+	picture, _ := payload.Claims["picture"].(string)
+
+	// User-provided names take precedence if provided (e.g. from signup form)
+	if req.FirstName != "" {
+		firstName = req.FirstName
+	}
+	if req.LastName != "" {
+		lastName = req.LastName
+	}
+
+	// 2. Check if user exists, otherwise create
+	var user models.User
+	err = h.db.QueryRow(`
+		SELECT id, email, name, first_name, last_name, picture_url 
+		FROM users WHERE email = $1
+	`, email).Scan(&user.ID, &user.Email, &user.Name, &user.FirstName, &user.LastName, &user.PictureURL)
+
+	if err == sql.ErrNoRows {
+		// Create new user
+		tx, err := h.db.Begin()
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
+		}
+		defer tx.Rollback()
+
+		err = tx.QueryRow(`
+			INSERT INTO users (email, name, first_name, last_name, picture_url) 
+			VALUES ($1, $2, $3, $4, $5) RETURNING id
+		`, email, name, firstName, lastName, picture).Scan(&user.ID)
+
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to create user", err)
+		}
+
+		// Create free subscription
+		_, err = tx.Exec(`
+			INSERT INTO subscriptions (user_id, plan, billing_cycle, status, current_period_end)
+			VALUES ($1, $2, 'monthly', 'active', NOW() + INTERVAL '1 month')
+		`, user.ID, features.PlanFree)
+
+		if err != nil {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to initialize subscription", err)
+		}
+
+		if err := tx.Commit(); err != nil {
+			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "commit failed", err)
+		}
+
+		user.Email = email
+		user.Name = name
+		user.FirstName = firstName
+		user.LastName = lastName
+		user.PictureURL = picture
+	} else if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "database error", err)
+	} else {
+		// Update existing user's name/picture if they just came from Google (optional improvement)
+		_, _ = h.db.Exec(`
+			UPDATE users SET name = $1, picture_url = $2 WHERE id = $3 AND (name = '' OR picture_url = '')
+		`, name, picture, user.ID)
+	}
+
+	// 3. Generate JWT and return
+	token, err := generateToken(user.ID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate token", err)
+	}
+
+	setAuthCookies(c, token)
+
+	return utils.SuccessResponse(c, AuthResponse{
+		User: user,
+	}, "google login successful")
+}
+
 // Login handles user login
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	var req LoginRequest
@@ -119,9 +222,9 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	// Get user from database
 	var user models.User
 	err := h.db.QueryRow(
-		"SELECT id, email, password_hash FROM users WHERE email = $1",
+		"SELECT id, email, password_hash, name, first_name, last_name, picture_url FROM users WHERE email = $1",
 		req.Email,
-	).Scan(&user.ID, &user.Email, &user.PasswordHash)
+	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.FirstName, &user.LastName, &user.PictureURL)
 
 	if err == sql.ErrNoRows {
 		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "invalid credentials")
@@ -156,12 +259,41 @@ func (h *AuthHandler) CheckAuth(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(int)
 
 	var user models.User
-	err := h.db.QueryRow("SELECT id, email FROM users WHERE id = $1", userID).Scan(&user.ID, &user.Email)
+	err := h.db.QueryRow(`
+		SELECT id, email, name, first_name, last_name, picture_url FROM users WHERE id = $1
+	`, userID).Scan(&user.ID, &user.Email, &user.Name, &user.FirstName, &user.LastName, &user.PictureURL)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusNotFound, "user not found")
 	}
 
 	return utils.SuccessResponse(c, AuthResponse{User: user}, "authenticated")
+}
+
+type UpdateProfileRequest struct {
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	Name      string `json:"name"`
+	Picture   string `json:"picture_url"`
+}
+
+// UpdateProfile handles updating user profile information
+func (h *AuthHandler) UpdateProfile(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(int)
+	var req UpdateProfileRequest
+	if err := c.BodyParser(&req); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
+	}
+
+	_, err := h.db.Exec(`
+		UPDATE users SET name = $1, first_name = $2, last_name = $3, picture_url = $4, updated_at = NOW()
+		WHERE id = $5
+	`, req.Name, req.FirstName, req.LastName, req.Picture, userID)
+
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update profile", err)
+	}
+
+	return utils.SuccessResponse(c, nil, "profile updated successfully")
 }
 
 // Logout clears the auth cookies

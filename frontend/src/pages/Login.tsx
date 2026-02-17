@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { Label } from "@/components/ui/Label";
 import { slideInBottom } from "@/lib/animations";
 import { useUI } from "@/context/UIContext";
+import { GoogleLogin } from "@react-oauth/google";
 
 export const Login = () => {
   const [email, setEmail] = useState("");
@@ -16,7 +17,7 @@ export const Login = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const { login } = useAuth();
+  const { login, googleLogin } = useAuth();
   const navigate = useNavigate();
   const { setInputFocused } = useUI();
 
@@ -47,6 +48,19 @@ export const Login = () => {
     }
   };
 
+  const handleGoogleSuccess = async (response: any) => {
+    setLoading(true);
+    setError("");
+    try {
+      await googleLogin(response.credential);
+      navigate("/dashboard");
+    } catch (err: any) {
+      setError("Google login failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex items-center justify-center p-4 min-h-[70vh]">
       <motion.div
@@ -65,6 +79,28 @@ export const Login = () => {
         </div>
 
         <div className="bg-card p-8 rounded-2xl border border-border">
+          <div className="flex justify-center mb-8">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => setError("Google Login Failed")}
+              useOneTap
+              theme="filled_black"
+              shape="pill"
+              width="320px"
+            />
+          </div>
+
+          <div className="relative mb-8">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">
+                Or continue with email
+              </span>
+            </div>
+          </div>
+
           <form
             onSubmit={handleSubmit}
             className="space-y-6"

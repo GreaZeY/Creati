@@ -53,7 +53,21 @@ export interface Client {
   createdAt: string;
 }
 
-// Create axios instance with defaults
+export interface User {
+  id: number;
+  email: string;
+  name?: string;
+  first_name?: string;
+  last_name?: string;
+  picture_url?: string;
+  createdAt: string;
+}
+
+export interface AuthResponse {
+  token?: string;
+  user: User;
+}
+
 // Create axios instance with defaults
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -125,15 +139,28 @@ api.interceptors.response.use(
 
 export const authAPI = {
   login: (email: string, password: string) =>
-    api.post("/auth/login", { email, password }),
-
-  register: (email: string, password: string) =>
-    api.post("/auth/register", { email, password }),
-
-  // Check session on load
-  check: () => api.get("/auth/me"),
-
-  logout: () => api.post("/auth/logout"),
+    api.post<ApiResponse<AuthResponse>>("/auth/login", { email, password }),
+  register: (email: string, password: string, firstName?: string, lastName?: string) =>
+    api.post<ApiResponse<AuthResponse>>("/auth/register", { 
+      email, 
+      password,
+      firstName,
+      lastName
+    }),
+  googleLogin: (idToken: string, firstName?: string, lastName?: string) =>
+    api.post<ApiResponse<AuthResponse>>("/auth/google", {
+      idToken,
+      firstName,
+      lastName,
+    }),
+  logout: () => api.post<ApiResponse<null>>("/auth/logout", {}),
+  check: () => api.get<ApiResponse<AuthResponse>>("/auth/me"),
+  updateProfile: (data: {
+    firstName: string;
+    lastName: string;
+    name: string;
+    picture_url: string;
+  }) => api.put<ApiResponse<null>>("/auth/profile", data),
 };
 
 export const preferencesAPI = {

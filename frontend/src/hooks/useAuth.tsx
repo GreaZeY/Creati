@@ -1,24 +1,27 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import type { ReactNode } from "react";
-import { authAPI } from "@/lib/api";
+import { authAPI, type User } from "@/lib/api";
 
 interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (
+    email: string,
+    password: string,
+    firstName?: string,
+    lastName?: string,
+  ) => Promise<void>;
+  googleLogin: (
+    idToken: string,
+    firstName?: string,
+    lastName?: string,
+  ) => Promise<void>;
   logout: () => void;
   loading: boolean;
   user: User | null;
 }
 
-interface User {
-  id: number;
-  email: string;
-  name: string;
-  profilePicture: string;
-}
-
-// ... imports logic fixed
+// Redundant User interface removed, using import from lib/api
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -53,9 +56,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setIsAuthenticated(true);
   };
 
-  const register = async (email: string, password: string) => {
-    await authAPI.register(email, password);
+  const register = async (
+    email: string,
+    password: string,
+    firstName?: string,
+    lastName?: string,
+  ) => {
+    await authAPI.register(email, password, firstName, lastName);
     // Cookie is set by backend
+    setIsAuthenticated(true);
+  };
+
+  const googleLogin = async (
+    idToken: string,
+    firstName?: string,
+    lastName?: string,
+  ) => {
+    await authAPI.googleLogin(idToken, firstName, lastName);
     setIsAuthenticated(true);
   };
 
@@ -72,7 +89,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <AuthContext.Provider
-      value={{ isAuthenticated, login, register, logout, loading, user }}
+      value={{
+        isAuthenticated,
+        login,
+        register,
+        googleLogin,
+        logout,
+        loading,
+        user,
+      }}
     >
       {children}
     </AuthContext.Provider>
