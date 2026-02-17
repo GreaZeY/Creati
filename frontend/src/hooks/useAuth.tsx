@@ -62,10 +62,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = async (email: string, password: string) => {
-    await authAPI.login(email, password);
+    const { data } = await authAPI.login(email, password);
     queryClient.clear();
     // Cookie is set by backend
     setIsAuthenticated(true);
+    setUser(data?.data?.user);
   };
 
   const register = async (
@@ -74,10 +75,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     firstName?: string,
     lastName?: string,
   ) => {
-    await authAPI.register(email, password, firstName, lastName);
+    const { data } = await authAPI.register(
+      email,
+      password,
+      firstName,
+      lastName,
+    );
     queryClient.clear();
     // Cookie is set by backend
     setIsAuthenticated(true);
+    setUser(data?.data?.user);
   };
 
   const googleLogin = async (
@@ -85,9 +92,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     firstName?: string,
     lastName?: string,
   ) => {
-    await authAPI.googleLogin(idToken, firstName, lastName);
+    const { data } = await authAPI.googleLogin(idToken, firstName, lastName);
     queryClient.clear();
     setIsAuthenticated(true);
+    setUser(data?.data?.user);
   };
 
   const logout = async () => {
