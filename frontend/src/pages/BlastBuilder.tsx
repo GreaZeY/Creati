@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, lazy, Suspense } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
@@ -20,10 +20,12 @@ import { cn } from "@/lib/utils";
 import { useClient } from "@/context/ClientContext";
 import { PlatformChips } from "@/components/composer/Editor/PlatformChips";
 import { usePlatforms } from "@/hooks/usePlatforms";
-import {
-  VideoEditorModal,
-  type ProcessingSettings,
-} from "@/components/video/VideoEditorModal";
+const VideoEditorModal = lazy(() =>
+  import("@/components/video/VideoEditorModal").then((m) => ({
+    default: m.VideoEditorModal,
+  })),
+);
+import type { ProcessingSettings } from "@/components/video/VideoEditorModal";
 import { Edit2 } from "lucide-react";
 import { PublishDropdown } from "@/components/composer/PublishBar/PublishDropdown";
 import { ScheduleModal } from "@/components/composer/PublishBar/ScheduleModal";
@@ -436,19 +438,21 @@ export function BlastBuilder() {
         </div>
       </div>
 
-      {editingVideo && (
-        <VideoEditorModal
-          isOpen={!!editingVideo}
-          onClose={() => setEditingVideo(null)}
-          video={{
-            id: editingVideo.id,
-            title: editingVideo.title,
-            url: editingVideo.url || editingVideo.downloadUrl,
-          }}
-          initialSettings={videoSettings[editingVideo.id]}
-          onSave={handleSaveSettings}
-        />
-      )}
+      <Suspense fallback={null}>
+        {editingVideo && (
+          <VideoEditorModal
+            isOpen={!!editingVideo}
+            onClose={() => setEditingVideo(null)}
+            video={{
+              id: editingVideo.id,
+              title: editingVideo.title,
+              url: editingVideo.url || editingVideo.downloadUrl,
+            }}
+            initialSettings={videoSettings[editingVideo.id]}
+            onSave={handleSaveSettings}
+          />
+        )}
+      </Suspense>
 
       <ScheduleModal
         isOpen={isScheduleModalOpen}

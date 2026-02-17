@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { Zap } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
@@ -8,8 +8,16 @@ import { SocialTextArea } from "@/components/composer/Editor/SocialTextArea";
 import type { SocialTextAreaHandle } from "@/components/composer/Editor/SocialTextArea";
 import { PlatformChips } from "@/components/composer/Editor/PlatformChips";
 import { EditorFooter } from "@/components/composer/Editor/EditorFooter";
-import { AIWriteModal } from "@/components/composer/Editor/AIWriteModal";
-import { GiphyPicker } from "@/components/composer/Editor/GiphyPicker";
+const AIWriteModal = lazy(() =>
+  import("@/components/composer/Editor/AIWriteModal").then((m) => ({
+    default: m.AIWriteModal,
+  })),
+);
+const GiphyPicker = lazy(() =>
+  import("@/components/composer/Editor/GiphyPicker").then((m) => ({
+    default: m.GiphyPicker,
+  })),
+);
 import { EmojiPicker } from "@/components/composer/Editor/EmojiPicker";
 import { PreviewPane } from "@/components/composer/Preview/PreviewPane";
 import { PublishDropdown } from "@/components/composer/PublishBar/PublishDropdown";
@@ -420,14 +428,16 @@ export function PostComposer() {
         }}
       />
 
-      <AIWriteModal
-        isOpen={isAIModalOpen}
-        onClose={() => setIsAIModalOpen(false)}
-        onInsert={(text) =>
-          setPost((prev) => ({ ...prev, text: prev.text + text }))
-        }
-        currentText={post.text}
-      />
+      <Suspense fallback={null}>
+        <AIWriteModal
+          isOpen={isAIModalOpen}
+          onClose={() => setIsAIModalOpen(false)}
+          onInsert={(text) =>
+            setPost((prev) => ({ ...prev, text: prev.text + text }))
+          }
+          currentText={post.text}
+        />
+      </Suspense>
 
       <Modal
         isOpen={isMediaModalOpen}
@@ -457,11 +467,13 @@ export function PostComposer() {
         </div>
       </Modal>
 
-      <GiphyPicker
-        isOpen={isGiphyPickerOpen}
-        onClose={() => setIsGiphyPickerOpen(false)}
-        onSelect={handleSelectGif}
-      />
+      <Suspense fallback={null}>
+        <GiphyPicker
+          isOpen={isGiphyPickerOpen}
+          onClose={() => setIsGiphyPickerOpen(false)}
+          onSelect={handleSelectGif}
+        />
+      </Suspense>
 
       <ScheduleModal
         isOpen={isScheduleModalOpen}

@@ -23,5 +23,17 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-charts': ['recharts'],
+          'vendor-motion': ['framer-motion'],
+          'vendor-icons': ['lucide-react'],
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-ui': ['@tanstack/react-query', '@tanstack/react-virtual', 'date-fns'],
+        }
+      }
+    },
+  }
 });

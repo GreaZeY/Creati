@@ -1,46 +1,107 @@
+import { Suspense, lazy, useEffect, useLayoutEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   createBrowserRouter,
   RouterProvider,
   Navigate,
   Outlet,
+  useNavigation,
+  useLocation,
 } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
 import { GoogleOAuthProvider } from "@react-oauth/google";
-import { Landing } from "./pages/Landing";
-import { Login } from "./pages/Login";
-import { Register } from "./pages/Register";
-import { ConnectPlatforms } from "./pages/ConnectPlatforms";
-import { Dashboard } from "./pages/Dashboard";
-import { Platforms } from "./pages/Platforms";
-import { Analytics } from "./pages/Analytics";
-import {
-  Settings,
-  SettingsMain,
-  SettingsSectionPlaceholder,
-} from "./pages/Settings";
-import { ProfileManager } from "./components/settings/ProfileManager";
-import { WorkspaceManager } from "./components/settings/WorkspaceManager";
-import { Upload } from "./pages/Upload";
-import { Automations } from "./pages/automations/Automations";
-import { UnifiedBuilder } from "./pages/automations/UnifiedBuilder";
-import { QueuedJobs } from "@/pages/QueuedJobs";
-import { BlastBuilder } from "./pages/BlastBuilder";
-import { PostComposer } from "./pages/PostComposer";
-import { Pricing } from "./pages/Pricing";
-import { WorkspaceSetup } from "./pages/WorkspaceSetup";
+
+// Lazy-loaded pages
+const Landing = lazy(() =>
+  import("./pages/Landing").then((m) => ({ default: m.Landing })),
+);
+const Login = lazy(() =>
+  import("./pages/Login").then((m) => ({ default: m.Login })),
+);
+const Register = lazy(() =>
+  import("./pages/Register").then((m) => ({ default: m.Register })),
+);
+const ConnectPlatforms = lazy(() =>
+  import("./pages/ConnectPlatforms").then((m) => ({
+    default: m.ConnectPlatforms,
+  })),
+);
+const Dashboard = lazy(() =>
+  import("./pages/Dashboard").then((m) => ({ default: m.Dashboard })),
+);
+const Platforms = lazy(() =>
+  import("./pages/Platforms").then((m) => ({ default: m.Platforms })),
+);
+const Analytics = lazy(() =>
+  import("./pages/Analytics").then((m) => ({ default: m.Analytics })),
+);
+const Settings = lazy(() =>
+  import("./pages/Settings").then((m) => ({ default: m.Settings })),
+);
+const SettingsMain = lazy(() =>
+  import("./pages/Settings").then((m) => ({ default: m.SettingsMain })),
+);
+const SettingsSectionPlaceholder = lazy(() =>
+  import("./pages/Settings").then((m) => ({
+    default: m.SettingsSectionPlaceholder,
+  })),
+);
+const ProfileManager = lazy(() =>
+  import("./components/settings/ProfileManager").then((m) => ({
+    default: m.ProfileManager,
+  })),
+);
+const WorkspaceManager = lazy(() =>
+  import("./components/settings/WorkspaceManager").then((m) => ({
+    default: m.WorkspaceManager,
+  })),
+);
+const Upload = lazy(() =>
+  import("./pages/Upload").then((m) => ({ default: m.Upload })),
+);
+const Automations = lazy(() =>
+  import("./pages/automations/Automations").then((m) => ({
+    default: m.Automations,
+  })),
+);
+const UnifiedBuilder = lazy(() =>
+  import("./pages/automations/UnifiedBuilder").then((m) => ({
+    default: m.UnifiedBuilder,
+  })),
+);
+const QueuedJobs = lazy(() =>
+  import("@/pages/QueuedJobs").then((m) => ({ default: m.QueuedJobs })),
+);
+const BlastBuilder = lazy(() =>
+  import("./pages/BlastBuilder").then((m) => ({ default: m.BlastBuilder })),
+);
+const PostComposer = lazy(() =>
+  import("./pages/PostComposer").then((m) => ({ default: m.PostComposer })),
+);
+const Pricing = lazy(() =>
+  import("./pages/Pricing").then((m) => ({ default: m.Pricing })),
+);
+const WorkspaceSetup = lazy(() =>
+  import("./pages/WorkspaceSetup").then((m) => ({ default: m.WorkspaceSetup })),
+);
+const PlatformCallback = lazy(() =>
+  import("./pages/PlatformCallback").then((m) => ({
+    default: m.PlatformCallback,
+  })),
+);
+
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PublicRoute } from "./components/PublicRoute";
 import { PageTransition } from "./components/layout/PageTransition";
-import { UIProvider } from "./context/UIContext";
+import { UIProvider, useUI } from "./context/UIContext";
 import { ClientProvider } from "./context/ClientContext";
 import { BackgroundEffect } from "./components/ui/BackgroundEffect";
 import { Toaster } from "./components/ui/Toaster";
+import { LoadingBar } from "./components/ui/LoadingBar";
 import "./index.css";
 
 import { MainLayout } from "./components/layout/MainLayout";
 import { AuthLayout } from "./components/layout/AuthLayout";
-import { PlatformCallback } from "./pages/PlatformCallback";
 
 // Create React Query client
 const queryClient = new QueryClient({
@@ -52,15 +113,53 @@ const queryClient = new QueryClient({
   },
 });
 
+const PageTracker = () => {
+  const { setIsLoading } = useUI();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Small delay to ensure the bar is visible long enough for the eye
+    const timeout = setTimeout(() => {
+      setIsLoading(false);
+    }, 100);
+    return () => clearTimeout(timeout);
+  }, [location.pathname, setIsLoading]);
+
+  return <Outlet />;
+};
+
+const RootLayout = () => {
+  const { isLoading, setIsLoading } = useUI();
+  const navigation = useNavigation();
+  const location = useLocation();
+
+  // Use useLayoutEffect for the START signal to ensure it happens BEFORE child useEffects
+  useLayoutEffect(() => {
+    setIsLoading(true);
+  }, [location.pathname, setIsLoading]);
+
+  // Sync state with router-driven navigation (loaders/actions)
+  useEffect(() => {
+    if (navigation.state === "loading") {
+      setIsLoading(true);
+    }
+  }, [navigation.state, setIsLoading]);
+
+  return (
+    <>
+      <BackgroundEffect />
+      <Toaster />
+      <LoadingBar isLoading={isLoading} />
+      <Suspense fallback={null}>
+        <PageTracker />
+      </Suspense>
+    </>
+  );
+};
+
 const router = createBrowserRouter([
   {
-    element: (
-      <>
-        <BackgroundEffect />
-        <Toaster />
-        <Outlet />
-      </>
-    ),
+    element: <RootLayout />,
     children: [
       {
         path: "/",
