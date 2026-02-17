@@ -71,7 +71,13 @@ const router = createBrowserRouter([
         ),
       },
       {
-        element: <AuthLayout />,
+        element: (
+          <GoogleOAuthProvider
+            clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ""}
+          >
+            <AuthLayout />
+          </GoogleOAuthProvider>
+        ),
         children: [
           {
             path: "login",
@@ -98,7 +104,9 @@ const router = createBrowserRouter([
       {
         element: (
           <ProtectedRoute>
-            <MainLayout />
+            <ClientProvider>
+              <MainLayout />
+            </ClientProvider>
           </ProtectedRoute>
         ),
         children: [
@@ -262,17 +270,11 @@ const router = createBrowserRouter([
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <GoogleOAuthProvider
-        clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ""}
-      >
-        <AuthProvider>
-          <UIProvider>
-            <ClientProvider>
-              <RouterProvider router={router} />
-            </ClientProvider>
-          </UIProvider>
-        </AuthProvider>
-      </GoogleOAuthProvider>
+      <AuthProvider>
+        <UIProvider>
+          <RouterProvider router={router} />
+        </UIProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { User, Camera, Save, CheckCircle2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
@@ -16,6 +16,13 @@ export const ProfileManager = () => {
   const [name, setName] = useState(user?.name || "");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  // Sync state when user object changes (e.g. account switch or fetch complete)
+  useEffect(() => {
+    setFirstName(user?.first_name || "");
+    setLastName(user?.last_name || "");
+    setName(user?.name || "");
+  }, [user]);
 
   const handleSave = async () => {
     setLoading(true);

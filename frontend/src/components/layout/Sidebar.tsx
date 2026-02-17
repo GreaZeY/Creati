@@ -11,6 +11,7 @@ import {
   List,
   MessageSquare,
   Video,
+  User as UserIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -124,12 +125,16 @@ export function Sidebar() {
         {/* Footer / Account */}
         <div className="p-3">
           <div className="glass-panel rounded-3xl flex items-center gap-3 cursor-pointer transition-all duration-300 border border-white/50 dark:border-glass-border group relative">
-            <div className="relative w-12 h-12 rounded-full overflow-hidden ring-2 ring-neon-pink ring-offset-2 ring-offset-white dark:ring-offset-midnight">
-              <img
-                alt="Profile"
-                className="w-full h-full object-cover"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrRDGLkZjh7VvZ0Kda0Meni_8Dh70VBttDYZjftO8Qn4AqXupdWf6qRN3zaekU2dy2PNZqOyLauKHzdgPFazMxrKgh1yr8paZjFLqgiVAWr4LB7K4yb_Taxbd-w3nfLjH9lSb-Gz6L8T4jNpcwjBizTXGOeZ4XfQh-OitmSAEGqFHmvMWwKUeYasg-mppO1f9vtRSkCifnx8JJXA0sqzPjamVx8pedeL1QWY1R2ikl_ZY4CQLWQaP7FS6rOi47Mo76Nhe__cpGAa4"
-              />
+            <div className="relative w-12 h-12 rounded-full overflow-hidden ring-2 ring-neon-pink ring-offset-2 ring-offset-white dark:ring-offset-midnight bg-secondary/20 flex items-center justify-center">
+              {user?.picture_url ? (
+                <img
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                  src={user.picture_url}
+                />
+              ) : (
+                <UserIcon size={24} className="text-slate-400" />
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <TextTruncate

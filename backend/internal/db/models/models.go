@@ -15,6 +15,7 @@ type User struct {
 	LastName     string    `json:"last_name" db:"last_name"`
 	PictureURL   string    `json:"picture_url" db:"picture_url"`
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // CreatorPreferences model

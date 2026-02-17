@@ -150,7 +150,7 @@ func (h *AuthHandler) GoogleLogin(c *fiber.Ctx) error {
 	// 2. Check if user exists, otherwise create
 	var user models.User
 	err = h.db.QueryRow(`
-		SELECT id, email, name, first_name, last_name, picture_url 
+		SELECT id, email, COALESCE(name, ''), COALESCE(first_name, ''), COALESCE(last_name, ''), COALESCE(picture_url, '') 
 		FROM users WHERE email = $1
 	`, email).Scan(&user.ID, &user.Email, &user.Name, &user.FirstName, &user.LastName, &user.PictureURL)
 
@@ -222,7 +222,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	// Get user from database
 	var user models.User
 	err := h.db.QueryRow(
-		"SELECT id, email, password_hash, name, first_name, last_name, picture_url FROM users WHERE email = $1",
+		"SELECT id, email, COALESCE(password_hash, ''), COALESCE(name, ''), COALESCE(first_name, ''), COALESCE(last_name, ''), COALESCE(picture_url, '') FROM users WHERE email = $1",
 		req.Email,
 	).Scan(&user.ID, &user.Email, &user.PasswordHash, &user.Name, &user.FirstName, &user.LastName, &user.PictureURL)
 
@@ -260,7 +260,7 @@ func (h *AuthHandler) CheckAuth(c *fiber.Ctx) error {
 
 	var user models.User
 	err := h.db.QueryRow(`
-		SELECT id, email, name, first_name, last_name, picture_url FROM users WHERE id = $1
+		SELECT id, email, COALESCE(name, ''), COALESCE(first_name, ''), COALESCE(last_name, ''), COALESCE(picture_url, '') FROM users WHERE id = $1
 	`, userID).Scan(&user.ID, &user.Email, &user.Name, &user.FirstName, &user.LastName, &user.PictureURL)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusNotFound, "user not found")

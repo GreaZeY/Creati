@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS users (
     last_name VARCHAR(100),
     picture_url TEXT,
     ai_credits INTEGER DEFAULT 10,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -30,6 +31,7 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS name VARCHAR(255);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(100);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(100);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS picture_url TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;
 ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
 
 -- Creator preferences
@@ -409,6 +411,13 @@ CREATE TRIGGER update_automation_rules_updated_at
 DROP TRIGGER IF EXISTS update_automation_executions_updated_at ON automation_executions;
 CREATE TRIGGER update_automation_executions_updated_at
     BEFORE UPDATE ON automation_executions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Trigger: users updated_at
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
+CREATE TRIGGER update_users_updated_at
+    BEFORE UPDATE ON users
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 

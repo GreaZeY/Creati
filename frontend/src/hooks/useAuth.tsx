@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { authAPI, type User } from "@/lib/api";
 
@@ -33,10 +34,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     // Check session with backend on mount
     const checkAuth = async () => {
+      // Optimization: if no CSRF token cookie, we likely aren't logged in
+      const hasCookie = document.cookie
+        .split(";")
+        .some((c) => c.trim().startsWith("csrf_token="));
+      if (!hasCookie) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const { data } = await authAPI.check();
         setIsAuthenticated(true);
@@ -52,6 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     await authAPI.login(email, password);
+    queryClient.clear();
     // Cookie is set by backend
     setIsAuthenticated(true);
   };
@@ -63,6 +75,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     lastName?: string,
   ) => {
     await authAPI.register(email, password, firstName, lastName);
+    queryClient.clear();
     // Cookie is set by backend
     setIsAuthenticated(true);
   };
@@ -73,6 +86,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     lastName?: string,
   ) => {
     await authAPI.googleLogin(idToken, firstName, lastName);
+    queryClient.clear();
     setIsAuthenticated(true);
   };
 
@@ -82,7 +96,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch (error) {
       console.error("Logout failed", error);
     }
+    queryClient.clear();
     setIsAuthenticated(false);
+    setUser(null);
     // Let the router handle redirect if needed, or api.ts interceptor
     // window.location.href = '/login';
   };
