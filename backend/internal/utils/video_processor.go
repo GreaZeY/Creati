@@ -3,7 +3,6 @@ package utils
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 
 	ffmpeg "github.com/u2takey/ffmpeg-go"
@@ -110,19 +109,19 @@ func (vp *VideoProcessor) ApplyOverlays(ctx context.Context, inputPath string, o
 func (vp *VideoProcessor) MergeStreams(ctx context.Context, videoPath, audioPath string) (string, error) {
 	outputPath := filepath.Dir(videoPath) + string(filepath.Separator) + "merged_" + filepath.Base(videoPath)
 
-	// ffmpeg -i video.mp4 -i audio.m4a -c:v copy -c:a copy output.mp4
-	cmd := exec.CommandContext(ctx, "ffmpeg",
-		"-i", videoPath,
-		"-i", audioPath,
-		"-c:v", "copy",
-		"-c:a", "copy",
-		"-y", // overwrite
+	err := ffmpeg.Output(
+		[]*ffmpeg.Stream{
+			ffmpeg.Input(videoPath),
+			ffmpeg.Input(audioPath),
+		},
 		outputPath,
-	)
+		ffmpeg.KwArgs{"c:v": "copy", "c:a": "copy"},
+	).
+		OverWriteOutput().
+		Run()
 
-	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("ffmpeg merge failed: %s (%w)", string(output), err)
+		return "", fmt.Errorf("ffmpeg merge failed: %w", err)
 	}
 
 	return outputPath, nil

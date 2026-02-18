@@ -9,6 +9,7 @@ import (
 	url "net/url"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -499,49 +500,27 @@ func (y *YouTubeService) GetStream(ctx context.Context, vidID string) (io.ReadCl
 	client := youtube_dl.Client{}
 	video, err := client.GetVideoContext(ctx, vidID)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("failed to get video info: %w", err)
 	}
 
-	formats := video.Formats.WithAudioChannels()
-
-	// Prioritize itag 22 (720p combined mp4) if available
-	var bestFormat *youtube_dl.Format
-	for i := range formats {
-		if formats[i].ItagNo == 22 {
-			bestFormat = &formats[i]
-			break
-		}
+	// For streaming/preview, we prefer combined formats (itag 22 = 720p mp4)
+	best := y.selectBestFormat(video.Formats.WithAudioChannels(), "video/mp4")
+	if best == nil {
+		// Fallback to any combined format
+		best = y.selectBestFormat(video.Formats.WithAudioChannels(), "")
 	}
 
-	if bestFormat == nil {
-		// Fallback to highest height mp4
-		mp4Formats := formats.Type("video/mp4")
-		if len(mp4Formats) > 0 {
-			sort.Slice(mp4Formats, func(i, j int) bool { return mp4Formats[i].Height > mp4Formats[j].Height })
-			bestFormat = &mp4Formats[0]
-		}
-	}
-
-	if bestFormat == nil {
-		// Absolute fallback to highest height anything
-		sort.Slice(formats, func(i, j int) bool { return formats[i].Height > formats[j].Height })
-		if len(formats) > 0 {
-			bestFormat = &formats[0]
-		}
-	}
-
-	if bestFormat == nil {
-		return nil, "", fmt.Errorf("no suitable audio-video formats found for %s", vidID)
+	if best == nil {
+		return nil, "", fmt.Errorf("no suitable combined stream found for %s", vidID)
 	}
 
 	logger.Get("youtube").WithFields(logrus.Fields{
 		"vid":    vidID,
-		"itag":   bestFormat.ItagNo,
-		"height": bestFormat.Height,
-		"type":   bestFormat.MimeType,
-	}).Info("Selected highest quality combined stream")
+		"itag":   best.ItagNo,
+		"height": best.Height,
+	}).Info("Selected combined stream for preview")
 
-	stream, _, err := client.GetStreamContext(ctx, video, bestFormat)
+	stream, _, err := client.GetStreamContext(ctx, video, best)
 	if err != nil {
 		return nil, "", err
 	}
@@ -550,7 +529,6 @@ func (y *YouTubeService) GetStream(ctx context.Context, vidID string) (io.ReadCl
 }
 
 // DownloadHighQuality implements HighQualityDownloader interface
-// It attempts to download the best available quality (1080p, 4K) by merging video and audio streams if necessary
 func (y *YouTubeService) DownloadHighQuality(ctx context.Context, vidID string, destPath string) error {
 	client := youtube_dl.Client{}
 	video, err := client.GetVideoContext(ctx, vidID)
@@ -558,134 +536,120 @@ func (y *YouTubeService) DownloadHighQuality(ctx context.Context, vidID string, 
 		return fmt.Errorf("failed to get video info: %w", err)
 	}
 
-	// 1. Find best video format
-	formats := video.Formats
-	// Sort by height descending, then by bitrate descending for same height
-	sort.Slice(formats, func(i, j int) bool {
-		if formats[i].Height != formats[j].Height {
-			return formats[i].Height > formats[j].Height
-		}
-		return formats[i].Bitrate > formats[j].Bitrate
-	})
-
-	var bestVideo *youtube_dl.Format
-	if len(formats) > 0 {
-		bestVideo = &formats[0]
+	// 1. Select best video format (resolution > bitrate)
+	bestVideo := y.selectBestFormat(video.Formats, "video/mp4")
+	if bestVideo == nil {
+		bestVideo = y.selectBestFormat(video.Formats, "")
 	}
 
 	if bestVideo == nil {
-		return fmt.Errorf("no formats found for video %s", vidID)
+		return fmt.Errorf("no video formats found for %s", vidID)
+	}
+
+	// 2. If it has audio, download directly
+	if bestVideo.AudioChannels > 0 {
+		return downloadStreamToFile(ctx, client, video, bestVideo, destPath)
+	}
+
+	// 3. Needs merging (1080p+)
+	bestAudio := y.selectBestAudio(video.Formats)
+	if bestAudio == nil {
+		return fmt.Errorf("no audio format found for %s (required for merging)", vidID)
 	}
 
 	logger.Get("youtube").WithFields(logrus.Fields{
-		"vid":    vidID,
-		"height": bestVideo.Height,
-		"itag":   bestVideo.ItagNo,
-		"audio":  bestVideo.AudioChannels > 0,
-	}).Info("Selected best video format for HQ download")
+		"vid":          vidID,
+		"video_height": bestVideo.Height,
+		"video_itag":   bestVideo.ItagNo,
+		"audio_itag":   bestAudio.ItagNo,
+	}).Info("Downloading separate tracks for HQ merge")
 
-	// 2. Check if it needs audio merging
-	if bestVideo.AudioChannels > 0 {
-		// It has audio, direct download
-		stream, _, err := client.GetStreamContext(ctx, video, bestVideo)
-		if err != nil {
-			return err
-		}
-		defer stream.Close()
+	// Download to temp files
+	vTemp, _ := os.CreateTemp("", "yt_video_*.mp4")
+	vTempPath := vTemp.Name()
+	vTemp.Close()
+	defer os.Remove(vTempPath)
 
-		file, err := os.Create(destPath)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
+	aTemp, _ := os.CreateTemp("", "yt_audio_*.m4a")
+	aTempPath := aTemp.Name()
+	aTemp.Close()
+	defer os.Remove(aTempPath)
 
-		_, err = io.Copy(file, stream)
+	if err := downloadStreamToFile(ctx, client, video, bestVideo, vTempPath); err != nil {
+		return err
+	}
+	if err := downloadStreamToFile(ctx, client, video, bestAudio, aTempPath); err != nil {
 		return err
 	}
 
-	// 3. Needs merging - Find best audio
-	audioFormats := video.Formats.Type("audio/mp4") // Prefer mp4 container audio
-	if len(audioFormats) == 0 {
-		// Fallback to any audio
-		audioFormats = video.Formats.Type("audio")
-	}
-
-	if len(audioFormats) == 0 {
-		// Panic fallback: try to find any format with audio channels
-		audioFormats = video.Formats.WithAudioChannels()
-	}
-
-	if len(audioFormats) == 0 {
-		return fmt.Errorf("no audio formats found for video %s", vidID)
-	}
-
-	// Sort by bitrate if available? Assuming first is best or sort by logic
-	// Usually higher itag or AudioBitrate
-	sort.Slice(audioFormats, func(i, j int) bool { return audioFormats[i].Bitrate > audioFormats[j].Bitrate })
-	bestAudio := &audioFormats[0]
-
-	// 4. Download Video Track
-	videoTemp, err := os.CreateTemp("", fmt.Sprintf("yt_video_%s_*.mp4", vidID))
-	if err != nil {
-		return err
-	}
-	videoTempPath := videoTemp.Name()
-	defer os.Remove(videoTempPath) // Clean up temp file
-
-	// We need to close the file handle before ffmpeg reads it
-	videoTemp.Close()
-
-	if err := downloadStreamToFile(ctx, client, video, bestVideo, videoTempPath); err != nil {
-		return fmt.Errorf("failed to download video track: %w", err)
-	}
-
-	// 5. Download Audio Track
-	audioTemp, err := os.CreateTemp("", fmt.Sprintf("yt_audio_%s_*.m4a", vidID))
-	if err != nil {
-		return err
-	}
-	audioTempPath := audioTemp.Name()
-	defer os.Remove(audioTempPath)
-	audioTemp.Close()
-
-	if err := downloadStreamToFile(ctx, client, video, bestAudio, audioTempPath); err != nil {
-		return fmt.Errorf("failed to download audio track: %w", err)
-	}
-
-	// 6. Merge using VideoProcessor
+	// Merge
 	vp := utils.NewVideoProcessor()
-	mergedPath, err := vp.MergeStreams(ctx, videoTempPath, audioTempPath)
+	merged, err := vp.MergeStreams(ctx, vTempPath, aTempPath)
 	if err != nil {
-		return fmt.Errorf("merge failed: %w", err)
+		return err
+	}
+	defer os.Remove(merged)
+
+	return utils.MoveFile(merged, destPath)
+}
+
+// selectBestFormat picks the highest resolution format, optionally filtered by mime type
+func (y *YouTubeService) selectBestFormat(formats []youtube_dl.Format, mimeType string) *youtube_dl.Format {
+	var filtered []youtube_dl.Format
+	if mimeType != "" {
+		for _, f := range formats {
+			if strings.Contains(f.MimeType, mimeType) {
+				filtered = append(filtered, f)
+			}
+		}
+	} else {
+		filtered = formats
 	}
 
-	// VP.MergeStreams returns a new path (usually with "merged_" prefix or similar).
-	// We need to move it to destPath.
-	// But wait, VideoProcessor.MergeStreams logic:
-	// outputPath := filepath.Dir(videoPath) + string(filepath.Separator) + "merged_" + filepath.Base(videoPath)
-	// Since videoPath is in temp dir, outputPath is also in temp dir.
-	// We should move/copy it to destPath.
-
-	err = utils.MoveFile(mergedPath, destPath)
-	if err != nil {
-		return fmt.Errorf("failed to move merged file to dest: %w", err)
+	if len(filtered) == 0 {
+		return nil
 	}
-	// Clean up merged file
-	os.Remove(mergedPath)
 
-	return nil
+	sort.Slice(filtered, func(i, j int) bool {
+		if filtered[i].Height != filtered[j].Height {
+			return filtered[i].Height > filtered[j].Height
+		}
+		return filtered[i].Bitrate > filtered[j].Bitrate
+	})
+
+	return &filtered[0]
+}
+
+// selectBestAudio picks the highest bitrate audio track
+func (y *YouTubeService) selectBestAudio(formats []youtube_dl.Format) *youtube_dl.Format {
+	var audio []youtube_dl.Format
+	for _, f := range formats {
+		if strings.Contains(f.MimeType, "audio") {
+			audio = append(audio, f)
+		}
+	}
+
+	if len(audio) == 0 {
+		return nil
+	}
+
+	sort.Slice(audio, func(i, j int) bool {
+		return audio[i].Bitrate > audio[j].Bitrate
+	})
+
+	return &audio[0]
 }
 
 func downloadStreamToFile(ctx context.Context, client youtube_dl.Client, video *youtube_dl.Video, format *youtube_dl.Format, path string) error {
 	stream, _, err := client.GetStreamContext(ctx, video, format)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get stream: %w", err)
 	}
 	defer stream.Close()
 
 	file, err := os.Create(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create file: %w", err)
 	}
 	defer file.Close()
 
