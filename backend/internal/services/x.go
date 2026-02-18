@@ -539,7 +539,103 @@ func (t *TwitterService) FetchRecentVideos(accountID int) ([]ExternalVideo, erro
 
 // GetStream implements Platform interface
 func (t *TwitterService) GetStream(ctx context.Context, platformVideoID string) (io.ReadCloser, string, error) {
-	return nil, "", fmt.Errorf("GetStream not implemented for X/Twitter")
+	variant, err := t.getBestVariant(ctx, platformVideoID)
+	if err != nil {
+		return nil, "", err
+	}
+
+	resp, err := http.Get(variant.URL)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to fetch video stream: %w", err)
+	}
+
+	return resp.Body, resp.Header.Get("Content-Type"), nil
+}
+
+// DownloadHighQuality implements HighQualityDownloader interface
+func (t *TwitterService) DownloadHighQuality(ctx context.Context, platformVideoID string, destPath string) error {
+	variant, err := t.getBestVariant(ctx, platformVideoID)
+	if err != nil {
+		return err
+	}
+
+	return DownloadVariantToFile(ctx, variant, destPath)
+}
+
+func (t *TwitterService) getBestVariant(ctx context.Context, platformVideoID string) (*MediaVariant, error) {
+	// 1. Get access token
+	var encAccess string
+	err := t.db.QueryRowContext(ctx,
+		"SELECT access_token FROM platform_accounts WHERE platform = 'twitter' AND status = 'connected' ORDER BY COALESCE(updated_at, connected_at) DESC LIMIT 1",
+	).Scan(&encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("no twitter account available: %w", err)
+	}
+
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt tokens: %w", err)
+	}
+
+	// 2. Fetch Tweet details with media expansions
+	reqURL := fmt.Sprintf("https://api.twitter.com/2/tweets/%s?expansions=attachments.media_keys&media.fields=url,variants,type", platformVideoID)
+	req, _ := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call twitter api: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Includes struct {
+			Media []struct {
+				Type     string `json:"type"`
+				Variants []struct {
+					URL         string `json:"url"`
+					ContentType string `json:"content_type"`
+					Bitrate     int    `json:"bitrate"`
+				} `json:"variants"`
+			} `json:"media"`
+		} `json:"includes"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode twitter response: %w", err)
+	}
+
+	if len(result.Includes.Media) == 0 {
+		return nil, fmt.Errorf("no media found in tweet")
+	}
+
+	// Map to MediaVariant
+	var variants []MediaVariant
+	for _, m := range result.Includes.Media {
+		if m.Type != "video" {
+			continue
+		}
+		for _, v := range m.Variants {
+			if !strings.Contains(v.ContentType, "video") {
+				continue
+			}
+			variants = append(variants, MediaVariant{
+				URL:      v.URL,
+				MimeType: v.ContentType,
+				Bitrate:  v.Bitrate,
+				HasAudio: true, // X variants usually have combined audio/video
+				HasVideo: true,
+				Height:   1080, // Default to 1080 as height is often not in variants field directly
+			})
+		}
+	}
+
+	best := SelectBestVariant(variants, "")
+	if best == nil {
+		return nil, fmt.Errorf("no suitable video variants found for tweet")
+	}
+
+	return best, nil
 }
 
 // Notify implements Platform interface - posts a tweet announcement

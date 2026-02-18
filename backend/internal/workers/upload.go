@@ -81,8 +81,8 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 		return fmt.Errorf("invalid job payload: missing ExecutionID or ContentID")
 	}
 
-	// 1. Update Execution Status
-	w.DB.ExecContext(ctx, "UPDATE automation_executions SET status = 'processing' WHERE id = $1", job.ExecutionID)
+	// 1. Update Execution Status: downloading
+	w.DB.ExecContext(ctx, "UPDATE automation_executions SET status = 'downloading' WHERE id = $1", job.ExecutionID)
 
 	// Fetch Processing Settings
 	var settingsJSON []byte
@@ -143,8 +143,9 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 		finalStorageURL = w.Storage.GetObjectURL(sourceKey)
 	}
 
-	// If processing is required, we need to download source, process, and re-upload
+	// 4. Processing Phase
 	if settings != nil {
+		w.DB.ExecContext(ctx, "UPDATE automation_executions SET status = 'processing' WHERE id = $1", job.ExecutionID)
 		// Download source to temp
 		stream, err := w.Storage.GetStream(ctx, sourceKey)
 		if err != nil {
@@ -216,7 +217,10 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 		return w.fail(ctx, job, payload, fmt.Errorf("throttle failed: %w", err))
 	}
 
-	// 5. Upload to Destination Platform
+	// 5. Update Status: publishing
+	w.DB.ExecContext(ctx, "UPDATE automation_executions SET status = 'publishing' WHERE id = $1", job.ExecutionID)
+
+	// 6. Upload to Destination Platform
 	logger.Get("worker").WithFields(logrus.Fields{
 		"platform": job.TargetPlatform,
 		"url":      finalStorageURL,

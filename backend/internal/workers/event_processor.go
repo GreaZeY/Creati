@@ -63,8 +63,8 @@ func (p *EventProcessor) Start(ctx context.Context) {
 
 	listener := pq.NewListener(p.dsn, 10*time.Second, time.Minute, reportProblem)
 	_ = listener.Listen("platform_event_inserted")
-	_ = listener.Listen("automation_execution_updated") // Correct V2 channel
-	_ = listener.Listen("automation_log_updated")       // Notification channel
+	_ = listener.Listen("execution_updates") // Matches DB trigger
+	_ = listener.Listen("automation_log_updated")
 	defer listener.UnlistenAll()
 
 	// 2. Ticker for fallback polling (heartbeat)
@@ -99,7 +99,7 @@ func (p *EventProcessor) Start(ctx context.Context) {
 				if err := p.processBatch(ctx); err != nil {
 					log.WithField("error", err).Error("Triggered batch processing failed")
 				}
-			} else if n.Channel == "automation_execution_updated" {
+			} else if n.Channel == "execution_updates" {
 				p.handleExecutionNotification(ctx, n.Extra)
 			} else if n.Channel == "automation_log_updated" {
 				p.handleLogNotification(ctx, n.Extra)
@@ -124,12 +124,12 @@ func (p *EventProcessor) handleExecutionNotification(ctx context.Context, execID
 		return
 	}
 
-	// Payload for SSE
+	// Payload for SSE - Unified for Job Updates
 	update := map[string]interface{}{
 		"type":   "job_update",
-		"id":     execIDStr,
+		"jobid":  execIDStr, // Match user request
+		"status": status,    // Granular status
 		"ruleId": ruleID,
-		"status": status,
 		"kind":   "sync",
 	}
 	msg, _ := json.Marshal(update)
@@ -155,9 +155,9 @@ func (p *EventProcessor) handleLogNotification(ctx context.Context, logIDStr str
 	// Payload
 	update := map[string]interface{}{
 		"type":   "job_update",
-		"id":     logIDStr,
-		"ruleId": ruleID,
+		"jobid":  logIDStr,
 		"status": status,
+		"ruleId": ruleID,
 		"kind":   "notify",
 	}
 	msg, _ := json.Marshal(update)

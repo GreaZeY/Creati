@@ -428,7 +428,95 @@ func (r *RedditService) FetchRecentVideos(accountID int) ([]ExternalVideo, error
 
 // GetStream implements Platform interface
 func (r *RedditService) GetStream(ctx context.Context, platformVideoID string) (io.ReadCloser, string, error) {
-	return nil, "", fmt.Errorf("GetStream not implemented for Reddit")
+	variant, err := r.getBestVariant(ctx, platformVideoID)
+	if err != nil {
+		return nil, "", err
+	}
+
+	resp, err := http.Get(variant.URL)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to fetch video stream: %w", err)
+	}
+
+	return resp.Body, resp.Header.Get("Content-Type"), nil
+}
+
+// DownloadHighQuality implements HighQualityDownloader interface
+func (r *RedditService) DownloadHighQuality(ctx context.Context, platformVideoID string, destPath string) error {
+	variant, err := r.getBestVariant(ctx, platformVideoID)
+	if err != nil {
+		return err
+	}
+
+	return DownloadVariantToFile(ctx, variant, destPath)
+}
+
+func (r *RedditService) getBestVariant(ctx context.Context, platformVideoID string) (*MediaVariant, error) {
+	// 1. Get access token
+	var encAccess string
+	err := r.db.QueryRowContext(ctx,
+		"SELECT access_token FROM platform_accounts WHERE platform = 'reddit' AND status = 'connected' LIMIT 1",
+	).Scan(&encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("no reddit account available: %w", err)
+	}
+
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt tokens: %w", err)
+	}
+
+	// 2. Fetch Post Info
+	// Reddit post IDs are t3_xxxx
+	id := platformVideoID
+	if !strings.HasPrefix(id, "t3_") {
+		id = "t3_" + id
+	}
+
+	infoURL := fmt.Sprintf("https://oauth.reddit.com/api/info?id=%s", id)
+	req, _ := http.NewRequestWithContext(ctx, "GET", infoURL, nil)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	req.Header.Set("User-Agent", r.userAgent)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call reddit api: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Data struct {
+			Children []struct {
+				Data struct {
+					Media struct {
+						RedditVideo struct {
+							FallbackURL string `json:"fallback_url"`
+						} `json:"reddit_video"`
+					} `json:"media"`
+				} `json:"data"`
+			} `json:"children"`
+		} `json:"data"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode reddit response: %w", err)
+	}
+
+	if len(result.Data.Children) == 0 {
+		return nil, fmt.Errorf("reddit post not found")
+	}
+
+	videoURL := result.Data.Children[0].Data.Media.RedditVideo.FallbackURL
+	if videoURL == "" {
+		return nil, fmt.Errorf("no video found in reddit post")
+	}
+
+	return &MediaVariant{
+		URL:      videoURL,
+		HasAudio: true,
+		HasVideo: true,
+		Height:   1080, // Best effort
+	}, nil
 }
 
 // Notify implements Platform interface - submits a link post to Reddit

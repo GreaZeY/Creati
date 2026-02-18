@@ -8,6 +8,11 @@ import (
 	"creati.in/creati/backend/internal/db/models"
 )
 
+const (
+	// MaxDownloadHeight is the global resolution cap for video ingestions (1080p)
+	MaxDownloadHeight = 1080
+)
+
 /**
  * Platform interface - the contract all platforms must implement
  * Following Interface Segregation and Dependency Inversion principles

@@ -8,8 +8,6 @@ import (
 	"net/http"
 	url "net/url"
 	"os"
-	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -503,24 +501,40 @@ func (y *YouTubeService) GetStream(ctx context.Context, vidID string) (io.ReadCl
 		return nil, "", fmt.Errorf("failed to get video info: %w", err)
 	}
 
-	// For streaming/preview, we prefer combined formats (itag 22 = 720p mp4)
-	best := y.selectBestFormat(video.Formats.WithAudioChannels(), "video/mp4")
-	if best == nil {
+	// Map to MediaVariant for standardized selection
+	var variants []MediaVariant
+	for i := range video.Formats {
+		f := &video.Formats[i]
+		variants = append(variants, MediaVariant{
+			URL:      f.URL,
+			Height:   f.Height,
+			Bitrate:  f.Bitrate,
+			MimeType: f.MimeType,
+			HasAudio: f.AudioChannels > 0,
+			HasVideo: f.Height > 0,
+			Metadata: &YouTubeMetadata{Video: video, Format: f},
+		})
+	}
+
+	// For streaming/preview, we prefer combined formats (mp4)
+	best := SelectBestVariant(variants, "video/mp4")
+	if best == nil || !best.HasAudio {
 		// Fallback to any combined format
-		best = y.selectBestFormat(video.Formats.WithAudioChannels(), "")
+		best = SelectBestVariant(variants, "")
 	}
 
 	if best == nil {
-		return nil, "", fmt.Errorf("no suitable combined stream found for %s", vidID)
+		return nil, "", fmt.Errorf("no suitable stream found for %s", vidID)
 	}
 
 	logger.Get("youtube").WithFields(logrus.Fields{
 		"vid":    vidID,
-		"itag":   best.ItagNo,
 		"height": best.Height,
-	}).Info("Selected combined stream for preview")
+	}).Info("Selected stream for preview")
 
-	stream, _, err := client.GetStreamContext(ctx, video, best)
+	// Use our library-aware downloader to get the stream
+	meta := best.Metadata.(*YouTubeMetadata)
+	stream, _, err := client.GetStreamContext(ctx, meta.Video, meta.Format)
 	if err != nil {
 		return nil, "", err
 	}
@@ -536,23 +550,33 @@ func (y *YouTubeService) DownloadHighQuality(ctx context.Context, vidID string, 
 		return fmt.Errorf("failed to get video info: %w", err)
 	}
 
-	// 1. Select best video format (resolution > bitrate)
-	bestVideo := y.selectBestFormat(video.Formats, "video/mp4")
-	if bestVideo == nil {
-		bestVideo = y.selectBestFormat(video.Formats, "")
+	var variants []MediaVariant
+	for i := range video.Formats {
+		f := &video.Formats[i]
+		variants = append(variants, MediaVariant{
+			URL:      f.URL,
+			Height:   f.Height,
+			Bitrate:  f.Bitrate,
+			MimeType: f.MimeType,
+			HasAudio: f.AudioChannels > 0,
+			HasVideo: f.Height > 0,
+			Metadata: f,
+		})
 	}
 
+	// 1. Select best video format (RESOLUTION FIRST)
+	bestVideo := SelectBestVariant(variants, "video")
 	if bestVideo == nil {
 		return fmt.Errorf("no video formats found for %s", vidID)
 	}
 
 	// 2. If it has audio, download directly
-	if bestVideo.AudioChannels > 0 {
-		return downloadStreamToFile(ctx, client, video, bestVideo, destPath)
+	if bestVideo.HasAudio {
+		return y.download(ctx, bestVideo, destPath)
 	}
 
 	// 3. Needs merging (1080p+)
-	bestAudio := y.selectBestAudio(video.Formats)
+	bestAudio := SelectBestVariant(variants, "audio")
 	if bestAudio == nil {
 		return fmt.Errorf("no audio format found for %s (required for merging)", vidID)
 	}
@@ -560,101 +584,44 @@ func (y *YouTubeService) DownloadHighQuality(ctx context.Context, vidID string, 
 	logger.Get("youtube").WithFields(logrus.Fields{
 		"vid":          vidID,
 		"video_height": bestVideo.Height,
-		"video_itag":   bestVideo.ItagNo,
-		"audio_itag":   bestAudio.ItagNo,
 	}).Info("Downloading separate tracks for HQ merge")
 
-	// Download to temp files
-	vTemp, _ := os.CreateTemp("", "yt_video_*.mp4")
-	vTempPath := vTemp.Name()
-	vTemp.Close()
-	defer os.Remove(vTempPath)
+	return OrchestrateHQMerge(ctx, bestVideo, bestAudio, destPath, y.download)
+}
 
-	aTemp, _ := os.CreateTemp("", "yt_audio_*.m4a")
-	aTempPath := aTemp.Name()
-	aTemp.Close()
-	defer os.Remove(aTempPath)
+// YouTubeMetadata stores library-specific context for downloading
+type YouTubeMetadata struct {
+	Video  *youtube_dl.Video
+	Format *youtube_dl.Format
+}
 
-	if err := downloadStreamToFile(ctx, client, video, bestVideo, vTempPath); err != nil {
-		return err
-	}
-	if err := downloadStreamToFile(ctx, client, video, bestAudio, aTempPath); err != nil {
-		return err
+// download is a library-aware implementation of DownloaderFunc for YouTube
+func (y *YouTubeService) download(ctx context.Context, variant *MediaVariant, destPath string) error {
+	meta, ok := variant.Metadata.(*YouTubeMetadata)
+	if !ok {
+		return fmt.Errorf("invalid metadata for youtube download")
 	}
 
-	// Merge
-	vp := utils.NewVideoProcessor()
-	merged, err := vp.MergeStreams(ctx, vTempPath, aTempPath)
+	client := youtube_dl.Client{}
+	stream, _, err := client.GetStreamContext(ctx, meta.Video, meta.Format)
 	if err != nil {
-		return err
-	}
-	defer os.Remove(merged)
-
-	return utils.MoveFile(merged, destPath)
-}
-
-// selectBestFormat picks the highest resolution format, optionally filtered by mime type
-func (y *YouTubeService) selectBestFormat(formats []youtube_dl.Format, mimeType string) *youtube_dl.Format {
-	var filtered []youtube_dl.Format
-	if mimeType != "" {
-		for _, f := range formats {
-			if strings.Contains(f.MimeType, mimeType) {
-				filtered = append(filtered, f)
-			}
-		}
-	} else {
-		filtered = formats
-	}
-
-	if len(filtered) == 0 {
-		return nil
-	}
-
-	sort.Slice(filtered, func(i, j int) bool {
-		if filtered[i].Height != filtered[j].Height {
-			return filtered[i].Height > filtered[j].Height
-		}
-		return filtered[i].Bitrate > filtered[j].Bitrate
-	})
-
-	return &filtered[0]
-}
-
-// selectBestAudio picks the highest bitrate audio track
-func (y *YouTubeService) selectBestAudio(formats []youtube_dl.Format) *youtube_dl.Format {
-	var audio []youtube_dl.Format
-	for _, f := range formats {
-		if strings.Contains(f.MimeType, "audio") {
-			audio = append(audio, f)
-		}
-	}
-
-	if len(audio) == 0 {
-		return nil
-	}
-
-	sort.Slice(audio, func(i, j int) bool {
-		return audio[i].Bitrate > audio[j].Bitrate
-	})
-
-	return &audio[0]
-}
-
-func downloadStreamToFile(ctx context.Context, client youtube_dl.Client, video *youtube_dl.Video, format *youtube_dl.Format, path string) error {
-	stream, _, err := client.GetStreamContext(ctx, video, format)
-	if err != nil {
-		return fmt.Errorf("failed to get stream: %w", err)
+		return fmt.Errorf("failed to get youtube stream: %w", err)
 	}
 	defer stream.Close()
 
-	file, err := os.Create(path)
+	out, err := os.Create(destPath)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
-	defer file.Close()
+	defer out.Close()
 
-	_, err = io.Copy(file, stream)
+	_, err = io.Copy(out, stream)
 	return err
+}
+
+func (y *YouTubeService) downloadWithLibrary(ctx context.Context, variant *MediaVariant, destPath string) error {
+	// Consistently using y.download instead
+	return nil
 }
 
 // Notify implements Platform interface - targets YouTube Community Posts for announcements

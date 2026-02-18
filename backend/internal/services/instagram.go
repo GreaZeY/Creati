@@ -453,7 +453,69 @@ func (i *InstagramService) FetchRecentVideos(accountID int) ([]ExternalVideo, er
 
 // GetStream implements Platform interface
 func (i *InstagramService) GetStream(ctx context.Context, platformVideoID string) (io.ReadCloser, string, error) {
-	return nil, "", fmt.Errorf("GetStream not implemented for Instagram")
+	variant, err := i.getBestVariant(ctx, platformVideoID)
+	if err != nil {
+		return nil, "", err
+	}
+
+	resp, err := http.Get(variant.URL)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to fetch video stream: %w", err)
+	}
+
+	return resp.Body, resp.Header.Get("Content-Type"), nil
+}
+
+// DownloadHighQuality implements HighQualityDownloader interface
+func (i *InstagramService) DownloadHighQuality(ctx context.Context, platformVideoID string, destPath string) error {
+	variant, err := i.getBestVariant(ctx, platformVideoID)
+	if err != nil {
+		return err
+	}
+
+	return DownloadVariantToFile(ctx, variant, destPath)
+}
+
+func (i *InstagramService) getBestVariant(ctx context.Context, platformVideoID string) (*MediaVariant, error) {
+	// 1. Get token
+	var encAccess string
+	err := i.db.QueryRowContext(ctx,
+		"SELECT access_token FROM platform_accounts WHERE platform = 'instagram' AND status = 'active' ORDER BY COALESCE(updated_at, connected_at) DESC LIMIT 1",
+	).Scan(&encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("no instagram account available: %w", err)
+	}
+
+	accessToken, err := utils.Decrypt(encAccess)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt tokens: %w", err)
+	}
+
+	// 2. Fetch media details (media_url)
+	reqURL := fmt.Sprintf("https://graph.instagram.com/v19.0/%s?fields=media_url&access_token=%s", platformVideoID, accessToken)
+	resp, err := http.Get(reqURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to call instagram api: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		MediaURL string `json:"media_url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode instagram response: %w", err)
+	}
+
+	if result.MediaURL == "" {
+		return nil, fmt.Errorf("instagram video has no media url")
+	}
+
+	return &MediaVariant{
+		URL:      result.MediaURL,
+		HasAudio: true,
+		HasVideo: true,
+		Height:   1080, // Reels are typically 1080p
+	}, nil
 }
 
 // Notify implements Platform interface - targets Instagram for announcements
