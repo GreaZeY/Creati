@@ -12,19 +12,19 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-white dark:bg-white dark:text-black hover:bg-primary/90 dark:hover:bg-slate-200 shadow-glow-purple dark:shadow-[0_0_20px_rgba(255,255,255,0.3)]",
-        destructive: "bg-red-500 text-white hover:bg-red-600 shadow-glow-pink",
+          "bg-primary text-white dark:bg-white dark:text-black hover:bg-primary/90 dark:hover:bg-slate-200",
+        destructive: "bg-red-500 text-white hover:bg-red-600",
         outline:
           "text-foreground dark:text-white border border-border dark:border-white/10 bg-transparent hover:bg-secondary/10 dark:hover:bg-white/5 hover:border-primary/20 dark:hover:border-white/20",
         secondary:
           "text-foreground dark:text-white bg-secondary/10 dark:bg-white/5 border border-border dark:border-white/10 hover:bg-secondary/20 dark:hover:bg-white/10 hover:border-primary/20 dark:hover:border-white/20",
         premium:
-          "bg-gradient-to-r from-neon-purple to-neon-blue text-white shadow-glow-purple hover:scale-[1.02] active:scale-[0.98]",
+          "bg-gradient-to-r from-neon-purple to-neon-blue text-white hover:scale-[1.02] active:scale-[0.98]",
         ghost:
           "text-muted-foreground hover:text-foreground dark:hover:text-white hover:bg-secondary/20 dark:hover:bg-white/5",
         link: "text-primary underline-offset-4 hover:underline lowercase tracking-normal font-medium",
-        neon: "bg-neon-purple text-black font-black shadow-glow-purple hover:bg-neon-purple/90",
-        lime: "bg-neon-lime text-black font-black shadow-glow-lime hover:bg-neon-lime/90",
+        neon: "bg-neon-purple text-black font-black hover:bg-neon-purple/90",
+        lime: "bg-neon-lime text-black font-black hover:bg-neon-lime/90",
       },
       size: {
         default: "h-12 px-8 rounded-full",
@@ -98,15 +98,15 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         className={cn(buttonVariants({ variant, size, className }))}
         disabled={isLoading || isSuccess || props.disabled}
         // Motion Props
-        whileHover={
-          isPrimary && !isLoading && !isSuccess && !isError
-            ? {
-                // Removed glow and lift as per feedback
-                // Subtle brightness bump is standard, but user said "no glow".
-                // We'll rely on CSS class hover state for color fill.
-              }
-            : {}
-        }
+        // whileHover={
+        //   isPrimary && !isLoading && !isSuccess && !isError
+        //     ? {
+        //         // Removed glow and lift as per feedback
+        //         // Subtle brightness bump is standard, but user said "no glow".
+        //         // We'll rely on CSS class hover state for color fill.
+        //       }
+        //     : {}
+        // }
         whileTap={
           isPrimary && !isLoading && !isSuccess && !isError
             ? {
