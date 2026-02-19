@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"creati.in/creati/backend/internal/api"
+	"creati.in/creati/backend/internal/db/repositories"
 	"creati.in/creati/backend/internal/features"
 	"creati.in/creati/backend/internal/logger"
 	"creati.in/creati/backend/internal/middleware"
@@ -81,6 +82,15 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	cacheClient := redis.NewClient(cacheOpt)
 	cacheService := services.NewCacheService(cacheClient)
 
+	// AI Agent Infrastructure
+	abilityRegistry := services.NewAbilityRegistry()
+	// Register Initial Abilities
+	platformRepo := repositories.NewPlatformRepository(db)
+	abilityRegistry.Register(&services.ListAccountsAbility{Repo: platformRepo})
+	abilityRegistry.Register(&services.GetAnalyticsSummaryAbility{Repo: platformRepo})
+
+	chatService := services.NewChatService(db, abilityRegistry)
+
 	// Initialize RealtimeService (SSE)
 	realtimeService := services.NewRealtimeService()
 
@@ -98,7 +108,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	paymentHandler := api.NewPaymentHandler(db)
 	webhookHandler := api.NewWebhookHandler(db)
 	agencyHandler := api.NewAgencyHandler(db)
-	aiHandler := api.NewAiHandler(db)
+	aiHandler := api.NewAiHandler(db, chatService)
 	postsHandler := api.NewPostsHandler(db, storageService, queueService)
 	proxyHandler := api.NewProxyHandler(db, mediaService)
 	// audienceHandler := api.NewAudienceHandler(db)
@@ -193,6 +203,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	aiRoutes.Get("/credits", aiHandler.GetCredits)
 	aiRoutes.Post("/generate", aiHandler.GeneratePost)
 	aiRoutes.Post("/rewrite", aiHandler.RewritePost)
+	aiRoutes.Post("/chat", aiHandler.Chat)
 
 	// Posts & Media
 	protected.Post("/media/upload", postsHandler.UploadMedia)

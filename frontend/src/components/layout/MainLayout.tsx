@@ -2,6 +2,7 @@ import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { AnimatePresence } from "framer-motion";
 import { Outlet, useLocation } from "react-router-dom";
+import { CreatiAgent } from "../ai/CreatiAgent";
 
 export function MainLayout() {
   const location = useLocation();
@@ -26,6 +27,8 @@ export function MainLayout() {
           </AnimatePresence>
         </main>
       </div>
+
+      <CreatiAgent />
     </div>
   );
 }

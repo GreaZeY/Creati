@@ -210,6 +210,17 @@
 }
 
 @layer utilities {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none; /* IE and Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+
+  .shadow-neon {
+    box-shadow: 0 0 15px rgba(185, 70, 255, 0.3), 0 0 30px rgba(0, 240, 255, 0.1);
+  }
 }
 
 /* Custom Scrollbar & Layout Stability */

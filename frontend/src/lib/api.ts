@@ -340,6 +340,11 @@ export const aiAPI = {
       "/ai/rewrite",
       data,
     ),
+  chat: (data: { conversationId?: string; message: string }) =>
+    api.post<ApiResponse<{ conversationId: string; message: string; history: any[] }>>(
+      "/ai/chat",
+      data,
+    ),
 };
 
 export const mediaAPI = {

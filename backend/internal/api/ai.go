@@ -3,17 +3,23 @@ package api
 import (
 	"database/sql"
 	"fmt"
+
 	"creati.in/creati/backend/internal/middleware"
+	"creati.in/creati/backend/internal/services"
 	"creati.in/creati/backend/internal/utils"
 	"github.com/gofiber/fiber/v2"
 )
 
 type AiHandler struct {
-	db *sql.DB
+	db          *sql.DB
+	chatService *services.ChatService
 }
 
-func NewAiHandler(db *sql.DB) *AiHandler {
-	return &AiHandler{db: db}
+func NewAiHandler(db *sql.DB, chatService *services.ChatService) *AiHandler {
+	return &AiHandler{
+		db:          db,
+		chatService: chatService,
+	}
 }
 
 // GetCredits returns the user's current AI credit balance
@@ -148,4 +154,29 @@ func (h *AiHandler) RewritePost(c *fiber.Ctx) error {
 		"text":             mockResponse,
 		"creditsRemaining": credits - 1,
 	}, "Post rewritten for "+req.Platform)
+}
+
+// Chat handles the main conversation loop with the Creati Agent
+func (h *AiHandler) Chat(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	var req struct {
+		ConversationID *string `json:"conversationId"`
+		Message        string  `json:"message"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
+	}
+
+	if req.Message == "" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "message is required")
+	}
+
+	result, err := h.chatService.ProcessChat(c.Context(), userID, req.ConversationID, req.Message)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to process chat", err)
+	}
+
+	return utils.SuccessResponse(c, result, "")
 }
