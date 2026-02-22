@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS video_comments (
 CREATE INDEX IF NOT EXISTS idx_video_comments_video ON video_comments(video_id);
 
 -- 7. Analytics Views for optimized performance
+DROP VIEW IF EXISTS vw_user_stats CASCADE;
 CREATE OR REPLACE VIEW vw_user_stats AS
 SELECT 
     v.user_id,
@@ -77,6 +78,7 @@ FROM (
 JOIN videos v ON latest.video_id = v.id
 GROUP BY v.user_id, v.client_id;
 
+DROP VIEW IF EXISTS vw_video_stats CASCADE;
 CREATE OR REPLACE VIEW vw_video_stats AS
 SELECT 
     v.id as video_id,

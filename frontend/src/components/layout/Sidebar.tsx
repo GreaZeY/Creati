@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Video,
   User as UserIcon,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { label: "Queue", icon: List, href: "/queued" },
   { label: "Calendar", icon: CalendarIcon, href: "/calendar" },
   { label: "Platforms", icon: Link2, href: "/platforms" },
+  { label: "Invoices", icon: FileText, href: "/invoices" },
   { label: "Upgrade", icon: Crown, href: "/pricing" },
   { label: "Settings", icon: Settings, href: "/settings" },
 ];
