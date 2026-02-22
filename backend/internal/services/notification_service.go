@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"creati.in/creati/backend/internal/logger"
@@ -9,11 +10,11 @@ import (
 )
 
 type NotificationService struct {
-	// In production, this would hold SMTP/SendGrid clients
+	db *sql.DB
 }
 
-func NewNotificationService() *NotificationService {
-	return &NotificationService{}
+func NewNotificationService(db *sql.DB) *NotificationService {
+	return &NotificationService{db: db}
 }
 
 func (s *NotificationService) SendEmail(ctx context.Context, to string, subject string, body string) error {
@@ -30,11 +31,20 @@ func (s *NotificationService) SendEmail(ctx context.Context, to string, subject 
 }
 
 func (s *NotificationService) SendSystemAlert(ctx context.Context, userID int, title string, message string) error {
-	// This would insert into a 'notifications' table for in-app alerts
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO notifications (user_id, title, message)
+		VALUES ($1, $2, $3)
+	`, userID, title, message)
+
+	if err != nil {
+		logger.Get("notify").WithError(err).Error("Failed to persist system alert")
+		return err
+	}
+
 	logger.Get("notify").WithFields(logrus.Fields{
 		"user_id": userID,
 		"title":   title,
-	}).Info("System Alert Created")
+	}).Info("System Alert Persisted")
 
 	return nil
 }

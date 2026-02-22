@@ -116,9 +116,10 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	teamService := services.NewTeamService(db)
 	reportingService := services.NewReportingService(db, analyticsService)
 	brandIdentityService := services.NewBrandIdentityService(db)
-	notificationService := services.NewNotificationService()
+	notificationService := services.NewNotificationService(db)
+	notificationHandler := api.NewNotificationHandler(db)
 	reportingScheduler := services.NewReportingScheduler(db, analyticsService, notificationService)
-	agencyHandler := api.NewAgencyHandler(db, intakeService, approvalService, teamService, reportingService, brandIdentityService)
+	agencyHandler := api.NewAgencyHandler(db, intakeService, approvalService, teamService, reportingService, brandIdentityService, reportingScheduler)
 	aiHandler := api.NewAiHandler(db, chatService)
 	postRepo := repositories.NewPostRepository(db)
 	postService := services.NewPostService(postRepo)
@@ -194,6 +195,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	agencyRoutes.Get("/approvals", agencyHandler.ListPendingApprovals)
 	agencyRoutes.Get("/calendar", postsHandler.GetGlobalCalendar)
 	agencyRoutes.Put("/calendar/batch", postsHandler.BatchUpdateStatus)
+	agencyRoutes.Post("/reports/trigger-weekly", agencyHandler.TriggerWeeklyRoundup)
 	agencyRoutes.Get("/search", agencyHandler.GlobalSearch)
 
 	agencyRoutes.Get("/clients/:id/identity", agencyHandler.GetClientIdentity)
@@ -201,6 +203,12 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	agencyRoutes.Post("/clients/:id/identity/generate", agencyHandler.GenerateClientIdentity)
 	agencyRoutes.Get("/videos/:id/comments", agencyHandler.GetVideoComments)
 	agencyRoutes.Post("/videos/:id/comments", agencyHandler.AddVideoComment)
+
+	// Notifications
+	notifications := protected.Group("/notifications")
+	notifications.Get("", notificationHandler.List)
+	notifications.Post("/:id/read", notificationHandler.MarkRead)
+	notifications.Post("/read-all", notificationHandler.MarkAllRead)
 
 	protected.Get("/realtime/blasts", func(c *fiber.Ctx) error {
 		userID := middleware.GetUserID(c)

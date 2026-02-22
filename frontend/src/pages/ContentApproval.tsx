@@ -108,8 +108,8 @@ export const ContentApproval = () => {
     );
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col p-6 sm:p-12 overflow-x-hidden">
-      <div className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+    <div className="min-h-screen bg-[#050505] text-white flex flex-col p-4 md:p-12 overflow-x-hidden">
+      <div className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-start">
         {/* Left: Video Preview */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
@@ -147,10 +147,10 @@ export const ContentApproval = () => {
             <span className="text-primary font-bold tracking-tighter text-sm uppercase mb-2 block">
               Content Review
             </span>
-            <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4">
+            <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight mb-4">
               {video?.title}
             </h1>
-            <p className="text-gray-400 text-lg leading-relaxed">
+            <p className="text-gray-400 text-sm md:text-lg leading-relaxed">
               {video?.description || "No description provided."}
             </p>
           </div>

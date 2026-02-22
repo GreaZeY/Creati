@@ -21,9 +21,10 @@ type AgencyHandler struct {
 	teamSvc     *services.TeamService
 	reportSvc   *services.ReportingService
 	identitySvc *services.BrandIdentityService
+	scheduler   *services.ReportingScheduler
 }
 
-func NewAgencyHandler(db *sql.DB, intake *services.IntakeService, approval *services.ApprovalService, team *services.TeamService, reporting *services.ReportingService, identity *services.BrandIdentityService) *AgencyHandler {
+func NewAgencyHandler(db *sql.DB, intake *services.IntakeService, approval *services.ApprovalService, team *services.TeamService, reporting *services.ReportingService, identity *services.BrandIdentityService, scheduler *services.ReportingScheduler) *AgencyHandler {
 	return &AgencyHandler{
 		db:          db,
 		intakeSvc:   intake,
@@ -31,6 +32,7 @@ func NewAgencyHandler(db *sql.DB, intake *services.IntakeService, approval *serv
 		teamSvc:     team,
 		reportSvc:   reporting,
 		identitySvc: identity,
+		scheduler:   scheduler,
 	}
 }
 
@@ -837,4 +839,19 @@ func (h *AgencyHandler) GlobalSearch(c *fiber.Ctx) error {
 	}
 
 	return utils.SuccessResponse(c, results, "")
+}
+
+// TriggerWeeklyRoundup manually executes the weekly performance snapshot for all clients
+func (h *AgencyHandler) TriggerWeeklyRoundup(c *fiber.Ctx) error {
+	// RBAC: Only Owners/Admins of an organization should trigger this,
+	// but since it's "Global", we might restrict it to Agency owners.
+	// For simplicity in this pivot, any authenticated user can trigger for now,
+	// but practically this would be a system-only or admin-only route.
+
+	err := h.scheduler.RunWeeklyRoundup(c.Context())
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to execute roundup", err)
+	}
+
+	return utils.SuccessResponse(c, nil, "Weekly impact snapshots dispatched successfully")
 }

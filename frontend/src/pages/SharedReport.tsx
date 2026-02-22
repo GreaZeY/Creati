@@ -123,11 +123,11 @@ export function SharedReport() {
             </div>
           </div>
 
-          <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-end gap-1 relative z-10 border-t md:border-t-0 border-slate-100 dark:border-white/5 pt-4 md:pt-0">
-            <p className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-muted-foreground/40">
+          <div className="flex flex-col md:items-end justify-center md:justify-end gap-1 relative z-10 border-t md:border-t-0 border-slate-100 dark:border-white/5 pt-4 md:pt-0 mt-2 md:mt-0">
+            <p className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-muted-foreground/40 mb-1 md:mb-0">
               Agency Insights
             </p>
-            <div className="px-3 py-1 bg-black text-white text-[8px] md:text-[10px] font-black uppercase tracking-widest rounded-lg border border-white/10">
+            <div className="px-3 py-1.5 bg-black text-white text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-lg border border-white/10 w-fit md:w-auto">
               Creati <span className="text-primary italic">OS</span>
             </div>
           </div>
@@ -153,7 +153,7 @@ export function SharedReport() {
                 <p className="text-[8px] md:text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-muted-foreground/60">
                   {stat.label}
                 </p>
-                <h3 className="text-xl md:text-2xl font-black font-display tracking-tight mt-1">
+                <h3 className="text-lg md:text-2xl font-black font-display tracking-tighter mt-1">
                   {stat.value}
                 </h3>
               </LensedCard>
