@@ -107,9 +107,12 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	automationHandler := api.NewAutomationHandler(db, automationService)
 	paymentHandler := api.NewPaymentHandler(db)
 	webhookHandler := api.NewWebhookHandler(db)
+	analyticsService := services.NewAnalyticsService(db, cacheService)
 	intakeService := services.NewIntakeService(db)
 	approvalService := services.NewApprovalService(db)
-	agencyHandler := api.NewAgencyHandler(db, intakeService, approvalService)
+	teamService := services.NewTeamService(db)
+	reportingService := services.NewReportingService(db, analyticsService)
+	agencyHandler := api.NewAgencyHandler(db, intakeService, approvalService, teamService, reportingService)
 	aiHandler := api.NewAiHandler(db, chatService)
 	postsHandler := api.NewPostsHandler(db, storageService, queueService)
 	proxyHandler := api.NewProxyHandler(db, mediaService)
@@ -163,6 +166,14 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	// Pivot Features
 	agencyRoutes.Post("/intake-link", agencyHandler.CreateIntakeLink)
 	agencyRoutes.Post("/approval-link/:id", agencyHandler.CreateApprovalLink)
+
+	// Team Management
+	agencyRoutes.Get("/team", agencyHandler.ListTeamMembers)
+	agencyRoutes.Post("/team/invite", agencyHandler.InviteTeamMember)
+	agencyRoutes.Put("/team/:memberID/role", agencyHandler.UpdateTeamMemberRole)
+	agencyRoutes.Delete("/team/:memberID", agencyHandler.RemoveTeamMember)
+
+	agencyRoutes.Get("/reports", agencyHandler.GenerateClientReport)
 
 	protected.Get("/realtime/blasts", func(c *fiber.Ctx) error {
 		userID := middleware.GetUserID(c)

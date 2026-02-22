@@ -234,8 +234,17 @@ export const videosAPI = {
 };
 
 export const analyticsAPI = {
-  getOverview: (clientId?: number) =>
-    api.get("/analytics/overview" + (clientId ? `?clientId=${clientId}` : "")),
+  getOverview: (clientId?: number, isGlobal?: boolean) => {
+    let url = "/analytics/overview";
+    const params = new URLSearchParams();
+    if (clientId) params.append("clientId", clientId.toString());
+    if (isGlobal) params.append("global", "true");
+    
+    const queryString = params.toString();
+    if (queryString) url += `?${queryString}`;
+    
+    return api.get(url);
+  },
 };
 export const automationAPI = {
   list: (clientId?: number) =>
@@ -305,6 +314,11 @@ export const agencyAPI = {
   commitClients: (clients: Client[]) => api.put('/agency/clients/commit', { clients }),
   createIntakeLink: () => api.post<ApiResponse<{ token: string; url: string }>>('/agency/intake-link'),
   createApprovalLink: (id: number) => api.post<ApiResponse<{ token: string; url: string }>>(`/agency/approval-link/${id}`),
+  listTeam: () => api.get<ApiResponse<any[]>>('/agency/team'),
+  inviteMember: (email: string, role: string) => api.post('/agency/team/invite', { email, role }),
+  updateMemberRole: (memberId: number, role: string) => api.put(`/agency/team/${memberId}/role`, { role }),
+  removeMember: (memberId: number) => api.delete(`/agency/team/${memberId}`),
+  generateReport: () => api.get<ApiResponse<any>>('/agency/reports'),
 };
 
 export const paymentsAPI = {

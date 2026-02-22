@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	"GreaZeY/Creati/backend/internal/db/models"
+	"creati.in/creati/backend/internal/db/models"
 )
 
 type ApprovalService struct {

@@ -18,13 +18,17 @@ type AgencyHandler struct {
 	db          *sql.DB
 	intakeSvc   *services.IntakeService
 	approvalSvc *services.ApprovalService
+	teamSvc     *services.TeamService
+	reportSvc   *services.ReportingService
 }
 
-func NewAgencyHandler(db *sql.DB, intake *services.IntakeService, approval *services.ApprovalService) *AgencyHandler {
+func NewAgencyHandler(db *sql.DB, intake *services.IntakeService, approval *services.ApprovalService, team *services.TeamService, reporting *services.ReportingService) *AgencyHandler {
 	return &AgencyHandler{
 		db:          db,
 		intakeSvc:   intake,
 		approvalSvc: approval,
+		teamSvc:     team,
+		reportSvc:   reporting,
 	}
 }
 
@@ -469,4 +473,121 @@ func (h *AgencyHandler) SubmitApprovalDecision(c *fiber.Ctx) error {
 	}
 
 	return utils.SuccessResponse(c, nil, "Decision submitted successfully")
+}
+
+// ListTeamMembers returns all members of the current client's organization
+func (h *AgencyHandler) ListTeamMembers(c *fiber.Ctx) error {
+	ctx := middleware.GetContext(c)
+	if ctx.OrgID == nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no organization context")
+	}
+
+	members, err := h.teamSvc.ListTeamMembers(c.Context(), *ctx.OrgID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to list team members", err)
+	}
+
+	return utils.SuccessResponse(c, members, "")
+}
+
+// InviteTeamMember adds a new member by email
+func (h *AgencyHandler) InviteTeamMember(c *fiber.Ctx) error {
+	ctx := middleware.GetContext(c)
+	if ctx.OrgID == nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no organization context")
+	}
+
+	// RBAC: Only Admin or Owner can invite
+	allowed, err := h.teamSvc.CheckPermission(c.Context(), ctx.UserID, *ctx.OrgID, []string{"owner", "admin"})
+	if err != nil || !allowed {
+		return utils.ErrorResponse(c, fiber.StatusForbidden, "insufficient permissions")
+	}
+
+	var payload struct {
+		Email string `json:"email"`
+		Role  string `json:"role"`
+	}
+
+	if err := c.BodyParser(&payload); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request")
+	}
+
+	if payload.Email == "" || payload.Role == "" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "email and role are required")
+	}
+
+	err = h.teamSvc.InviteMember(c.Context(), *ctx.OrgID, payload.Email, payload.Role)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, err.Error(), err)
+	}
+
+	return utils.SuccessResponse(c, nil, "Team member invited successfully")
+}
+
+// UpdateTeamMemberRole changes a member's role
+func (h *AgencyHandler) UpdateTeamMemberRole(c *fiber.Ctx) error {
+	ctx := middleware.GetContext(c)
+	if ctx.OrgID == nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no organization context")
+	}
+
+	memberID, _ := strconv.Atoi(c.Params("memberID"))
+
+	// RBAC: Only Admin or Owner
+	allowed, err := h.teamSvc.CheckPermission(c.Context(), ctx.UserID, *ctx.OrgID, []string{"owner", "admin"})
+	if err != nil || !allowed {
+		return utils.ErrorResponse(c, fiber.StatusForbidden, "insufficient permissions")
+	}
+
+	var payload struct {
+		Role string `json:"role"`
+	}
+	if err := c.BodyParser(&payload); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request")
+	}
+
+	err = h.teamSvc.UpdateMemberRole(c.Context(), *ctx.OrgID, memberID, payload.Role)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update role", err)
+	}
+
+	return utils.SuccessResponse(c, nil, "Role updated")
+}
+
+// RemoveTeamMember removes a member from the org
+func (h *AgencyHandler) RemoveTeamMember(c *fiber.Ctx) error {
+	ctx := middleware.GetContext(c)
+	if ctx.OrgID == nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no organization context")
+	}
+
+	memberID, _ := strconv.Atoi(c.Params("memberID"))
+
+	// RBAC: Only Admin or Owner
+	allowed, err := h.teamSvc.CheckPermission(c.Context(), ctx.UserID, *ctx.OrgID, []string{"owner", "admin"})
+	if err != nil || !allowed {
+		return utils.ErrorResponse(c, fiber.StatusForbidden, "insufficient permissions")
+	}
+
+	err = h.teamSvc.RemoveMember(c.Context(), *ctx.OrgID, memberID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, err.Error(), err)
+	}
+
+	return utils.SuccessResponse(c, nil, "Member removed")
+}
+
+// GenerateClientReport returns a white-labeled performance summary
+func (h *AgencyHandler) GenerateClientReport(c *fiber.Ctx) error {
+	ctx := middleware.GetContext(c)
+	if ctx.ClientID == nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no client workspace selected")
+	}
+
+	report, err := h.reportSvc.GenerateMonthlyReport(c.Context(), ctx.UserID, *ctx.ClientID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate report", err)
+	}
+
+	return utils.SuccessResponse(c, report, "")
 }

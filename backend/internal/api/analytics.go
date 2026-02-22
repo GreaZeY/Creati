@@ -2,7 +2,6 @@ package api
 
 import (
 	"database/sql"
-	"strconv"
 
 	"creati.in/creati/backend/internal/middleware"
 	"creati.in/creati/backend/internal/services"
@@ -22,23 +21,31 @@ func NewAnalyticsHandler(db *sql.DB, queue *services.QueueService, cache *servic
 	}
 }
 
-// GetOverview returns aggregated stats for the user
+// GetOverview returns aggregated stats for the user or entire organization
 func (h *AnalyticsHandler) GetOverview(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
 		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "User not found")
 	}
 
+	isGlobal := c.Query("global") == "true"
 	clientID := middleware.GetClientID(c)
 
-	// 1. Get Instant Stats from DB (Fast)
-	stats, err := h.service.GetUserStats(userID, clientID)
+	var stats *services.UserStats
+	var err error
+
+	if isGlobal {
+		stats, err = h.service.GetOrgStats(userID)
+	} else {
+		// 1. Get Instant Stats from DB (Fast)
+		stats, err = h.service.GetUserStats(userID, clientID)
+		// 2. Trigger Async Refresh (Non-blocking) - Only for client specific for now to save resources
+		go h.service.SyncUserAnalytics(userID, clientID)
+	}
+
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to fetch analytics", err)
 	}
-
-	// 2. Trigger Async Refresh (Non-blocking)
-	go h.service.SyncUserAnalytics(userID, clientID)
 
 	return utils.SuccessResponse(c, stats, "")
 }

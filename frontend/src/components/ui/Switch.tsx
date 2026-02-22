@@ -1,10 +1,9 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-interface SwitchProps {
+interface SwitchProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   checked: boolean;
   onCheckedChange: (checked: boolean) => void;
-  className?: string;
   size?: "sm" | "md" | "lg";
   thumbIconChecked?: React.ReactNode;
   thumbIconUnchecked?: React.ReactNode;
@@ -35,11 +34,13 @@ export function Switch({
   size = "md",
   thumbIconChecked,
   thumbIconUnchecked,
+  ...props
 }: SwitchProps) {
   const styles = SIZES[size];
 
   return (
     <button
+      {...props}
       type="button"
       role="switch"
       aria-checked={checked}

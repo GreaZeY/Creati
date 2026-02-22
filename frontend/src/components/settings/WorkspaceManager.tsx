@@ -25,6 +25,11 @@ import {
   X,
   Plus,
   AlertTriangle,
+  Users,
+  Layout,
+  Mail,
+  Shield,
+  UserPlus,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -65,7 +70,6 @@ const SortableWorkspaceItem = ({
 
   useEffect(() => {
     if (showDeleteConfirm) {
-      // Wait for animation frame to ensure element is rendering
       const timer = setTimeout(() => {
         confirmRef.current?.scrollIntoView({
           behavior: "smooth",
@@ -76,7 +80,6 @@ const SortableWorkspaceItem = ({
     }
   }, [showDeleteConfirm]);
 
-  // Sync back to parent with debounce
   useEffect(() => {
     const timer = setTimeout(() => {
       if (localColor !== client.color) {
@@ -86,7 +89,6 @@ const SortableWorkspaceItem = ({
     return () => clearTimeout(timer);
   }, [localColor, client.id, onColorChange, client.color]);
 
-  // Sync from parent if changed externally (e.g. discard)
   useEffect(() => {
     setLocalColor(client.color || "#000000");
   }, [client.color]);
@@ -112,7 +114,7 @@ const SortableWorkspaceItem = ({
     >
       <Card
         className={cn(
-          "p-2 border-0 bg-white/40 dark:bg-card/40 backdrop-blur-xl ring-1 ring-border transition-all group flex items-center gap-3",
+          "p-2 border-0 bg-white/40 dark:bg-card/40 backdrop-blur-xl ring-1 ring-border transition-all group flex items-center gap-3 rounded-2xl",
           isDragging && "shadow-2xl ring-primary/50",
         )}
       >
@@ -124,7 +126,6 @@ const SortableWorkspaceItem = ({
           <GripVertical className="w-3.5 h-3.5 text-muted-foreground" />
         </div>
 
-        {/* Circular Color Picker */}
         <div className="relative group/color">
           <div
             className="w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-white font-black text-[10px] shadow-inner cursor-pointer hover:scale-110 transition-transform relative overflow-hidden ring-2 ring-background ring-offset-2 ring-offset-transparent"
@@ -207,7 +208,7 @@ const SortableWorkspaceItem = ({
           >
             <Card
               ref={confirmRef}
-              className="mt-2 p-4 border-destructive/20 bg-destructive/5 ring-1 ring-destructive/30 scroll-mt-20"
+              className="mt-2 p-4 border-destructive/20 bg-destructive/5 ring-1 ring-destructive/30 scroll-mt-20 rounded-2xl"
             >
               <div className="flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
@@ -250,6 +251,9 @@ const SortableWorkspaceItem = ({
 };
 
 export const WorkspaceManager = () => {
+  const [activeTab, setActiveTab] = useState<"workspaces" | "team">(
+    "workspaces",
+  );
   const [workspaces, setWorkspaces] = useState<Client[]>([]);
   const [draftWorkspaces, setDraftWorkspaces] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -257,57 +261,60 @@ export const WorkspaceManager = () => {
   const [newName, setNewName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
+  // Team state
+  const [team, setTeam] = useState<any[]>([]);
+  const [isInviting, setIsInviting] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("editor");
+
   const isDirty =
+    activeTab === "workspaces" &&
     JSON.stringify(workspaces) !== JSON.stringify(draftWorkspaces);
 
-  // Hook handles blocking and shake trigger
   const shouldShake = useNavigationLock(isDirty);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
   );
 
-  const fetchWorkspaces = async () => {
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      const resp = await agencyAPI.listClients();
-      if (resp.data.success) {
-        // Sort by displayOrder and normalize colors
-        const normalized = (resp.data.data || [])
-          .map((w) => ({
-            ...w,
-            color: w.color || "#000000",
-          }))
-          .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
-        setWorkspaces(normalized);
-        setDraftWorkspaces(normalized);
+      if (activeTab === "workspaces") {
+        const resp = await agencyAPI.listClients();
+        if (resp.data.success) {
+          const normalized = (resp.data.data || [])
+            .map((w) => ({ ...w, color: w.color || "#000000" }))
+            .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+          setWorkspaces(normalized);
+          setDraftWorkspaces(normalized);
+        }
+      } else {
+        const resp = await agencyAPI.listTeam();
+        if (resp.data.success) {
+          setTeam(resp.data.data);
+        }
       }
     } catch (err) {
-      toast.error("Failed to load workspaces");
+      toast.error(`Failed to load ${activeTab}`);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchWorkspaces();
-  }, []);
+    fetchData();
+  }, [activeTab]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-
     if (over && active.id !== over.id) {
       const oldIndex = draftWorkspaces.findIndex((w) => w.id === active.id);
       const newIndex = draftWorkspaces.findIndex((w) => w.id === over.id);
-
       const reordered = arrayMove(draftWorkspaces, oldIndex, newIndex);
-      // Update displayOrder in draft
       const withNewOrders = reordered.map((w, idx) => ({
         ...w,
         displayOrder: idx,
@@ -345,8 +352,7 @@ export const WorkspaceManager = () => {
       await agencyAPI.createClient(newName.trim(), "#6366f1");
       setNewName("");
       setIsAdding(false);
-      // We must fetch to ensure we get the ID and correct state sync
-      await fetchWorkspaces();
+      await fetchData();
       toast.success("Workspace created");
     } catch (err) {
       toast.error("Failed to create workspace");
@@ -371,118 +377,342 @@ export const WorkspaceManager = () => {
     toast.info("Changes discarded");
   };
 
-  if (loading)
-    return (
-      <div className="p-8 text-center opacity-40 animate-pulse font-black uppercase tracking-widest text-[10px]">
-        Loading workspaces...
-      </div>
-    );
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) return;
+    try {
+      await agencyAPI.inviteMember(inviteEmail, inviteRole);
+      setInviteEmail("");
+      setIsInviting(false);
+      await fetchData();
+      toast.success("Team member invited");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to invite member",
+      );
+    }
+  };
+
+  const handleRemoveMember = async (id: number) => {
+    try {
+      await agencyAPI.removeMember(id);
+      await fetchData();
+      toast.success("Member removed");
+    } catch (err) {
+      toast.error("Failed to remove member");
+    }
+  };
+
+  const handleUpdateRole = async (id: number, role: string) => {
+    try {
+      await agencyAPI.updateMemberRole(id, role);
+      await fetchData();
+      toast.success("Role updated");
+    } catch (err) {
+      toast.error("Failed to update role");
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="font-bold text-lg tracking-tight">Manage Workspaces</h3>
-        <Button
-          size="sm"
-          onClick={() => setIsAdding(true)}
-          className="rounded-xl h-8 px-3 font-bold uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20"
+      {/* Tab Switcher */}
+      <div className="flex items-center p-1 bg-secondary/30 rounded-2xl border border-border/50 w-fit">
+        <button
+          onClick={() => setActiveTab("workspaces")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+            activeTab === "workspaces"
+              ? "bg-primary text-white shadow-xl shadow-primary/20"
+              : "text-muted-foreground hover:text-foreground",
+          )}
         >
-          <Plus className="w-3.5 h-3.5 mr-1.5" />
-          Add New
-        </Button>
+          <Layout className="w-3.5 h-3.5" />
+          Workspaces
+        </button>
+        <button
+          onClick={() => setActiveTab("team")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+            activeTab === "team"
+              ? "bg-primary text-white shadow-xl shadow-primary/20"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <Users className="w-3.5 h-3.5" />
+          Team Control
+        </button>
       </div>
 
-      <AnimatePresence>
-        {isAdding && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <Card className="mb-6 p-4 border-primary/20 bg-primary/[0.02] ring-1 ring-primary/30 rounded-2xl">
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest opacity-40">
-                    Workspace Name
-                  </label>
-                  <Input
-                    autoFocus
-                    placeholder="e.g. Acme Marketing, Personal Hub"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                    className="h-10 text-sm font-bold bg-secondary/30 dark:bg-background/50 border-0 ring-1 ring-border focus:ring-primary/50"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    className="h-8 font-bold uppercase tracking-widest text-[10px] px-4"
-                    onClick={handleAdd}
-                  >
-                    Create Workspace
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 font-bold uppercase tracking-widest text-[10px] px-4"
-                    onClick={() => {
-                      setIsAdding(false);
-                      setNewName("");
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext
-          items={draftWorkspaces.map((w) => w.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <div className="space-y-3">
-            {draftWorkspaces.map((workspace) => (
-              <SortableWorkspaceItem
-                key={workspace.id}
-                client={workspace}
-                onRename={handleRename}
-                onDelete={handleDelete}
-                onColorChange={handleColorChange}
-              />
-            ))}
-
-            {draftWorkspaces.length === 0 && (
-              <div className="p-12 text-center rounded-[2rem] border-2 border-dashed border-border/50 opacity-40">
-                <p className="font-black uppercase tracking-widest text-xs">
-                  No workspaces yet
-                </p>
-                <p className="text-xs font-medium mt-2">
-                  Create one to start organizing your projects
-                </p>
-              </div>
-            )}
+      {activeTab === "workspaces" ? (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-lg tracking-tight">Manage Nodes</h3>
+            <Button
+              size="sm"
+              onClick={() => setIsAdding(true)}
+              className="rounded-xl h-8 px-3 font-bold uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20"
+            >
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              Add Node
+            </Button>
           </div>
-        </SortableContext>
-      </DndContext>
 
-      {/* Floating Save Bar */}
-      <SaveChangesBar
-        isDirty={isDirty}
-        isSaving={isSaving}
-        onSave={handleCommit}
-        onDiscard={handleDiscard}
-        shake={shouldShake}
-      />
+          <AnimatePresence>
+            {isAdding && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <Card className="mb-6 p-4 border-primary/20 bg-primary/[0.02] ring-1 ring-primary/30 rounded-[2rem]">
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-widest opacity-40">
+                        Client/Project Name
+                      </label>
+                      <Input
+                        autoFocus
+                        placeholder="e.g. Acme Marketing, Personal Hub"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                        className="h-12 text-sm font-bold bg-secondary/30 border-0 ring-1 ring-border focus:ring-primary/50"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="h-8 font-bold uppercase tracking-widest text-[10px] px-6"
+                        onClick={handleAdd}
+                      >
+                        Initialize Node
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 font-bold uppercase tracking-widest text-[10px] px-6"
+                        onClick={() => {
+                          setIsAdding(false);
+                          setNewName("");
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {loading ? (
+            <div className="p-8 text-center opacity-40 animate-pulse font-black uppercase tracking-widest text-[10px]">
+              Syncing nodes...
+            </div>
+          ) : (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={draftWorkspaces.map((w) => w.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-3">
+                  {draftWorkspaces.map((workspace) => (
+                    <SortableWorkspaceItem
+                      key={workspace.id}
+                      client={workspace}
+                      onRename={handleRename}
+                      onDelete={handleDelete}
+                      onColorChange={handleColorChange}
+                    />
+                  ))}
+                  {draftWorkspaces.length === 0 && (
+                    <div className="p-12 text-center rounded-[2rem] border-2 border-dashed border-border/50 opacity-40">
+                      <p className="font-black uppercase tracking-widest text-xs">
+                        No active nodes
+                      </p>
+                      <p className="text-xs font-medium mt-2">
+                        Add a client workspace to begin orchestration.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </SortableContext>
+            </DndContext>
+          )}
+
+          <SaveChangesBar
+            isDirty={isDirty}
+            isSaving={isSaving}
+            onSave={handleCommit}
+            onDiscard={handleDiscard}
+            shake={shouldShake}
+          />
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-lg tracking-tight">
+              Organization Team
+            </h3>
+            <Button
+              size="sm"
+              onClick={() => setIsInviting(true)}
+              className="rounded-xl h-8 px-3 font-bold uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 text-white"
+            >
+              <UserPlus className="w-3.5 h-3.5 mr-1.5" />
+              Invite Member
+            </Button>
+          </div>
+
+          <AnimatePresence>
+            {isInviting && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden"
+              >
+                <Card className="mb-6 p-4 border-primary/20 bg-primary/[0.02] ring-1 ring-primary/30 rounded-[2rem]">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-widest opacity-40">
+                        Email Address
+                      </label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          autoFocus
+                          placeholder="colleague@agency.com"
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                          className="h-12 pl-10 text-sm font-bold bg-secondary/30 border-0 ring-1 ring-border focus:ring-primary/50"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-widest opacity-40">
+                        Permission Role
+                      </label>
+                      <select
+                        value={inviteRole}
+                        onChange={(e) => setInviteRole(e.target.value)}
+                        className="w-full h-12 rounded-xl bg-secondary/30 border-0 ring-1 ring-border px-4 text-sm font-bold focus:ring-primary/50 outline-none appearance-none"
+                      >
+                        <option value="admin">
+                          Administrator (Full Access)
+                        </option>
+                        <option value="editor">Editor (Node Access)</option>
+                        <option value="viewer">Viewer (Read Only)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      className="h-8 font-bold uppercase tracking-widest text-[10px] px-6"
+                      onClick={handleInvite}
+                    >
+                      Send Invitation
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 font-bold uppercase tracking-widest text-[10px] px-6"
+                      onClick={() => setIsInviting(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {loading ? (
+            <div className="p-8 text-center opacity-40 animate-pulse font-black uppercase tracking-widest text-[10px]">
+              Syncing team roster...
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3">
+              {team.map((member) => (
+                <Card
+                  key={member.id}
+                  className="p-4 border-0 bg-white/40 dark:bg-card/40 backdrop-blur-xl ring-1 ring-border rounded-2xl flex items-center gap-4 group"
+                >
+                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border border-primary/20 overflow-hidden shrink-0">
+                    {member.avatar ? (
+                      <img
+                        src={member.avatar}
+                        alt={member.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="font-black text-primary text-sm uppercase">
+                        {member.name?.charAt(0) || member.email.charAt(0)}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-bold text-sm truncate">
+                        {member.name || member.email}
+                      </h4>
+                      <div
+                        className={cn(
+                          "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tighter",
+                          member.role === "owner"
+                            ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                            : member.role === "admin"
+                              ? "bg-primary/10 text-primary border border-primary/20"
+                              : "bg-muted text-muted-foreground border border-border",
+                        )}
+                      >
+                        {member.role}
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground font-medium truncate">
+                      {member.email}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {member.role !== "owner" && (
+                      <>
+                        <select
+                          value={member.role}
+                          onChange={(e) =>
+                            handleUpdateRole(member.id, e.target.value)
+                          }
+                          className="h-8 rounded-lg bg-secondary/50 border-0 ring-1 ring-border px-2 text-[10px] font-bold focus:ring-primary/50 outline-none"
+                        >
+                          <option value="admin">Admin</option>
+                          <option value="editor">Editor</option>
+                          <option value="viewer">Viewer</option>
+                        </select>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleRemoveMember(member.id)}
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
+                    {member.role === "owner" && (
+                      <Shield className="w-4 h-4 text-amber-500 shrink-0 mr-2" />
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

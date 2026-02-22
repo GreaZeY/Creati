@@ -128,6 +128,77 @@ func (s *AnalyticsService) GetUserStats(userID int, clientID *int) (*UserStats, 
 	return stats, nil
 }
 
+// GetOrgStats fetches aggregated stats for all clients in the user's organizations
+func (s *AnalyticsService) GetOrgStats(userID int) (*UserStats, error) {
+	stats := &UserStats{
+		PlatformBreakdown: []PlatformStat{},
+		PulseData:         []PulsePoint{},
+	}
+
+	// 1. Core aggregates across all clients the user has access to
+	query := `
+		SELECT 
+			COUNT(DISTINCT v.id) as total_videos,
+			COALESCE(SUM(latest.views), 0) as total_views,
+			COALESCE(SUM(latest.likes), 0) as total_likes,
+			COALESCE(SUM(latest.comments), 0) as total_comments,
+			COALESCE(SUM(latest.shares), 0) as total_shares
+		FROM (
+			SELECT DISTINCT ON (va.video_id, va.account_id) va.video_id, va.views, va.likes, va.comments, va.shares
+			FROM video_analytics va
+			JOIN videos v ON va.video_id = v.id
+			JOIN clients c ON v.client_id = c.id
+			JOIN team_members tm ON c.org_id = tm.org_id
+			WHERE tm.user_id = $1 AND tm.status = 'active'
+			ORDER BY va.video_id, va.account_id, va.fetched_at DESC
+		) latest
+		JOIN videos v ON latest.video_id = v.id
+	`
+	err := s.db.QueryRow(query, userID).Scan(
+		&stats.TotalVideos, &stats.TotalViews, &stats.TotalLikes, &stats.TotalComments, &stats.TotalShares,
+	)
+
+	if err != nil && err != sql.ErrNoRows {
+		logger.Get("analytics").WithError(err).Error("GetOrgStats failed")
+		return nil, err
+	}
+
+	// 2. Fetch platform breakdown for all clients
+	pbQuery := `
+		SELECT platform, COALESCE(SUM(views), 0)
+		FROM (
+			SELECT DISTINCT ON (va.video_id, va.account_id) va.platform, va.views
+			FROM video_analytics va
+			JOIN videos v ON va.video_id = v.id
+			JOIN clients c ON v.client_id = c.id
+			JOIN team_members tm ON c.org_id = tm.org_id
+			WHERE tm.user_id = $1 AND tm.status = 'active'
+			ORDER BY va.video_id, va.account_id, va.fetched_at DESC
+		) latest_per_account
+		GROUP BY platform`
+
+	rows, err := s.db.Query(pbQuery, userID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var p PlatformStat
+			if err := rows.Scan(&p.Platform, &p.Views); err == nil {
+				p.Revenue = float64(p.Views) * 0.002
+				stats.PlatformBreakdown = append(stats.PlatformBreakdown, p)
+				stats.ProjectedRevenue += p.Revenue
+			}
+		}
+	}
+
+	// 3. Pulse Data (Org Global)
+	pulse, err := s.GetOrgGrowthPulse(userID)
+	if err == nil {
+		stats.PulseData = pulse
+	}
+
+	return stats, nil
+}
+
 // GetGrowthPulse fetches time-series data for the last 7 days
 func (s *AnalyticsService) GetGrowthPulse(userID int, clientID *int) ([]PulsePoint, error) {
 	gpQuery := `
@@ -177,7 +248,64 @@ func (s *AnalyticsService) GetGrowthPulse(userID int, clientID *int) ([]PulsePoi
 		FROM summed_daily`
 
 	rows, err := s.db.Query(gpQuery, gpArgs...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
+	pulse := make([]PulsePoint, 0)
+	for rows.Next() {
+		var p PulsePoint
+		if err := rows.Scan(&p.Date, &p.Reach, &p.Engagement); err == nil {
+			pulse = append(pulse, p)
+		}
+	}
+
+	return pulse, nil
+}
+
+// GetOrgGrowthPulse fetches time-series data for all clients in org
+func (s *AnalyticsService) GetOrgGrowthPulse(userID int) ([]PulsePoint, error) {
+	gpQuery := `
+		WITH RECURSIVE days AS (
+			SELECT DATE_TRUNC('day', NOW()) as day
+			UNION ALL
+			SELECT day - INTERVAL '1 day'
+			FROM days
+			WHERE day > DATE_TRUNC('day', NOW()) - INTERVAL '6 days'
+		),
+		daily_snaps AS (
+			SELECT 
+				DATE_TRUNC('day', va.fetched_at) as day,
+				va.video_id,
+				va.account_id,
+				MAX(va.views) as max_views,
+				MAX(va.likes + va.comments + va.shares) as max_engagement
+			FROM video_analytics va
+			JOIN videos v ON va.video_id = v.id
+			JOIN clients c ON v.client_id = c.id
+			JOIN team_members tm ON c.org_id = tm.org_id
+			WHERE tm.user_id = $1 AND tm.status = 'active'
+			  AND va.fetched_at > NOW() - INTERVAL '7 days'
+			GROUP BY 1, 2, 3
+		),
+		summed_daily AS (
+			SELECT 
+				d.day,
+				COALESCE(SUM(s.max_views), 0) as reach,
+				COALESCE(SUM(s.max_engagement), 0) as engagement
+			FROM days d
+			LEFT JOIN daily_snaps s ON d.day = s.day
+			GROUP BY 1
+			ORDER BY 1 ASC
+		)
+		SELECT 
+			TO_CHAR(day, 'Dy') as name,
+			reach,
+			engagement
+		FROM summed_daily`
+
+	rows, err := s.db.Query(gpQuery, userID)
 	if err != nil {
 		return nil, err
 	}

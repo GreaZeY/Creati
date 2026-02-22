@@ -12,8 +12,9 @@ func GetContext(c *fiber.Ctx) types.UserContext {
 		UserID: GetUserID(c),
 	}
 
-	// Extract ClientID from locals (set by TenancyMiddleware)
+	// Extract IDs from locals (set by TenancyMiddleware)
 	ctx.ClientID = GetClientID(c)
+	ctx.OrgID = GetOrgID(c)
 
 	return ctx
 }

@@ -37,27 +37,25 @@ func TenancyMiddleware(db *sql.DB) fiber.Handler {
 			return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid workspace id format")
 		}
 
-		// 2. Security Check: Verify User has access to this Workspace (Client)
-		// Verifies that the user belongs to the organization that owns this client/workspace.
-		var hasAccess bool
+		// 2. Security Check & Org Discovery
+		var orgID int
 		query := `
-			SELECT EXISTS (
-				SELECT 1 FROM team_members tm
-				JOIN clients cl ON cl.org_id = tm.org_id
-				WHERE tm.user_id = $1 AND cl.id = $2
-			)
+			SELECT tm.org_id
+			FROM team_members tm
+			JOIN clients cl ON cl.org_id = tm.org_id
+			WHERE tm.user_id = $1 AND cl.id = $2 AND tm.status = 'active'
 		`
-		err = db.QueryRow(query, userID, workspaceID).Scan(&hasAccess)
+		err = db.QueryRow(query, userID, workspaceID).Scan(&orgID)
+		if err == sql.ErrNoRows {
+			return utils.ErrorResponse(c, fiber.StatusForbidden, "access denied to this workspace")
+		}
 		if err != nil {
 			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "tenancy validation error", err)
 		}
 
-		if !hasAccess {
-			return utils.ErrorResponse(c, fiber.StatusForbidden, "access denied to this workspace")
-		}
-
-		// 3. Inject validated Workspace ID into locals for downstream handlers/services
+		// 3. Inject validated Workspace and Org IDs into locals
 		c.Locals("clientID", workspaceID)
+		c.Locals("orgID", orgID)
 
 		return c.Next()
 	}
@@ -69,10 +67,21 @@ func GetClientID(c *fiber.Ctx) *int {
 	if val == nil {
 		return nil
 	}
-
 	if id, ok := val.(int); ok {
 		return &id
 	}
+	return nil
+}
 
+// GetOrgID retrieves the validated organization ID from context
+func GetOrgID(c *fiber.Ctx) *int {
+	val := c.Locals("orgID")
+	if val == nil {
+		// If not set via Tenancy, try to find user's default org
+		return nil
+	}
+	if id, ok := val.(int); ok {
+		return &id
+	}
 	return nil
 }
