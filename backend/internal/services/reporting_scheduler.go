@@ -45,7 +45,7 @@ func (s *ReportingScheduler) RunWeeklyRoundup(ctx context.Context) error {
 		// 2. Fetch metrics for the last 7 days
 		// AnalyticsService.GetOverview typically returns all-time,
 		// but we can extend it or use a custom query for the weekly recap.
-		summary, err := s.analyticsService.GetOverview(clientID, false) // false = client-scoped
+		summary, err := s.analyticsService.GetClientMetrics(ctx, clientID)
 		if err != nil {
 			logger.Get("reporting").WithField("client_id", clientID).WithError(err).Error("Failed to fetch metrics for recap")
 			continue

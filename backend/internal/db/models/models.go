@@ -27,10 +27,14 @@ type CreatorPreferences struct {
 
 // Organization model (Agency)
 type Organization struct {
-	ID        int       `json:"id" db:"id"`
-	Name      string    `json:"name" db:"name"`
-	OwnerID   int       `json:"owner_id" db:"owner_id"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	ID           int       `json:"id" db:"id"`
+	Name         string    `json:"name" db:"name"`
+	LogoURL      string    `json:"logo_url" db:"logo_url"`
+	PrimaryColor string    `json:"primary_color" db:"primary_color"`
+	Subdomain    *string   `json:"subdomain" db:"subdomain"`
+	CustomDomain *string   `json:"custom_domain" db:"custom_domain"`
+	OwnerID      int       `json:"owner_id" db:"owner_id"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 }
 
 // Client model (Workspace)
@@ -196,4 +200,15 @@ type CalendarEntry struct {
 	ClientID        int        `json:"clientId"`
 	ClientName      string     `json:"clientName"`
 	ClientColor     string     `json:"clientColor"`
+}
+
+// VideoComment model for agency/client collaboration
+type VideoComment struct {
+	ID         int       `json:"id" db:"id"`
+	VideoID    int       `json:"videoId" db:"video_id"`
+	ClientID   *int      `json:"clientId,omitempty" db:"client_id"` // Nullable if from agency directly
+	UserID     *int      `json:"userId,omitempty" db:"user_id"`     // Nullable if from client directly
+	Content    string    `json:"content" db:"content"`
+	IsInternal bool      `json:"isInternal" db:"is_internal"` // Comments only visible to agency team
+	CreatedAt  time.Time `json:"createdAt" db:"created_at"`
 }

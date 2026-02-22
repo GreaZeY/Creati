@@ -42,6 +42,11 @@ export const Dashboard = () => {
     },
   });
 
+  const { data: analytics, isLoading: analyticsLoading } = useQuery({
+    queryKey: ["analytics-overview", selectedClient?.id],
+    queryFn: async () => {
+      const res = await analyticsAPI.getOverview(selectedClient?.id);
+      return res.data.data;
     },
   });
 
@@ -244,7 +249,11 @@ export const Dashboard = () => {
                   <Button
                     variant="outline"
                     className="w-full border-neon-lime/20 text-neon-lime hover:bg-neon-lime/10 font-black uppercase tracking-widest text-[10px] h-9"
-                    onClick={() => navigate(`/create/${item.platform}?source=${item.externalId}`)}
+                    onClick={() =>
+                      navigate(
+                        `/create/${item.platform}?source=${item.externalId}`,
+                      )
+                    }
                   >
                     Reschedule Asset
                   </Button>

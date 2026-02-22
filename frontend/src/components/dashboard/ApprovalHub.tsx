@@ -2,9 +2,18 @@ import { useQuery } from "@tanstack/react-query";
 import { agencyAPI } from "@/lib/api";
 import { LensedCard } from "@/components/ui/LensedCard";
 import { Button } from "@/components/ui/Button";
-import { ClipboardCheck, ExternalLink, Clock, Copy } from "lucide-react";
+import {
+  ClipboardCheck,
+  ExternalLink,
+  Clock,
+  Copy,
+  MessageSquare,
+} from "lucide-react";
 import { toast } from "@/lib/events";
 import { motion, AnimatePresence } from "framer-motion";
+import { Modal } from "@/components/ui/Modal";
+import { CommentThread } from "./CommentThread";
+import { useState } from "react";
 
 export function ApprovalHub() {
   const { data: approvals = [] } = useQuery({
@@ -16,6 +25,11 @@ export function ApprovalHub() {
     // Poll every 30 seconds for new agency-wide approvals
     refetchInterval: 30000,
   });
+
+  const [selectedVideo, setSelectedVideo] = useState<{
+    id: number;
+    title: string;
+  } | null>(null);
 
   if (approvals.length === 0) return null;
 
@@ -104,6 +118,19 @@ export function ApprovalHub() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="h-9 w-9 rounded-xl hover:bg-neon-lime/10 text-neon-lime"
+                    onClick={() =>
+                      setSelectedVideo({
+                        id: approval.id,
+                        title: approval.title,
+                      })
+                    }
+                  >
+                    <MessageSquare size={14} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     className="h-9 w-9 rounded-xl hover:bg-neon-purple/10 text-neon-purple"
                     onClick={() =>
                       window.open(`/approve/${approval.token}`, "_blank")
@@ -118,6 +145,16 @@ export function ApprovalHub() {
           ))}
         </AnimatePresence>
       </div>
+
+      <Modal
+        isOpen={!!selectedVideo}
+        onClose={() => setSelectedVideo(null)}
+        title={`Discussion: ${selectedVideo?.title}`}
+      >
+        <div className="p-1">
+          <CommentThread videoId={selectedVideo?.id} isAgency={true} />
+        </div>
+      </Modal>
     </motion.div>
   );
 }

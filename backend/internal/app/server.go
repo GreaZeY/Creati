@@ -70,6 +70,9 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	// Static storage (for local driver)
 	app.Static("/storage", "./storage")
 
+	// Domain Resolution Middleware (White-Labeling)
+	app.Use(middleware.DomainMiddleware(db))
+
 	// Initialize Cache Client independently
 	cacheRedisURL := os.Getenv("REDIS_CACHE_URL")
 	if cacheRedisURL == "" {
@@ -146,6 +149,8 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	apiRoutes.Get("/agency/intake/:token", agencyHandler.GetClientPublicContext)
 	apiRoutes.Get("/agency/approval/:token", agencyHandler.GetApprovalContext)
 	apiRoutes.Post("/agency/approval/:token", agencyHandler.SubmitApprovalDecision)
+	apiRoutes.Get("/pub/videos/approval/:token/comments", agencyHandler.GetPublicComments)
+	apiRoutes.Post("/pub/videos/approval/:token/comments", agencyHandler.AddPublicComment)
 
 	webhooks := app.Group("/webhooks")
 	webhooks.Get("/youtube", webhookHandler.YouTubeWebhookVerification)
@@ -183,10 +188,13 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	agencyRoutes.Get("/approvals", agencyHandler.ListPendingApprovals)
 	agencyRoutes.Get("/calendar", postsHandler.GetGlobalCalendar)
 	agencyRoutes.Put("/calendar/batch", postsHandler.BatchUpdateStatus)
+	agencyRoutes.Get("/search", agencyHandler.GlobalSearch)
 
 	agencyRoutes.Get("/clients/:id/identity", agencyHandler.GetClientIdentity)
 	agencyRoutes.Put("/clients/:id/identity", agencyHandler.UpdateClientIdentity)
 	agencyRoutes.Post("/clients/:id/identity/generate", agencyHandler.GenerateClientIdentity)
+	agencyRoutes.Get("/videos/:id/comments", agencyHandler.GetVideoComments)
+	agencyRoutes.Post("/videos/:id/comments", agencyHandler.AddVideoComment)
 
 	protected.Get("/realtime/blasts", func(c *fiber.Ctx) error {
 		userID := middleware.GetUserID(c)

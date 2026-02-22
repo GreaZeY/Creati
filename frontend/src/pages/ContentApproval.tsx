@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle2, XCircle, MessageSquare, Eye } from "lucide-react";
+import { useBranding } from "@/hooks/useBranding";
+import { CheckCircle2, XCircle, Eye } from "lucide-react";
 import { toast } from "../lib/events";
+import { CommentThread } from "../components/dashboard/CommentThread";
 
 interface VideoContext {
   id: number;
@@ -15,9 +17,9 @@ interface VideoContext {
 export const ContentApproval = () => {
   const { token } = useParams<{ token: string }>();
   const [video, setVideo] = useState<VideoContext | null>(null);
+  useBranding();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
@@ -49,7 +51,7 @@ export const ContentApproval = () => {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ decision, feedback }),
+          body: JSON.stringify({ decision }),
         },
       );
       const data = await res.json();
@@ -154,16 +156,7 @@ export const ContentApproval = () => {
           </div>
 
           <div className="space-y-4">
-            <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
-              <MessageSquare className="w-4 h-4" />
-              Feedback (Optional)
-            </h3>
-            <textarea
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-              placeholder="Suggest changes or leave instructions for the agency..."
-              className="w-full h-32 bg-white/[0.02] border border-white/10 rounded-2xl p-6 focus:outline-none focus:border-primary/50 transition-all text-white placeholder:text-gray-600 resize-none"
-            />
+            <CommentThread token={token} isAgency={false} />
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 pt-4">

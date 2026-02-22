@@ -322,6 +322,15 @@ export const agencyAPI = {
   getIdentity: (clientId: number) => api.get<ApiResponse<any>>(`/agency/clients/${clientId}/identity`),
   updateIdentity: (clientId: number, data: any) => api.put(`/agency/clients/${clientId}/identity`, data),
   generateIdentity: (clientId: number, url: string) => api.post<ApiResponse<any>>(`/agency/clients/${clientId}/identity/generate`, { url }),
+  getComments: (videoId: number) => api.get<ApiResponse<any[]>>(`/agency/videos/${videoId}/comments`),
+  addComment: (videoId: number, content: string, isInternal: boolean) => api.post(`/agency/videos/${videoId}/comments`, { content, isInternal }),
+  search: (query: string) => api.get<ApiResponse<any[]>>(`/agency/search?q=${query}`),
+};
+
+export const publicAPI = {
+  getBranding: () => api.get<ApiResponse<any>>('/pub/branding'),
+  getComments: (token: string) => api.get<ApiResponse<any[]>>(`/pub/videos/approval/${token}/comments`),
+  addComment: (token: string, content: string) => api.post(`/pub/videos/approval/${token}/comments`, { content }),
 };
 
 export const paymentsAPI = {

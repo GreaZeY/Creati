@@ -3,9 +3,25 @@ import { Header } from "./Header";
 import { AnimatePresence } from "framer-motion";
 import { Outlet, useLocation } from "react-router-dom";
 import { CreatiAgent } from "../ai/CreatiAgent";
+import { GlobalSearch } from "./GlobalSearch";
+import { useState, useEffect } from "react";
+import { useBranding } from "@/hooks/useBranding";
 
 export function MainLayout() {
   const location = useLocation();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  useBranding();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden relative selection:bg-neon-purple/30">
@@ -29,6 +45,10 @@ export function MainLayout() {
       </div>
 
       <CreatiAgent />
+      <GlobalSearch
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+      />
     </div>
   );
 }

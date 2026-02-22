@@ -699,3 +699,142 @@ func (h *AgencyHandler) GenerateClientIdentity(c *fiber.Ctx) error {
 
 	return utils.SuccessResponse(c, identity, "Identity generated from website")
 }
+
+// AddVideoComment adds a new comment to a video (Agency side)
+func (h *AgencyHandler) AddVideoComment(c *fiber.Ctx) error {
+	ctx := middleware.GetContext(c)
+	videoID, _ := strconv.Atoi(c.Params("id"))
+
+	var payload struct {
+		Content    string `json:"content"`
+		IsInternal bool   `json:"isInternal"`
+	}
+	if err := c.BodyParser(&payload); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
+	}
+
+	err := h.approvalSvc.AddComment(c.Context(), videoID, ctx.ClientID, &ctx.UserID, payload.Content, payload.IsInternal)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to add comment", err)
+	}
+
+	return utils.SuccessResponse(c, nil, "Comment added")
+}
+
+// GetVideoComments returns all comments for a video (Agency side)
+func (h *AgencyHandler) GetVideoComments(c *fiber.Ctx) error {
+	videoID, _ := strconv.Atoi(c.Params("id"))
+	comments, err := h.approvalSvc.GetVideoComments(c.Context(), videoID, true) // Can see internal
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to fetch comments", err)
+	}
+
+	return utils.SuccessResponse(c, comments, "")
+}
+
+// AddPublicComment adds a comment via approval token (Client side)
+func (h *AgencyHandler) AddPublicComment(c *fiber.Ctx) error {
+	token := c.Params("token")
+	videoID, err := h.approvalSvc.GetVideoIDFromToken(c.Context(), token)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "invalid token")
+	}
+
+	var payload struct {
+		Content string `json:"content"`
+	}
+	if err := c.BodyParser(&payload); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
+	}
+
+	// For public comments, userID is nil, isInternal is false
+	// We might want to link it to the clientID eventually, but for now we keep it simple
+	err = h.approvalSvc.AddComment(c.Context(), videoID, nil, nil, payload.Content, false)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to add comment", err)
+	}
+
+	return utils.SuccessResponse(c, nil, "Comment added")
+}
+
+// GetPublicComments returns non-internal comments for a video (Client side)
+func (h *AgencyHandler) GetPublicComments(c *fiber.Ctx) error {
+	token := c.Params("token")
+	videoID, err := h.approvalSvc.GetVideoIDFromToken(c.Context(), token)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "invalid token")
+	}
+
+	comments, err := h.approvalSvc.GetVideoComments(c.Context(), videoID, false) // Cannot see internal
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to fetch comments", err)
+	}
+
+	return utils.SuccessResponse(c, comments, "")
+}
+
+// GlobalSearch performs a cross-client search for videos and clients
+func (h *AgencyHandler) GlobalSearch(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	query := c.Query("q")
+	if len(query) < 2 {
+		return utils.SuccessResponse(c, []interface{}{}, "")
+	}
+
+	searchTerm := "%" + query + "%"
+
+	type SearchResult struct {
+		Type        string `json:"type"`
+		ID          int    `json:"id"`
+		Title       string `json:"title"`
+		ClientName  string `json:"clientName"`
+		ClientColor string `json:"clientColor"`
+	}
+
+	results := make([]SearchResult, 0)
+
+	// Search Videos
+	videoQuery := `
+		SELECT 'video' as type, v.id, v.title, c.name as client_name, c.color as client_color
+		FROM videos v
+		JOIN clients c ON v.client_id = c.id
+		JOIN organizations o ON c.org_id = o.id
+		JOIN team_members tm ON o.id = tm.org_id
+		WHERE tm.user_id = $1 AND tm.status = 'active'
+		  AND (v.title ILIKE $2 OR v.description ILIKE $2)
+		LIMIT 10
+	`
+	rows, err := h.db.Query(videoQuery, userID, searchTerm)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var r SearchResult
+			if err := rows.Scan(&r.Type, &r.ID, &r.Title, &r.ClientName, &r.ClientColor); err == nil {
+				results = append(results, r)
+			}
+		}
+	}
+
+	// Search Clients
+	clientQuery := `
+		SELECT 'client' as type, c.id, c.name, o.name as org_name, c.color
+		FROM clients c
+		JOIN organizations o ON c.org_id = o.id
+		JOIN team_members tm ON o.id = tm.org_id
+		WHERE tm.user_id = $1 AND tm.status = 'active'
+		  AND c.name ILIKE $2
+		LIMIT 5
+	`
+	rows2, err := h.db.Query(clientQuery, userID, searchTerm)
+	if err == nil {
+		defer rows2.Close()
+		for rows2.Next() {
+			var r SearchResult
+			if err := rows2.Scan(&r.Type, &r.ID, &r.Title, &r.ClientName, &r.ClientColor); err == nil {
+				results = append(results, r)
+			}
+		}
+	}
+
+	return utils.SuccessResponse(c, results, "")
+}

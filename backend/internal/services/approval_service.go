@@ -122,3 +122,48 @@ func (s *ApprovalService) SubmitDecision(ctx context.Context, token string, deci
 
 	return tx.Commit()
 }
+
+// AddComment records a new comment on a video
+func (s *ApprovalService) AddComment(ctx context.Context, videoID int, clientID *int, userID *int, content string, isInternal bool) error {
+	_, err := s.db.ExecContext(ctx,
+		"INSERT INTO video_comments (video_id, client_id, user_id, content, is_internal) VALUES ($1, $2, $3, $4, $5)",
+		videoID, clientID, userID, content, isInternal,
+	)
+	return err
+}
+
+// GetVideoComments returns all comments for a video, optionally including internal ones
+func (s *ApprovalService) GetVideoComments(ctx context.Context, videoID int, includeInternal bool) ([]models.VideoComment, error) {
+	query := "SELECT id, video_id, client_id, user_id, content, is_internal, created_at FROM video_comments WHERE video_id = $1"
+	if !includeInternal {
+		query += " AND is_internal = false"
+	}
+	query += " ORDER BY created_at ASC"
+
+	rows, err := s.db.QueryContext(ctx, query, videoID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	comments := make([]models.VideoComment, 0)
+	for rows.Next() {
+		var c models.VideoComment
+		if err := rows.Scan(&c.ID, &c.VideoID, &c.ClientID, &c.UserID, &c.Content, &c.IsInternal, &c.CreatedAt); err != nil {
+			continue
+		}
+		comments = append(comments, c)
+	}
+
+	return comments, nil
+}
+
+// GetVideoIDFromToken returns the video ID associated with a magic link token
+func (s *ApprovalService) GetVideoIDFromToken(ctx context.Context, token string) (int, error) {
+	var videoID int
+	err := s.db.QueryRowContext(ctx, "SELECT video_id FROM approval_links WHERE token = $1", token).Scan(&videoID)
+	if err != nil {
+		return 0, err
+	}
+	return videoID, nil
+}
