@@ -183,3 +183,17 @@ type ApprovalLink struct {
 	UsedAt    *time.Time `json:"used_at,omitempty" db:"used_at"`
 	CreatedAt time.Time  `json:"created_at" db:"created_at"`
 }
+
+// CalendarEntry represents a scheduled post entry for the global calendar
+type CalendarEntry struct {
+	ID              string     `json:"id"`
+	ContentID       string     `json:"contentId"`
+	Platform        string     `json:"platform"`
+	Status          string     `json:"status"`
+	ScheduledAt     *time.Time `json:"scheduledAt"`
+	ScheduledStatus string     `json:"scheduledStatus"`
+	Title           string     `json:"title"`
+	ClientID        int        `json:"clientId"`
+	ClientName      string     `json:"clientName"`
+	ClientColor     string     `json:"clientColor"`
+}

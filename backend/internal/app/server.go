@@ -114,7 +114,9 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	reportingService := services.NewReportingService(db, analyticsService)
 	agencyHandler := api.NewAgencyHandler(db, intakeService, approvalService, teamService, reportingService)
 	aiHandler := api.NewAiHandler(db, chatService)
-	postsHandler := api.NewPostsHandler(db, storageService, queueService)
+	postRepo := repositories.NewPostRepository(db)
+	postService := services.NewPostService(postRepo)
+	postsHandler := api.NewPostsHandler(postService, storageService, queueService, db)
 	proxyHandler := api.NewProxyHandler(db, mediaService)
 	// audienceHandler := api.NewAudienceHandler(db)
 
