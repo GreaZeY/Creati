@@ -102,6 +102,9 @@ const ContentApproval = lazy(() =>
     default: m.ContentApproval,
   })),
 );
+const Calendar = lazy(() =>
+  import("./pages/Calendar").then((m) => ({ default: m.Calendar })),
+);
 
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PublicRoute } from "./components/PublicRoute";
@@ -271,6 +274,14 @@ const router = createBrowserRouter([
             element: (
               <PageTransition>
                 <Analytics />
+              </PageTransition>
+            ),
+          },
+          {
+            path: "calendar",
+            element: (
+              <PageTransition>
+                <Calendar />
               </PageTransition>
             ),
           },

@@ -257,7 +257,6 @@ export const automationAPI = {
       "/automation" + (clientId ? `?clientId=${clientId}` : ""),
       data,
     ),
-
   toggle: (id: number, isActive: boolean) =>
     api.put<ApiResponse>(`/automation/${id}`, { isActive }),
 
@@ -389,4 +388,8 @@ export const postsAPI = {
       "/posts" + (clientId ? `?clientId=${clientId}` : ""),
       data,
     ),
+  getCalendar: (start?: string, end?: string) =>
+    api.get<ApiResponse<any>>(`/agency/calendar${start ? `?start=${start}` : ""}${end ? (start ? "&" : "?") + `end=${end}` : ""}`),
+  batchUpdateStatus: (ids: string[], status: string) =>
+    api.put<ApiResponse>(`/agency/calendar/batch`, { ids, status }),
 };

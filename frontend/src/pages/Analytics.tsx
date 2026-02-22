@@ -4,7 +4,6 @@ import {
   Target,
   Zap,
   DollarSign,
-  FileText,
   Download,
   Calendar,
   ExternalLink,

@@ -250,3 +250,136 @@ func (h *PostsHandler) UploadMedia(c *fiber.Ctx) error {
 		"type": mediaType,
 	}, "Media uploaded successfully")
 }
+
+// GetGlobalCalendar returns all scheduled executions for the user's organization
+func (h *PostsHandler) GetGlobalCalendar(c *fiber.Ctx) error {
+	ctx := middleware.GetContext(c)
+	if ctx.OrgID == nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no organization context")
+	}
+
+	start := c.Query("start")
+	end := c.Query("end")
+
+	query := `
+		SELECT 
+			ae.id, 
+			ae.content_id, 
+			ae.target_platform, 
+			ae.status, 
+			ae.scheduled_at, 
+			ae.scheduled_status,
+			c.title,
+			cl.id as client_id,
+			cl.name as client_name,
+			cl.color as client_color
+		FROM automation_executions ae
+		JOIN contents c ON ae.content_id = c.id
+		JOIN clients cl ON ae.client_id = cl.id
+		JOIN team_members tm ON cl.org_id = tm.org_id
+		WHERE tm.org_id = $1 AND tm.user_id = $2 AND tm.status = 'active'
+		  AND ae.scheduled_at IS NOT NULL
+	`
+	args := []interface{}{*ctx.OrgID, ctx.UserID}
+
+	if start != "" {
+		query += " AND ae.scheduled_at >= $3"
+		args = append(args, start)
+	}
+	if end != "" {
+		placeholder := "$3"
+		if start != "" {
+			placeholder = "$4"
+		}
+		query += fmt.Sprintf(" AND ae.scheduled_at <= %s", placeholder)
+		args = append(args, end)
+	}
+
+	query += " ORDER BY ae.scheduled_at ASC"
+
+	rows, err := h.db.Query(query, args...)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to fetch calendar", err)
+	}
+	defer rows.Close()
+
+	type CalendarEntry struct {
+		ID              string     `json:"id"`
+		ContentID       string     `json:"contentId"`
+		Platform        string     `json:"platform"`
+		Status          string     `json:"status"`
+		ScheduledAt     *time.Time `json:"scheduledAt"`
+		ScheduledStatus string     `json:"scheduledStatus"`
+		Title           string     `json:"title"`
+		ClientID        int        `json:"clientId"`
+		ClientName      string     `json:"clientName"`
+		ClientColor     string     `json:"clientColor"`
+	}
+
+	entries := make([]CalendarEntry, 0)
+	for rows.Next() {
+		var e CalendarEntry
+		err := rows.Scan(
+			&e.ID, &e.ContentID, &e.Platform, &e.Status,
+			&e.ScheduledAt, &e.ScheduledStatus, &e.Title,
+			&e.ClientID, &e.ClientName, &e.ClientColor,
+		)
+		if err == nil {
+			entries = append(entries, e)
+		}
+	}
+
+	return utils.SuccessResponse(c, entries, "")
+}
+
+type BatchUpdateStatusRequest struct {
+	IDs    []string `json:"ids"`
+	Status string   `json:"status"`
+}
+
+// BatchUpdateStatus updates the status of multiple executions or posts
+func (h *PostsHandler) BatchUpdateStatus(c *fiber.Ctx) error {
+	ctx := middleware.GetContext(c)
+	if ctx.OrgID == nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no organization context")
+	}
+
+	var req BatchUpdateStatusRequest
+	if err := c.BodyParser(&req); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
+	}
+
+	if len(req.IDs) == 0 {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no IDs provided")
+	}
+
+	// Determine if status is valid
+	validStatuses := map[string]bool{
+		"pending":   true,
+		"scheduled": true,
+		"rejected":  true,
+		"cancelled": true,
+	}
+
+	if !validStatuses[req.Status] {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid status transition")
+	}
+
+	// Update automation_executions that belong to the user's organization
+	// We join with clients to ensure the user has permission via org_id
+	_, err := h.db.Exec(`
+		UPDATE automation_executions ae
+		SET status = $1, scheduled_status = $2
+		FROM clients cl
+		JOIN team_members tm ON cl.org_id = tm.org_id
+		WHERE ae.client_id = cl.id 
+		  AND tm.org_id = $3 AND tm.user_id = $4 AND tm.status = 'active'
+		  AND ae.id = ANY($5)
+	`, req.Status, req.Status, *ctx.OrgID, ctx.UserID, req.IDs)
+
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to batch update status", err)
+	}
+
+	return utils.SuccessResponse(c, nil, fmt.Sprintf("Successfully updated %d items to %s", len(req.IDs), req.Status))
+}

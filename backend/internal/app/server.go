@@ -174,6 +174,8 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	agencyRoutes.Delete("/team/:memberID", agencyHandler.RemoveTeamMember)
 
 	agencyRoutes.Get("/reports", agencyHandler.GenerateClientReport)
+	agencyRoutes.Get("/calendar", postsHandler.GetGlobalCalendar)
+	agencyRoutes.Put("/calendar/batch", postsHandler.BatchUpdateStatus)
 
 	protected.Get("/realtime/blasts", func(c *fiber.Ctx) error {
 		userID := middleware.GetUserID(c)
