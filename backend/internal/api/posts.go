@@ -111,9 +111,9 @@ func (h *PostsHandler) CreatePost(c *fiber.Ctx) error {
 	description := req.Text
 
 	// Handle media
-	mainStorageURL := ""
+	mainS3URL := ""
 	if len(req.MediaIDs) > 0 {
-		mainStorageURL = req.MediaIDs[0] // Frontend sends URL as ID now
+		mainS3URL = req.MediaIDs[0] // Frontend sends URL as ID now
 	}
 
 	normalized, err := normalizer.NormalizeContent(
@@ -123,7 +123,7 @@ func (h *PostsHandler) CreatePost(c *fiber.Ctx) error {
 		title,
 		description,
 		0,
-		mainStorageURL,
+		mainS3URL,
 	)
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to normalize content", err)

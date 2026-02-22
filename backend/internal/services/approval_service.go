@@ -71,9 +71,9 @@ func (s *ApprovalService) ValidateApprovalToken(ctx context.Context, token strin
 	// Get video details
 	var v models.Video
 	err = s.db.QueryRowContext(ctx,
-		"SELECT id, user_id, client_id, title, description, storage_url, status, created_at FROM videos WHERE id = $1",
+		"SELECT id, user_id, client_id, title, description, s3_url, status, created_at FROM videos WHERE id = $1",
 		videoID,
-	).Scan(&v.ID, &v.UserID, &v.ClientID, &v.Title, &v.Description, &v.StorageURL, &v.Status, &v.CreatedAt)
+	).Scan(&v.ID, &v.UserID, &v.ClientID, &v.Title, &v.Description, &v.S3URL, &v.Status, &v.CreatedAt)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get video details: %w", err)

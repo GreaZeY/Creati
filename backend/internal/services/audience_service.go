@@ -60,13 +60,13 @@ func (s *AudienceService) GetNotificationContext(ctx context.Context, contentID 
 	// 3. Fetch Content (Video)
 	var content models.Video
 	contentQuery := `
-		SELECT id, user_id, title, description, storage_url, status, created_at
+		SELECT id, user_id, title, description, s3_url, status, created_at
 		FROM videos
 		WHERE id = $1
 	`
 	if err := s.DB.QueryRowContext(ctx, contentQuery, contentID).Scan(
 		&content.ID, &content.UserID, &content.Title,
-		&content.Description, &content.StorageURL, &content.Status, &content.CreatedAt,
+		&content.Description, &content.S3URL, &content.Status, &content.CreatedAt,
 	); err != nil {
 		return nil, fmt.Errorf("failed to fetch content: %w", err)
 	}

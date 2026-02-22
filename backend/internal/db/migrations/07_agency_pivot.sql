@@ -41,9 +41,10 @@ ALTER TABLE organizations ADD COLUMN IF NOT EXISTS primary_color VARCHAR(20) DEF
 ALTER TABLE organizations ADD COLUMN IF NOT EXISTS subdomain VARCHAR(255) UNIQUE;
 ALTER TABLE organizations ADD COLUMN IF NOT EXISTS custom_domain VARCHAR(255) UNIQUE;
 
--- 5. Update Clients with extra visual fields
+-- 5. Update Clients with extra visual fields and ownership
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS logo_url TEXT;
 ALTER TABLE clients ADD COLUMN IF NOT EXISTS color VARCHAR(20);
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE SET NULL;
 
 -- 6. Create Video Comments for collaborative approval
 CREATE TABLE IF NOT EXISTS video_comments (
@@ -58,6 +59,41 @@ CREATE TABLE IF NOT EXISTS video_comments (
 
 CREATE INDEX IF NOT EXISTS idx_video_comments_video ON video_comments(video_id);
 
--- 7. Add approval statuses context (Documentation/Reminder)
+-- 7. Analytics Views for optimized performance
+CREATE OR REPLACE VIEW vw_user_stats AS
+SELECT 
+    v.user_id,
+    v.client_id,
+    COUNT(DISTINCT v.id) as total_videos,
+    COALESCE(SUM(latest.views), 0) as total_views,
+    COALESCE(SUM(latest.likes), 0) as total_likes,
+    COALESCE(SUM(latest.comments), 0) as total_comments,
+    COALESCE(SUM(latest.shares), 0) as total_shares
+FROM (
+    SELECT DISTINCT ON (video_id, account_id) video_id, views, likes, comments, shares
+    FROM video_analytics
+    ORDER BY video_id, account_id, fetched_at DESC
+) latest
+JOIN videos v ON latest.video_id = v.id
+GROUP BY v.user_id, v.client_id;
+
+CREATE OR REPLACE VIEW vw_video_stats AS
+SELECT 
+    v.id as video_id,
+    v.title,
+    v.created_at,
+    COALESCE(SUM(latest.views), 0) as total_views,
+    COALESCE(SUM(latest.likes), 0) as total_likes,
+    COALESCE(SUM(latest.comments), 0) as total_comments,
+    MAX(latest.fetched_at) as last_updated
+FROM (
+    SELECT DISTINCT ON (video_id, account_id) video_id, views, likes, comments, fetched_at
+    FROM video_analytics
+    ORDER BY video_id, account_id, fetched_at DESC
+) latest
+JOIN videos v ON latest.video_id = v.id
+GROUP BY v.id, v.title, v.created_at;
+
+-- 8. Add approval statuses context (Documentation/Reminder)
 -- Existing status: 'uploaded', 'pending', 'processing', 'completed', 'failed'
 -- New lifecycle statuses for agency flow: 'draft', 'pending_approval', 'approved', 'rejected'

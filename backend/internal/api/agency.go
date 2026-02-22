@@ -599,7 +599,7 @@ func (h *AgencyHandler) ListPendingApprovals(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
 	query := `
-		SELECT v.id, v.title, v.storage_url, v.status, v.created_at,
+		SELECT v.id, v.title, v.s3_url, v.status, v.created_at,
 		       c.name as client_name, c.color as client_color,
 		       COALESCE(al.token, '') as token
 		FROM videos v
@@ -624,7 +624,7 @@ func (h *AgencyHandler) ListPendingApprovals(c *fiber.Ctx) error {
 	type PendingApproval struct {
 		ID          int       `json:"id"`
 		Title       string    `json:"title"`
-		StorageURL  string    `json:"storageURL"`
+		S3URL       string    `json:"s3URL"`
 		Status      string    `json:"status"`
 		CreatedAt   time.Time `json:"createdAt"`
 		ClientName  string    `json:"clientName"`
@@ -635,7 +635,7 @@ func (h *AgencyHandler) ListPendingApprovals(c *fiber.Ctx) error {
 	approvals := make([]PendingApproval, 0)
 	for rows.Next() {
 		var a PendingApproval
-		if err := rows.Scan(&a.ID, &a.Title, &a.StorageURL, &a.Status, &a.CreatedAt, &a.ClientName, &a.ClientColor, &a.Token); err != nil {
+		if err := rows.Scan(&a.ID, &a.Title, &a.S3URL, &a.Status, &a.CreatedAt, &a.ClientName, &a.ClientColor, &a.Token); err != nil {
 			continue
 		}
 		approvals = append(approvals, a)

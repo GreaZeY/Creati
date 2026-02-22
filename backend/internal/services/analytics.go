@@ -543,8 +543,8 @@ func (s *AnalyticsService) DiscoverVideos(userID int) {
 
 			var newVideoID int
 			err = tx.QueryRow(`
-				INSERT INTO videos (user_id, title, description, platform, external_id, status)
-				VALUES ($1, $2, $3, $4, $5, 'synced')
+				INSERT INTO videos (user_id, title, description, source_platform, platform_id, status, s3_url)
+				VALUES ($1, $2, $3, $4, $5, 'synced', 'external')
 				RETURNING id
 			`, userID, ev.Title, ev.Description, platform, ev.ID).Scan(&newVideoID)
 

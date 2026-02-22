@@ -220,7 +220,7 @@ func (i *InstagramService) Upload(video *models.Video, accountID int) (string, e
 	containerURL := fmt.Sprintf("https://graph.instagram.com/v19.0/%s/media", igUserID)
 	data := url.Values{}
 	data.Set("media_type", "REELS")
-	data.Set("video_url", video.StorageURL)
+	data.Set("video_url", video.S3URL)
 	data.Set("caption", fmt.Sprintf("%s\n\n%s", video.Title, video.Description))
 	data.Set("access_token", accessToken)
 

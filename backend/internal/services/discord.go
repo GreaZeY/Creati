@@ -169,7 +169,7 @@ func (d *DiscordService) Upload(video *models.Video, accountID int) (string, err
 	}
 
 	// If no media, send text-only message
-	if video.StorageURL == "" {
+	if video.S3URL == "" {
 		payload := map[string]interface{}{
 			"content": fmt.Sprintf("**%s**\n%s", video.Title, video.Description),
 		}
@@ -194,7 +194,7 @@ func (d *DiscordService) Upload(video *models.Video, accountID int) (string, err
 	}
 
 	// Download video to temp file for reliable upload
-	tmpFile, err := utils.DownloadToTempFile(video.StorageURL)
+	tmpFile, err := utils.DownloadToTempFile(video.S3URL)
 	if err != nil {
 		return "", fmt.Errorf("failed to download video to temp file: %w", err)
 	}

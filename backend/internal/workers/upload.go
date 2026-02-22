@@ -114,7 +114,7 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 	}
 
 	// 3. Source Media Resolution
-	finalStorageURL := ""
+	finalS3URL := ""
 	var sourceKey string
 
 	// If it's an external platform, allow MediaService to handle caching/downloading
@@ -124,14 +124,14 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 		if err != nil {
 			return w.fail(ctx, job, payload, fmt.Errorf("failed to cache source media: %w", err))
 		}
-		finalStorageURL = w.Storage.GetObjectURL(sourceKey)
+		finalS3URL = w.Storage.GetObjectURL(sourceKey)
 	} else {
 		// Internal content
-		var sourceStorageURL sql.NullString
+		var sourceS3URL sql.NullString
 		err = w.DB.QueryRowContext(ctx, `
 			SELECT storage_key FROM platform_contents 
 			WHERE content_id = $1 AND platform = 'creati'
-		`, job.ContentID).Scan(&sourceStorageURL)
+		`, job.ContentID).Scan(&sourceS3URL)
 
 		if err != nil {
 			if err == sql.ErrNoRows {
@@ -139,8 +139,8 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 			}
 			return w.fail(ctx, job, payload, err)
 		}
-		sourceKey = sourceStorageURL.String
-		finalStorageURL = w.Storage.GetObjectURL(sourceKey)
+		sourceKey = sourceS3URL.String
+		finalS3URL = w.Storage.GetObjectURL(sourceKey)
 	}
 
 	// 4. Processing Phase
@@ -208,7 +208,7 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 		if err := w.Storage.Upload(ctx, processedKey, uploadFile, "video/mp4"); err != nil {
 			return w.fail(ctx, job, payload, fmt.Errorf("failed to upload processed video: %w", err))
 		}
-		finalStorageURL = w.Storage.GetObjectURL(processedKey)
+		finalS3URL = w.Storage.GetObjectURL(processedKey)
 	}
 
 	// 4. Rate Limiting via Throttle
@@ -223,7 +223,7 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 	// 6. Upload to Destination Platform
 	logger.Get("worker").WithFields(logrus.Fields{
 		"platform": job.TargetPlatform,
-		"url":      finalStorageURL,
+		"url":      finalS3URL,
 	}).Info("Starting platform upload")
 
 	// Create a temporary Video object for the uploader
@@ -241,7 +241,7 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 	// or a different job type. For UploadJob, title/description are not directly in payload.
 	// Keeping the original logic for now, assuming 'title' and 'description' are the final ones.
 
-	video.StorageURL = finalStorageURL
+	video.S3URL = finalS3URL
 
 	platformSvc, err := services.GetPlatformService(job.TargetPlatform, w.DB)
 	if err != nil {
@@ -266,7 +266,7 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 		INSERT INTO platform_contents (content_id, platform, platform_content_id, account_id, storage_key)
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (content_id, platform) DO NOTHING
-	`, job.ContentID, job.TargetPlatform, platformVideoID, job.AccountID, finalStorageURL)
+	`, job.ContentID, job.TargetPlatform, platformVideoID, job.AccountID, finalS3URL)
 
 	// 7. Enqueue Post Processing
 	postPayload, _ := json.Marshal(map[string]interface{}{

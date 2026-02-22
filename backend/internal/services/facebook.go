@@ -208,7 +208,7 @@ func (f *FacebookService) Upload(video *models.Video, accountID int) (string, er
 	// Since we provide an S3/Local public URL, we don't need resumable upload phases
 	uploadURL := fmt.Sprintf("https://graph.facebook.com/v19.0/%s/videos", pageID)
 	data := url.Values{}
-	data.Set("file_url", video.StorageURL)
+	data.Set("file_url", video.S3URL)
 	data.Set("title", video.Title)
 	data.Set("description", video.Description)
 	data.Set("access_token", pageToken)
@@ -540,7 +540,7 @@ func (f *FacebookService) Notify(ctx context.Context, target models.UnifiedTarge
 
 	data := url.Values{}
 	data.Set("message", message)
-	data.Set("link", content.StorageURL) // Should be final platform URL preferably
+	data.Set("link", content.S3URL) // Should be final platform URL preferably
 	data.Set("access_token", accessToken)
 
 	reqURL := fmt.Sprintf("https://graph.facebook.com/v19.0/%s/feed", pageID)

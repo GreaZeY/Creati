@@ -27,7 +27,7 @@ type VideoListItem struct {
 	ID          int       `json:"id"`
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
-	StorageURL  string    `json:"storageURL"`
+	S3URL       string    `json:"s3URL"`
 	Status      string    `json:"status"`
 	CreatedAt   time.Time `json:"createdAt"`
 	JobStatus   string    `json:"jobStatus"` // Aggregated status: 'pending', 'processing', 'completed', 'failed'
@@ -47,7 +47,7 @@ func (h *VideosHandler) ListVideos(c *fiber.Ctx) error {
 	}
 
 	query := `
-		SELECT v.id, v.title, v.description, v.storage_url, v.status, v.created_at,
+		SELECT v.id, v.title, v.description, v.s3_url, v.status, v.created_at,
 		       COALESCE(
 		           (SELECT CASE 
 		               WHEN EXISTS (SELECT 1 FROM video_platform_jobs WHERE video_id = v.id AND status = 'failed') THEN 'failed'
@@ -79,7 +79,7 @@ func (h *VideosHandler) ListVideos(c *fiber.Ctx) error {
 	videos := []VideoListItem{}
 	for rows.Next() {
 		var v VideoListItem
-		if err := rows.Scan(&v.ID, &v.Title, &v.Description, &v.StorageURL, &v.Status, &v.CreatedAt, &v.JobStatus); err != nil {
+		if err := rows.Scan(&v.ID, &v.Title, &v.Description, &v.S3URL, &v.Status, &v.CreatedAt, &v.JobStatus); err != nil {
 			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to parse videos", err)
 		}
 		videos = append(videos, v)

@@ -231,7 +231,7 @@ func (t *TwitterService) Upload(video *models.Video, accountID int) (string, err
 // uploadMedia handles chunked video upload to Twitter
 func (t *TwitterService) uploadMedia(accessToken string, video *models.Video) (string, error) {
 	// Download video to temp file for reliable chunked upload
-	tmpFile, err := utils.DownloadToTempFile(video.StorageURL)
+	tmpFile, err := utils.DownloadToTempFile(video.S3URL)
 	if err != nil {
 		return "", fmt.Errorf("failed to download video to temp file: %w", err)
 	}

@@ -198,7 +198,7 @@ func (r *RedditService) Upload(video *models.Video, accountID int) (string, erro
 	}
 
 	// Step 2: Download video from S3 and upload to Reddit's S3
-	tmpFile, err := utils.DownloadToTempFile(video.StorageURL)
+	tmpFile, err := utils.DownloadToTempFile(video.S3URL)
 	if err != nil {
 		return "", fmt.Errorf("failed to download video to temp file: %w", err)
 	}
@@ -562,7 +562,7 @@ func (r *RedditService) Notify(ctx context.Context, target models.UnifiedTarget,
 	data.Set("sr", sr)
 	data.Set("kind", "link")
 	data.Set("title", title)
-	data.Set("url", content.StorageURL) // Should be final platform URL preferably
+	data.Set("url", content.S3URL) // Should be final platform URL preferably
 	data.Set("resubmit", "true")
 
 	req, err := http.NewRequestWithContext(ctx, "POST", "https://oauth.reddit.com/api/submit", strings.NewReader(data.Encode()))
