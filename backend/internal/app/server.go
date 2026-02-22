@@ -120,6 +120,9 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	notificationHandler := api.NewNotificationHandler(db)
 	reportingScheduler := services.NewReportingScheduler(db, analyticsService, notificationService)
 	agencyHandler := api.NewAgencyHandler(db, intakeService, approvalService, teamService, reportingService, brandIdentityService, reportingScheduler)
+	recyclingService := services.NewRecyclingService(db)
+	evergreenWorker := workers.NewEvergreenWorker(recyclingService, 6*time.Hour)
+	evergreenHandler := api.NewEvergreenHandler(db)
 	aiHandler := api.NewAiHandler(db, chatService)
 	postRepo := repositories.NewPostRepository(db)
 	postService := services.NewPostService(postRepo)
@@ -140,6 +143,9 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	// Weekly Reporting Roundup (In a real app, this would be a CRON)
 	// For now, we provide the logic in ReportingScheduler.
 	_ = reportingScheduler // Keep reference
+
+	// Evergreen Worker - scans for high-performing content every 6 hours
+	go evergreenWorker.Start(ctx)
 
 	// Routes
 	apiRoutes := app.Group("/api")
@@ -209,6 +215,12 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	notifications.Get("", notificationHandler.List)
 	notifications.Post("/:id/read", notificationHandler.MarkRead)
 	notifications.Post("/read-all", notificationHandler.MarkAllRead)
+
+	// Evergreen Recycling Suggestions
+	evergreenRoutes := protected.Group("/evergreen")
+	evergreenRoutes.Get("/suggestions", evergreenHandler.List)
+	evergreenRoutes.Post("/suggestions/:id/approve", evergreenHandler.Approve)
+	evergreenRoutes.Post("/suggestions/:id/dismiss", evergreenHandler.Dismiss)
 
 	protected.Get("/realtime/blasts", func(c *fiber.Ctx) error {
 		userID := middleware.GetUserID(c)

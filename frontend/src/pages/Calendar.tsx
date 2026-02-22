@@ -20,6 +20,7 @@ import { PlatformLogo } from "@/components/platforms/PlatformLogo";
 import { useCalendar } from "@/hooks/useCalendar";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Dropdown } from "@/components/ui/Dropdown";
+import { SuggestionBar } from "@/components/calendar/SuggestionBar";
 
 export const Calendar = () => {
   const {
@@ -288,6 +289,9 @@ export const Calendar = () => {
           </div>
         </LensedCard>
       </div>
+
+      {/* Evergreen Recycling Suggestions */}
+      <SuggestionBar />
 
       <AnimatePresence mode="wait">
         {view === "month" ? (
