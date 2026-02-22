@@ -18,6 +18,7 @@ import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
 import { useClient } from "@/context/ClientContext";
+import { ApprovalHub } from "@/components/dashboard/ApprovalHub";
 
 export const Dashboard = () => {
   const navigate = useNavigate();
@@ -72,6 +73,8 @@ export const Dashboard = () => {
           </Button>
         </Link>
       </PageHeader>
+
+      <ApprovalHub />
 
       {/* Hero Ecosystem Pulse */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 font-sans">

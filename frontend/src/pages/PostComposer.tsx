@@ -31,6 +31,7 @@ import { toast } from "@/lib/events";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { cn } from "@/lib/utils";
 import { LensedCard } from "@/components/ui/LensedCard";
+import { ApprovalLinkModal } from "@/components/composer/ApprovalLinkModal";
 
 // Normalized post state
 interface PostState {
@@ -59,6 +60,13 @@ export function PostComposer() {
   const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
+  const [approvalModal, setApprovalModal] = useState<{
+    isOpen: boolean;
+    url: string;
+  }>({
+    isOpen: false,
+    url: "",
+  });
 
   const editorRef = useRef<SocialTextAreaHandle>(null);
 
@@ -269,14 +277,11 @@ export function PostComposer() {
         const approvalRes = await agencyAPI.createApprovalLink(videoId);
         if (approvalRes.data.success) {
           const url = `${window.location.origin}/approve/${approvalRes.data.data.token}`;
-          navigator.clipboard.writeText(url);
-          toast.success(
-            "Approval link copied to clipboard! Send it to your client.",
-          );
+          setApprovalModal({ isOpen: true, url });
+          toast.success("Approval link generated!");
 
           localStorage.removeItem(STORAGE_KEY);
           setPost({ text: "", media: [], platforms: [] });
-          navigate("/queued");
         }
       }
     } catch (err) {
@@ -539,6 +544,15 @@ export function PostComposer() {
         onEmojiSelect={(emoji) => {
           setPost((prev) => ({ ...prev, text: prev.text + emoji }));
           setIsEmojiPickerOpen(false);
+        }}
+      />
+
+      <ApprovalLinkModal
+        isOpen={approvalModal.isOpen}
+        url={approvalModal.url}
+        onClose={() => {
+          setApprovalModal({ ...approvalModal, isOpen: false });
+          navigate("/queued");
         }}
       />
     </div>

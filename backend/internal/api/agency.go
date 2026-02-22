@@ -591,3 +591,53 @@ func (h *AgencyHandler) GenerateClientReport(c *fiber.Ctx) error {
 
 	return utils.SuccessResponse(c, report, "")
 }
+
+// ListPendingApprovals returns all videos across the agency that need client action
+func (h *AgencyHandler) ListPendingApprovals(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	query := `
+		SELECT v.id, v.title, v.storage_url, v.status, v.created_at,
+		       c.name as client_name, c.color as client_color,
+		       COALESCE(al.token, '') as token
+		FROM videos v
+		JOIN clients c ON v.client_id = c.id
+		JOIN organizations o ON c.org_id = o.id
+		JOIN team_members tm ON o.id = tm.org_id
+		LEFT JOIN LATERAL (
+			SELECT token FROM approval_links 
+			WHERE video_id = v.id AND used_at IS NULL AND expires_at > CURRENT_TIMESTAMP
+			ORDER BY created_at DESC LIMIT 1
+		) al ON true
+		WHERE tm.user_id = $1 AND tm.status = 'active' AND v.status = 'pending_approval'
+		ORDER BY v.created_at DESC
+	`
+
+	rows, err := h.db.Query(query, userID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to fetch pending approvals", err)
+	}
+	defer rows.Close()
+
+	type PendingApproval struct {
+		ID          int       `json:"id"`
+		Title       string    `json:"title"`
+		StorageURL  string    `json:"storageURL"`
+		Status      string    `json:"status"`
+		CreatedAt   time.Time `json:"createdAt"`
+		ClientName  string    `json:"clientName"`
+		ClientColor string    `json:"clientColor"`
+		Token       string    `json:"token"`
+	}
+
+	approvals := make([]PendingApproval, 0)
+	for rows.Next() {
+		var a PendingApproval
+		if err := rows.Scan(&a.ID, &a.Title, &a.StorageURL, &a.Status, &a.CreatedAt, &a.ClientName, &a.ClientColor, &a.Token); err != nil {
+			continue
+		}
+		approvals = append(approvals, a)
+	}
+
+	return utils.SuccessResponse(c, approvals, "")
+}

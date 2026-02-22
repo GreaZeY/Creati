@@ -176,6 +176,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	agencyRoutes.Delete("/team/:memberID", agencyHandler.RemoveTeamMember)
 
 	agencyRoutes.Get("/reports", agencyHandler.GenerateClientReport)
+	agencyRoutes.Get("/approvals", agencyHandler.ListPendingApprovals)
 	agencyRoutes.Get("/calendar", postsHandler.GetGlobalCalendar)
 	agencyRoutes.Put("/calendar/batch", postsHandler.BatchUpdateStatus)
 

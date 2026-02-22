@@ -318,6 +318,7 @@ export const agencyAPI = {
   updateMemberRole: (memberId: number, role: string) => api.put(`/agency/team/${memberId}/role`, { role }),
   removeMember: (memberId: number) => api.delete(`/agency/team/${memberId}`),
   generateReport: () => api.get<ApiResponse<any>>('/agency/reports'),
+  listApprovals: () => api.get<ApiResponse<any[]>>('/agency/approvals'),
 };
 
 export const paymentsAPI = {
