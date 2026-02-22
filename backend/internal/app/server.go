@@ -107,7 +107,9 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	automationHandler := api.NewAutomationHandler(db, automationService)
 	paymentHandler := api.NewPaymentHandler(db)
 	webhookHandler := api.NewWebhookHandler(db)
-	agencyHandler := api.NewAgencyHandler(db)
+	intakeService := services.NewIntakeService(db)
+	approvalService := services.NewApprovalService(db)
+	agencyHandler := api.NewAgencyHandler(db, intakeService, approvalService)
 	aiHandler := api.NewAiHandler(db, chatService)
 	postsHandler := api.NewPostsHandler(db, storageService, queueService)
 	proxyHandler := api.NewProxyHandler(db, mediaService)
@@ -131,12 +133,21 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	apiRoutes.Post("/platforms/:platform/callback", platformHandler.HandleCallback)
 	apiRoutes.Get("/proxy/video", proxyHandler.HandleProxyVideo)
 
+	// Public Agency/Client Portals
+	apiRoutes.Get("/agency/intake/:token", agencyHandler.GetClientPublicContext)
+	apiRoutes.Get("/agency/approval/:token", agencyHandler.GetApprovalContext)
+	apiRoutes.Post("/agency/approval/:token", agencyHandler.SubmitApprovalDecision)
+
 	webhooks := app.Group("/webhooks")
 	webhooks.Get("/youtube", webhookHandler.YouTubeWebhookVerification)
 	webhooks.Post("/youtube", webhookHandler.YouTubeWebhookNotification)
 	webhooks.Post("/razorpay", paymentHandler.HandleWebhook)
 
 	protected := apiRoutes.Use(middleware.AuthMiddleware)
+
+	// Apply TenancyMiddleware to all protected routes
+	protected.Use(middleware.TenancyMiddleware(db))
+
 	protected.Get("/auth/me", authHandler.CheckAuth)
 	protected.Put("/auth/profile", authHandler.UpdateProfile)
 
@@ -148,6 +159,10 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	agencyRoutes.Put("/clients/commit", agencyHandler.BatchUpdateClients)
 	agencyRoutes.Put("/clients/:id", agencyHandler.UpdateClient)
 	agencyRoutes.Delete("/clients/:id", agencyHandler.DeleteClient)
+
+	// Pivot Features
+	agencyRoutes.Post("/intake-link", agencyHandler.CreateIntakeLink)
+	agencyRoutes.Post("/approval-link/:id", agencyHandler.CreateApprovalLink)
 
 	protected.Get("/realtime/blasts", func(c *fiber.Ctx) error {
 		userID := middleware.GetUserID(c)

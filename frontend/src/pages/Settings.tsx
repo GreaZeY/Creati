@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Briefcase,
   ArrowLeft,
+  Sparkles,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/Button";
@@ -44,6 +45,12 @@ export const Settings = () => {
       label: "Security",
       icon: Lock,
       desc: "Update your password and 2FA settings.",
+    },
+    {
+      id: "identity",
+      label: "Brand Identity",
+      icon: Sparkles,
+      desc: "Configure AI voice and brand guidelines.",
     },
   ];
 
@@ -106,6 +113,12 @@ export const SettingsMain = () => {
       label: "Security",
       icon: Lock,
       desc: "Update your password and 2FA settings.",
+    },
+    {
+      id: "identity",
+      label: "Brand Identity",
+      icon: Sparkles,
+      desc: "Configure AI voice and brand guidelines.",
     },
   ];
 

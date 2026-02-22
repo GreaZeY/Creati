@@ -3,21 +3,29 @@ package api
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"creati.in/creati/backend/internal/middleware"
+	"creati.in/creati/backend/internal/services"
 	"creati.in/creati/backend/internal/utils"
 
 	"github.com/gofiber/fiber/v2"
 )
 
 type AgencyHandler struct {
-	db *sql.DB
+	db          *sql.DB
+	intakeSvc   *services.IntakeService
+	approvalSvc *services.ApprovalService
 }
 
-func NewAgencyHandler(db *sql.DB) *AgencyHandler {
-	return &AgencyHandler{db: db}
+func NewAgencyHandler(db *sql.DB, intake *services.IntakeService, approval *services.ApprovalService) *AgencyHandler {
+	return &AgencyHandler{
+		db:          db,
+		intakeSvc:   intake,
+		approvalSvc: approval,
+	}
 }
 
 // ListClients returns all workspaces (clients) available to the user
@@ -368,4 +376,97 @@ func (h *AgencyHandler) BatchUpdateClients(c *fiber.Ctx) error {
 	}
 
 	return utils.SuccessResponse(c, nil, "All changes saved successfully")
+}
+
+// -- Agency Pivot: Secure Credential Vault & Approval Links --
+
+// CreateIntakeLink generates a magic link for client platform connection
+func (h *AgencyHandler) CreateIntakeLink(c *fiber.Ctx) error {
+	ctx := middleware.GetContext(c)
+	if ctx.ClientID == nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "must be in a client context to generate an intake link")
+	}
+
+	// Default 7 days expiry
+	token, err := h.intakeSvc.GenerateIntakeToken(c.Context(), ctx.UserID, *ctx.ClientID, 7*24*time.Hour)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate token", err)
+	}
+
+	return utils.SuccessResponse(c, fiber.Map{
+		"token": token,
+		"url":   "/connect-client/" + token,
+	}, "Intake link generated")
+}
+
+// GetClientPublicContext returns public brand info for the intake page
+func (h *AgencyHandler) GetClientPublicContext(c *fiber.Ctx) error {
+	token := c.Params("token")
+	_, clientID, err := h.intakeSvc.ValidateIntakeToken(c.Context(), token)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "invalid or expired token", err)
+	}
+
+	client, err := h.intakeSvc.GetClientContext(c.Context(), clientID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to fetch client context", err)
+	}
+
+	return utils.SuccessResponse(c, fiber.Map{
+		"name":     client.Name,
+		"logo_url": client.LogoURL,
+		"color":    client.Color,
+	}, "")
+}
+
+// CreateApprovalLink generates a magic link for content approval
+func (h *AgencyHandler) CreateApprovalLink(c *fiber.Ctx) error {
+	idStr := c.Params("id")
+	videoID, err := strconv.Atoi(idStr)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid video id")
+	}
+
+	// Default 3 days expiry
+	token, err := h.approvalSvc.GenerateApprovalLink(c.Context(), videoID, 3*24*time.Hour)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate approval link", err)
+	}
+
+	return utils.SuccessResponse(c, fiber.Map{
+		"token": token,
+		"url":   "/approve/" + token,
+	}, "Approval link generated")
+}
+
+// GetApprovalContext returns video info for the approval page
+func (h *AgencyHandler) GetApprovalContext(c *fiber.Ctx) error {
+	token := c.Params("token")
+	video, err := h.approvalSvc.ValidateApprovalToken(c.Context(), token)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "invalid or expired approval link", err)
+	}
+
+	return utils.SuccessResponse(c, video, "")
+}
+
+// SubmitApprovalDecision handles the client's decision
+func (h *AgencyHandler) SubmitApprovalDecision(c *fiber.Ctx) error {
+	token := c.Params("token")
+
+	var payload struct {
+		Decision string `json:"decision"` // 'approved', 'rejected'
+		Feedback string `json:"feedback"`
+	}
+
+	if err := c.BodyParser(&payload); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
+	}
+
+	err := h.approvalSvc.SubmitDecision(c.Context(), token, payload.Decision, payload.Feedback)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to submit decision", err)
+	}
+
+	return utils.SuccessResponse(c, nil, "Decision submitted successfully")
 }

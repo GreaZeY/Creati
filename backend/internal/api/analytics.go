@@ -29,13 +29,7 @@ func (h *AnalyticsHandler) GetOverview(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "User not found")
 	}
 
-	clientIDStr := c.Query("clientId")
-	var clientID *int
-	if clientIDStr != "" {
-		if cid, err := strconv.Atoi(clientIDStr); err == nil {
-			clientID = &cid
-		}
-	}
+	clientID := middleware.GetClientID(c)
 
 	// 1. Get Instant Stats from DB (Fast)
 	stats, err := h.service.GetUserStats(userID, clientID)

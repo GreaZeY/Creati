@@ -56,6 +56,11 @@ const WorkspaceManager = lazy(() =>
     default: m.WorkspaceManager,
   })),
 );
+const IdentityManager = lazy(() =>
+  import("./components/settings/IdentityManager").then((m) => ({
+    default: m.IdentityManager,
+  })),
+);
 const Upload = lazy(() =>
   import("./pages/Upload").then((m) => ({ default: m.Upload })),
 );
@@ -87,6 +92,14 @@ const WorkspaceSetup = lazy(() =>
 const PlatformCallback = lazy(() =>
   import("./pages/PlatformCallback").then((m) => ({
     default: m.PlatformCallback,
+  })),
+);
+const ConnectClient = lazy(() =>
+  import("./pages/ConnectClient").then((m) => ({ default: m.ConnectClient })),
+);
+const ContentApproval = lazy(() =>
+  import("./pages/ContentApproval").then((m) => ({
+    default: m.ContentApproval,
   })),
 );
 
@@ -201,6 +214,22 @@ const router = createBrowserRouter([
         ],
       },
       {
+        path: "connect-client/:token",
+        element: (
+          <PageTransition>
+            <ConnectClient />
+          </PageTransition>
+        ),
+      },
+      {
+        path: "approve/:token",
+        element: (
+          <PageTransition>
+            <ContentApproval />
+          </PageTransition>
+        ),
+      },
+      {
         element: (
           <ProtectedRoute>
             <ClientProvider>
@@ -256,6 +285,7 @@ const router = createBrowserRouter([
               { index: true, element: <SettingsMain /> },
               { path: "profile", element: <ProfileManager /> },
               { path: "workspaces", element: <WorkspaceManager /> },
+              { path: "identity", element: <IdentityManager /> },
               { path: "*", element: <SettingsSectionPlaceholder /> },
             ],
           },

@@ -303,6 +303,8 @@ export const agencyAPI = {
   deleteClient: (id: number) => api.delete(`/agency/clients/${id}`),
   reorderClients: (order: number[]) => api.put('/agency/clients/reorder', { order }),
   commitClients: (clients: Client[]) => api.put('/agency/clients/commit', { clients }),
+  createIntakeLink: () => api.post<ApiResponse<{ token: string; url: string }>>('/agency/intake-link'),
+  createApprovalLink: (id: number) => api.post<ApiResponse<{ token: string; url: string }>>(`/agency/approval-link/${id}`),
 };
 
 export const paymentsAPI = {

@@ -35,12 +35,15 @@ type Organization struct {
 
 // Client model (Workspace)
 type Client struct {
-	ID        int       `json:"id" db:"id"`
-	OrgID     int       `json:"org_id" db:"org_id"`
-	Name      string    `json:"name" db:"name"`
-	Color     string    `json:"color" db:"color"`
-	LogoURL   string    `json:"logo_url" db:"logo_url"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	ID             int       `json:"id" db:"id"`
+	OrgID          int       `json:"org_id" db:"org_id"`
+	Name           string    `json:"name" db:"name"`
+	Color          string    `json:"color" db:"color"`
+	LogoURL        string    `json:"logo_url" db:"logo_url"`
+	BrandVoice     string    `json:"brand_voice" db:"brand_voice"`
+	TargetAudience string    `json:"target_audience" db:"target_audience"`
+	AvoidKeywords  string    `json:"avoid_keywords" db:"avoid_keywords"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
 }
 
 // TeamMember model
@@ -154,4 +157,29 @@ type UnifiedTarget struct {
 	TitleTemplate    string `json:"titleTemplate"`
 	TargetPlatform   string `json:"targetPlatform"`
 	TargetIdentifier string `json:"targetIdentifier"`
+}
+
+// -- Agency Pivot Models --
+
+// IntakeToken for client platform connection
+type IntakeToken struct {
+	ID        int        `json:"id" db:"id"`
+	UserID    int        `json:"user_id" db:"user_id"` // Agency user who generated the link
+	ClientID  int        `json:"client_id" db:"client_id"`
+	Token     string     `json:"token" db:"token"`
+	ExpiresAt time.Time  `json:"expires_at" db:"expires_at"`
+	UsedAt    *time.Time `json:"used_at,omitempty" db:"used_at"`
+	CreatedAt time.Time  `json:"created_at" db:"created_at"`
+}
+
+// ApprovalLink for client post/video approvals
+type ApprovalLink struct {
+	ID        int        `json:"id" db:"id"`
+	VideoID   int        `json:"video_id" db:"video_id"`
+	Token     string     `json:"token" db:"token"`
+	ExpiresAt time.Time  `json:"expires_at" db:"expires_at"`
+	Decision  *string    `json:"decision,omitempty" db:"decision"` // 'approved', 'rejected'
+	Feedback  string     `json:"feedback,omitempty" db:"feedback"`
+	UsedAt    *time.Time `json:"used_at,omitempty" db:"used_at"`
+	CreatedAt time.Time  `json:"created_at" db:"created_at"`
 }

@@ -2,7 +2,9 @@ import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { Zap } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
-import { mediaAPI, postsAPI } from "@/lib/api";
+import { Button } from "@/components/ui/Button";
+import { mediaAPI, postsAPI, agencyAPI } from "@/lib/api";
+import { ClipboardCheck } from "lucide-react";
 import { useClient } from "@/context/ClientContext";
 import { SocialTextArea } from "@/components/composer/Editor/SocialTextArea";
 import type { SocialTextAreaHandle } from "@/components/composer/Editor/SocialTextArea";
@@ -244,6 +246,44 @@ export function PostComposer() {
     publishMutation.mutate(scheduledDate);
   };
 
+  const handleRequestApproval = async () => {
+    if (post.platforms.length === 0) {
+      toast.error("Select at least one platform");
+      return;
+    }
+
+    try {
+      // 1. Create the post in 'Draft' status
+      const res = await postsAPI.create(
+        {
+          text: post.text,
+          platformIds: post.platforms,
+          mediaIds: post.media.map((m) => m.id),
+        },
+        selectedClient?.id,
+      );
+
+      if (res.data.success) {
+        const videoId = parseInt(res.data.data.id);
+        // 2. Generate approval link
+        const approvalRes = await agencyAPI.createApprovalLink(videoId);
+        if (approvalRes.data.success) {
+          const url = `${window.location.origin}/approve/${approvalRes.data.data.token}`;
+          navigator.clipboard.writeText(url);
+          toast.success(
+            "Approval link copied to clipboard! Send it to your client.",
+          );
+
+          localStorage.removeItem(STORAGE_KEY);
+          setPost({ text: "", media: [], platforms: [] });
+          navigate("/queued");
+        }
+      }
+    } catch (err) {
+      toast.error("Failed to generate approval request");
+    }
+  };
+
   const hasDraft = post.text.length > 0 || post.media.length > 0;
   const isPublishing = publishMutation.isPending;
 
@@ -277,11 +317,22 @@ export function PostComposer() {
         title="Post Composer"
         description="Craft your message for the entire ecosystem. Precision and impact."
       >
-        <PublishDropdown
-          onPublishNow={handlePublishNow}
-          onSchedule={() => setIsScheduleModalOpen(true)}
-          disabled={!hasDraft || post.platforms.length === 0 || isPublishing}
-        />
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={handleRequestApproval}
+            disabled={!hasDraft || post.platforms.length === 0 || isPublishing}
+            variant="outline"
+            className="gap-2 border-primary/20 hover:border-primary/40 bg-primary/5 rounded-xl h-11"
+          >
+            <ClipboardCheck size={18} />
+            Send for Approval
+          </Button>
+          <PublishDropdown
+            onPublishNow={handlePublishNow}
+            onSchedule={() => setIsScheduleModalOpen(true)}
+            disabled={!hasDraft || post.platforms.length === 0 || isPublishing}
+          />
+        </div>
       </PageHeader>
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-8 min-h-0 relative z-10">

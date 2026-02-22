@@ -2,8 +2,16 @@ import { Modal } from "@/components/ui/Modal";
 import { useState } from "react";
 
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { platformsAPI } from "@/lib/api";
-import { CheckCheck, Link as LinkIcon, Zap, AlertTriangle } from "lucide-react";
+import { platformsAPI, agencyAPI } from "@/lib/api";
+import {
+  CheckCheck,
+  Link as LinkIcon,
+  Zap,
+  AlertTriangle,
+  Share2,
+  Copy,
+  ExternalLink,
+} from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { PLATFORMS } from "@/lib/constants";
@@ -72,7 +80,9 @@ export const ConnectPlatforms = () => {
       <PageHeader
         title="Connect Platforms"
         description="Link new delivery nodes to broadcast your message across the digital fabric."
-      />
+      >
+        <IntakeLinkButton />
+      </PageHeader>
 
       {/* Guidance Modal */}
       <Modal
@@ -371,5 +381,104 @@ export const ConnectPlatforms = () => {
         </div>
       </Card>
     </div>
+  );
+};
+
+const IntakeLinkButton = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    try {
+      const { data } = await agencyAPI.createIntakeLink();
+      if (data.success) {
+        setToken(data.data.token);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const intakeUrl = `${window.location.origin}/connect-client/${token}`;
+
+  return (
+    <>
+      <Button
+        onClick={() => {
+          setIsOpen(true);
+          if (!token) handleGenerate();
+        }}
+        variant="outline"
+        className="gap-2 border-primary/20 hover:border-primary/50 transition-all bg-primary/5"
+      >
+        <Share2 size={16} />
+        Share Intake Link
+      </Button>
+
+      <Modal
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        title="Client Connection Portal"
+      >
+        <div className="space-y-6">
+          <div className="bg-primary/5 p-4 rounded-xl border border-primary/10">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Send this secure, white-labeled link to your client. They can
+              connect their own social accounts without ever sharing passwords
+              with you.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              Secure Portal URL
+            </label>
+            <div className="flex gap-2">
+              <div className="flex-1 bg-black/40 border border-border rounded-lg px-4 py-2 text-sm font-mono truncate text-primary/80">
+                {isGenerating ? "Generating secure link..." : intakeUrl}
+              </div>
+              <Button
+                size="icon"
+                variant="secondary"
+                disabled={!token || isGenerating}
+                onClick={() => {
+                  navigator.clipboard.writeText(intakeUrl);
+                  // toast.success("Link copied to clipboard");
+                }}
+              >
+                <Copy size={16} />
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-[10px] text-muted-foreground bg-white/5 p-3 rounded-lg">
+            <AlertTriangle size={12} className="text-amber-500" />
+            <span>
+              This link expires in 7 days and is single-use for security.
+            </span>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => setIsOpen(false)}
+              className="flex-1"
+            >
+              Close
+            </Button>
+            <Button asChild disabled={!token} className="flex-1 gap-2">
+              <a href={intakeUrl} target="_blank" rel="noopener noreferrer">
+                <ExternalLink size={16} />
+                Preview Portal
+              </a>
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
   );
 };
