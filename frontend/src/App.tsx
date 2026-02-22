@@ -108,6 +108,9 @@ const Calendar = lazy(() =>
 const SharedReport = lazy(() =>
   import("./pages/SharedReport").then((m) => ({ default: m.SharedReport })),
 );
+const Invoices = lazy(() =>
+  import("./pages/Invoices").then((m) => ({ default: m.Invoices })),
+);
 
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PublicRoute } from "./components/PublicRoute";
@@ -293,6 +296,14 @@ const router = createBrowserRouter([
             element: (
               <PageTransition>
                 <Calendar />
+              </PageTransition>
+            ),
+          },
+          {
+            path: "invoices",
+            element: (
+              <PageTransition>
+                <Invoices />
               </PageTransition>
             ),
           },

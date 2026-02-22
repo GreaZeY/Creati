@@ -123,6 +123,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	recyclingService := services.NewRecyclingService(db)
 	evergreenWorker := workers.NewEvergreenWorker(recyclingService, 6*time.Hour)
 	evergreenHandler := api.NewEvergreenHandler(db)
+	invoiceHandler := api.NewInvoiceHandler(db)
 	aiHandler := api.NewAiHandler(db, chatService)
 	postRepo := repositories.NewPostRepository(db)
 	postService := services.NewPostService(postRepo)
@@ -169,6 +170,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	webhooks.Get("/youtube", webhookHandler.YouTubeWebhookVerification)
 	webhooks.Post("/youtube", webhookHandler.YouTubeWebhookNotification)
 	webhooks.Post("/razorpay", paymentHandler.HandleWebhook)
+	webhooks.Post("/razorpay-invoice", invoiceHandler.HandlePaymentLinkWebhook)
 
 	protected := apiRoutes.Use(middleware.AuthMiddleware)
 
@@ -221,6 +223,11 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	evergreenRoutes.Get("/suggestions", evergreenHandler.List)
 	evergreenRoutes.Post("/suggestions/:id/approve", evergreenHandler.Approve)
 	evergreenRoutes.Post("/suggestions/:id/dismiss", evergreenHandler.Dismiss)
+
+	// Client Invoicing
+	invoiceRoutes := protected.Group("/invoices")
+	invoiceRoutes.Get("", invoiceHandler.List)
+	invoiceRoutes.Post("", invoiceHandler.Create)
 
 	protected.Get("/realtime/blasts", func(c *fiber.Ctx) error {
 		userID := middleware.GetUserID(c)
