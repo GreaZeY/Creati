@@ -114,6 +114,14 @@ export const NewRuleModal: React.FC<NewRuleModalProps> = ({
     }
   };
 
+  const updateTargetDelay = (accountId: number, seconds: number) => {
+    setTargetSelections(
+      targetSelections.map((s) =>
+        s.accountId === accountId ? { ...s, delaySeconds: seconds } : s,
+      ),
+    );
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Create Notification Rule">
       <div className="space-y-6 py-4">
@@ -163,7 +171,7 @@ export const NewRuleModal: React.FC<NewRuleModalProps> = ({
               disabled={!name || !sourceAccountId}
               onClick={() => setStep(2)}
             >
-              Continue <ChevronRight className="ml-2 w-5 h-5" />
+              Configure Targets <ChevronRight className="ml-2 w-5 h-5" />
             </Button>
           </div>
         )}
@@ -212,7 +220,90 @@ export const NewRuleModal: React.FC<NewRuleModalProps> = ({
               </Button>
               <Button
                 className="flex-[2] h-12 text-lg gap-2"
-                disabled={targetSelections.length === 0 || loading}
+                disabled={targetSelections.length === 0}
+                onClick={() => setStep(3)}
+              >
+                Set Distribution <ChevronRight className="w-5 h-5" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+            <div className="space-y-4">
+              <Label className="text-sm font-semibold text-primary/80 uppercase tracking-wider">
+                Distribution Sequence
+              </Label>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
+                  <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                    <PlatformLogo platform={sourcePlatform} size={14} />
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-muted-foreground uppercase font-black">
+                      Trigger
+                    </span>
+                    <span className="font-medium">Upload detected</span>
+                  </div>
+                </div>
+
+                {targetSelections.map((target) => (
+                  <div key={target.accountId} className="space-y-2">
+                    <div className="flex justify-center py-1">
+                      <div className="w-0.5 h-4 bg-gradient-to-b from-primary/50 to-primary/10" />
+                    </div>
+                    <div className="p-4 rounded-xl bg-card border border-border/50 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <PlatformLogo platform={target.platform} size={18} />
+                        <div>
+                          <span className="block font-medium">
+                            {target.profileName}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground uppercase font-black">
+                            Target Platform
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4 pt-2">
+                        <Label className="text-xs text-muted-foreground whitespace-nowrap">
+                          Wait for
+                        </Label>
+                        <select
+                          className="bg-muted border-none rounded-md text-xs p-1 flex-1"
+                          value={target.delaySeconds}
+                          onChange={(e) =>
+                            updateTargetDelay(
+                              target.accountId,
+                              Number(e.target.value),
+                            )
+                          }
+                        >
+                          <option value={0}>Immediately</option>
+                          <option value={60 * 15}>15 Minutes</option>
+                          <option value={60 * 60}>1 Hour</option>
+                          <option value={60 * 120}>2 Hours</option>
+                          <option value={60 * 60 * 24}>1 Day</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="ghost"
+                onClick={() => setStep(2)}
+                className="flex-1"
+              >
+                Back
+              </Button>
+              <Button
+                className="flex-[2] h-12 text-lg gap-2"
+                disabled={loading}
                 onClick={handleCreate}
               >
                 {loading ? (
@@ -220,7 +311,7 @@ export const NewRuleModal: React.FC<NewRuleModalProps> = ({
                 ) : (
                   <>
                     <Zap className="w-5 h-5 fill-current" />
-                    Launch Rule
+                    Launch Sequence
                   </>
                 )}
               </Button>

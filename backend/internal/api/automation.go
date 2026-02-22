@@ -30,6 +30,7 @@ type RuleTarget struct {
 	CaptionTemplate string `json:"captionTemplate"` // For sync (media caption)
 	TitleTemplate   string `json:"titleTemplate"`   // For notify (announcement title)
 	BodyTemplate    string `json:"bodyTemplate"`    // For notify (announcement body)
+	DelaySeconds    int    `json:"delaySeconds"`
 }
 
 type AutomationRuleRequest struct {
@@ -89,6 +90,7 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 		ProfileName     string `json:"profileName"`
 		Handle          string `json:"handle"`
 		Platform        string `json:"platform"`
+		DelaySeconds    int    `json:"delaySeconds"`
 	}
 
 	type RuleResponse struct {
@@ -148,6 +150,7 @@ func (h *AutomationHandler) ListRules(c *fiber.Ctx) error {
 				ProfileName:     profileName.String,
 				Handle:          handle.String,
 				Platform:        platform.String,
+				DelaySeconds:    t.DelaySeconds,
 			})
 		}
 		r.Targets = enrichedTargets

@@ -31,6 +31,7 @@ interface NotificationTarget {
   titleTemplate?: string;
   bodyTemplate?: string;
   captionTemplate?: string;
+  delaySeconds?: number;
 }
 
 export const AudienceRules: React.FC = () => {
@@ -164,37 +165,58 @@ export const AudienceRules: React.FC = () => {
                         {rule.sourceAccount?.platform}
                       </div>
                       <span className="text-white/20 self-center">→</span>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-col gap-1 mt-3">
                         {rule.targets.map((t, idx) => (
                           <div
                             key={t.accountId}
-                            className="flex items-center gap-2"
+                            className="flex items-center gap-3 group/target"
                           >
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              className="h-7 text-[10px] px-3 rounded-full font-black uppercase tracking-widest bg-neon-purple/20 text-neon-purple border border-neon-purple/30 hover:bg-neon-purple/30 group"
-                              onClick={() =>
-                                setEditingTemplate({
-                                  rule: rule,
-                                  target: t,
-                                })
-                              }
-                            >
-                              <PlatformLogo
-                                platform={t.platform}
-                                size={10}
-                                className="mr-1.5"
-                              />
-                              {t.handle || t.profileName || t.platform}
-                              <Edit2
-                                size={10}
-                                className="ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                              />
-                            </Button>
-                            {idx < rule.targets.length - 1 && (
-                              <span className="w-1 h-1 rounded-full bg-white/10" />
-                            )}
+                            <div className="flex flex-col items-center w-4">
+                              <div className="w-1.5 h-1.5 rounded-full bg-primary/40 group-hover/target:bg-primary transition-colors" />
+                              {idx < rule.targets.length - 1 && (
+                                <div className="w-0.5 h-6 bg-border/30" />
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-lg pr-3 py-1 group/btn hover:border-primary/30 transition-all">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-[10px] px-2 rounded-full font-black uppercase tracking-widest text-primary hover:bg-transparent"
+                                onClick={() =>
+                                  setEditingTemplate({
+                                    rule: rule,
+                                    target: t,
+                                  })
+                                }
+                              >
+                                <PlatformLogo
+                                  platform={t.platform}
+                                  size={12}
+                                  className="mr-2"
+                                />
+                                {t.handle || t.profileName || t.platform}
+                                <Edit2
+                                  size={10}
+                                  className="ml-2 opacity-40 group-hover/btn:opacity-100 transition-opacity"
+                                />
+                              </Button>
+
+                              {t.delaySeconds && t.delaySeconds > 0 ? (
+                                <span className="text-[9px] font-bold text-white/30 uppercase bg-white/5 px-1.5 py-0.5 rounded border border-white/5">
+                                  +{" "}
+                                  {t.delaySeconds / 60 < 60
+                                    ? `${t.delaySeconds / 60}m`
+                                    : t.delaySeconds / 3600 < 24
+                                      ? `${t.delaySeconds / 3600}h`
+                                      : `${t.delaySeconds / 86400}d`}
+                                </span>
+                              ) : (
+                                <span className="text-[9px] font-bold text-primary/40 uppercase">
+                                  Instant
+                                </span>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
