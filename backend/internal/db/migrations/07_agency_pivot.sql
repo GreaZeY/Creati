@@ -35,8 +35,29 @@ CREATE TABLE IF NOT EXISTS approval_links (
 CREATE INDEX IF NOT EXISTS idx_approval_links_token ON approval_links(token);
 CREATE INDEX IF NOT EXISTS idx_approval_links_video ON approval_links(video_id);
 
--- 4. Add approval statuses to videos
+-- 4. Update Organizations with white-labeling fields
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS logo_url TEXT;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS primary_color VARCHAR(20) DEFAULT '#6366f1';
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS subdomain VARCHAR(255) UNIQUE;
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS custom_domain VARCHAR(255) UNIQUE;
+
+-- 5. Update Clients with extra visual fields
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS logo_url TEXT;
+ALTER TABLE clients ADD COLUMN IF NOT EXISTS color VARCHAR(20);
+
+-- 6. Create Video Comments for collaborative approval
+CREATE TABLE IF NOT EXISTS video_comments (
+    id SERIAL PRIMARY KEY,
+    video_id INT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+    client_id INT REFERENCES clients(id) ON DELETE CASCADE, -- NULL if from agency
+    user_id INT REFERENCES users(id) ON DELETE CASCADE,   -- NULL if from client public portal
+    content TEXT NOT NULL,
+    is_internal BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_video_comments_video ON video_comments(video_id);
+
+-- 7. Add approval statuses context (Documentation/Reminder)
 -- Existing status: 'uploaded', 'pending', 'processing', 'completed', 'failed'
 -- New lifecycle statuses for agency flow: 'draft', 'pending_approval', 'approved', 'rejected'
--- Note: 'pending' in legacy might be confused with 'pending_approval', 
--- but we will use 'pending_approval' specifically for client feedback cycles.

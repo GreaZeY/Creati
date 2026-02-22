@@ -25,7 +25,14 @@ export const NewRuleModal: React.FC<NewRuleModalProps> = ({
   const [name, setName] = useState("");
   const [sourcePlatform, setSourcePlatform] = useState("");
   const [sourceAccountId, setSourceAccountId] = useState<number | null>(null);
-  const [targetPlatforms, setTargetPlatforms] = useState<string[]>([]);
+  const [targetSelections, setTargetSelections] = useState<
+    {
+      accountId: number;
+      platform: string;
+      profileName: string;
+      delaySeconds: number;
+    }[]
+  >([]);
   const [platforms, setPlatforms] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -35,7 +42,8 @@ export const NewRuleModal: React.FC<NewRuleModalProps> = ({
       setStep(1);
       setName("");
       setSourcePlatform("");
-      setTargetPlatforms([]);
+      setSourceAccountId(null);
+      setTargetSelections([]);
     }
   }, [isOpen, selectedClient]);
 
@@ -48,16 +56,29 @@ export const NewRuleModal: React.FC<NewRuleModalProps> = ({
     }
   };
 
-  const toggleTarget = (platform: string) => {
-    if (targetPlatforms.includes(platform)) {
-      setTargetPlatforms(targetPlatforms.filter((p) => p !== platform));
+  const toggleTarget = (platformAccount: any) => {
+    const exists = targetSelections.find(
+      (s) => s.accountId === platformAccount.id,
+    );
+    if (exists) {
+      setTargetSelections(
+        targetSelections.filter((s) => s.accountId !== platformAccount.id),
+      );
     } else {
-      setTargetPlatforms([...targetPlatforms, platform]);
+      setTargetSelections([
+        ...targetSelections,
+        {
+          accountId: platformAccount.id,
+          platform: platformAccount.platform,
+          profileName: platformAccount.profileName,
+          delaySeconds: 0,
+        },
+      ]);
     }
   };
 
   const handleCreate = async () => {
-    if (!name || !sourcePlatform || targetPlatforms.length === 0) {
+    if (!name || !sourcePlatform || targetSelections.length === 0) {
       toast.error("Please fill in all fields");
       return;
     }
@@ -70,11 +91,11 @@ export const NewRuleModal: React.FC<NewRuleModalProps> = ({
           name,
           sourceAccountId,
           triggerType: "new_upload",
-          targets: targetPlatforms.map((p) => {
-            const targetAcc = platforms.find((acc) => acc.platform === p);
+          targets: targetSelections.map((s) => {
             return {
-              accountId: targetAcc?.id,
-              targetPlatform: p,
+              accountId: s.accountId,
+              targetPlatform: s.platform,
+              delaySeconds: s.delaySeconds,
               titleTemplate: "New video: {{title}}",
               bodyTemplate: "Check out my new video! {{url}}",
             };
@@ -139,7 +160,7 @@ export const NewRuleModal: React.FC<NewRuleModalProps> = ({
             </div>
             <Button
               className="w-full h-12 text-lg"
-              disabled={!name || !sourcePlatform}
+              disabled={!name || !sourceAccountId}
               onClick={() => setStep(2)}
             >
               Continue <ChevronRight className="ml-2 w-5 h-5" />
@@ -153,22 +174,27 @@ export const NewRuleModal: React.FC<NewRuleModalProps> = ({
               <Label>Announce it on...</Label>
               <div className="grid grid-cols-2 gap-3">
                 {platforms
-                  .filter((p) => p.platform !== sourcePlatform)
+                  .filter((p) => Number(p.id) !== sourceAccountId)
                   .map((p) => (
                     <button
-                      key={p.platform}
-                      onClick={() => toggleTarget(p.platform)}
+                      key={p.platform + p.id}
+                      onClick={() => toggleTarget(p)}
                       className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
-                        targetPlatforms.includes(p.platform)
+                        targetSelections.some((s) => s.accountId === p.id)
                           ? "border-primary bg-primary/10"
                           : "border-border hover:border-border/80 bg-background"
                       }`}
                     >
                       <PlatformLogo platform={p.platform} size={20} />
-                      <span className="font-medium capitalize">
-                        {p.platform}
-                      </span>
-                      {targetPlatforms.includes(p.platform) && (
+                      <div className="text-left">
+                        <span className="block font-medium capitalize">
+                          {p.platform}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          @{p.handle || p.profileName}
+                        </span>
+                      </div>
+                      {targetSelections.some((s) => s.accountId === p.id) && (
                         <Check className="ml-auto w-4 h-4 text-primary" />
                       )}
                     </button>
@@ -186,7 +212,7 @@ export const NewRuleModal: React.FC<NewRuleModalProps> = ({
               </Button>
               <Button
                 className="flex-[2] h-12 text-lg gap-2"
-                disabled={targetPlatforms.length === 0 || loading}
+                disabled={targetSelections.length === 0 || loading}
                 onClick={handleCreate}
               >
                 {loading ? (

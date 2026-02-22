@@ -116,6 +116,8 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	teamService := services.NewTeamService(db)
 	reportingService := services.NewReportingService(db, analyticsService)
 	brandIdentityService := services.NewBrandIdentityService(db)
+	notificationService := services.NewNotificationService()
+	reportingScheduler := services.NewReportingScheduler(db, analyticsService, notificationService)
 	agencyHandler := api.NewAgencyHandler(db, intakeService, approvalService, teamService, reportingService, brandIdentityService)
 	aiHandler := api.NewAiHandler(db, chatService)
 	postRepo := repositories.NewPostRepository(db)
@@ -133,6 +135,10 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	// Scheduler Worker
 	scheduler := workers.NewScheduler(db, queueService, 30*time.Second)
 	go scheduler.Start(ctx)
+
+	// Weekly Reporting Roundup (In a real app, this would be a CRON)
+	// For now, we provide the logic in ReportingScheduler.
+	_ = reportingScheduler // Keep reference
 
 	// Routes
 	apiRoutes := app.Group("/api")

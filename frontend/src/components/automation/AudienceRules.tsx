@@ -8,6 +8,7 @@ import { useClient } from "@/context/ClientContext";
 import { TemplateEditor } from "./TemplateEditor";
 import { NewRuleModal } from "./NewRuleModal";
 import { Modal } from "@/components/ui/Modal";
+import { PlatformLogo } from "@/components/platforms/PlatformLogo";
 
 interface NotificationRule {
   id: number;
@@ -154,30 +155,49 @@ export const AudienceRules: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="font-medium text-lg">{rule.name}</h3>
-                    <div className="flex gap-2 mt-1">
-                      <span className="text-xs uppercase px-2 py-0.5 rounded-full border border-border bg-background/50">
-                        {rule.sourceAccount?.platform || "youtube"}
-                      </span>
-                      <span className="text-muted-foreground text-xs flex items-center">
-                        →
-                      </span>
-                      {rule.targets.map((t) => (
-                        <Button
-                          key={t.accountId}
-                          variant="secondary"
-                          size="sm"
-                          className="h-6 text-[10px] px-2 rounded-full font-bold uppercase tracking-wider"
-                          onClick={() =>
-                            setEditingTemplate({
-                              rule: rule,
-                              target: t,
-                            })
-                          }
-                        >
-                          {t.platform}
-                          <Edit2 className="w-2 h-2 ml-1 opacity-50" />
-                        </Button>
-                      ))}
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-white/60">
+                        <PlatformLogo
+                          platform={rule.sourceAccount?.platform || "youtube"}
+                          size={12}
+                        />
+                        {rule.sourceAccount?.platform}
+                      </div>
+                      <span className="text-white/20 self-center">→</span>
+                      <div className="flex flex-wrap gap-2">
+                        {rule.targets.map((t, idx) => (
+                          <div
+                            key={t.accountId}
+                            className="flex items-center gap-2"
+                          >
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="h-7 text-[10px] px-3 rounded-full font-black uppercase tracking-widest bg-neon-purple/20 text-neon-purple border border-neon-purple/30 hover:bg-neon-purple/30 group"
+                              onClick={() =>
+                                setEditingTemplate({
+                                  rule: rule,
+                                  target: t,
+                                })
+                              }
+                            >
+                              <PlatformLogo
+                                platform={t.platform}
+                                size={10}
+                                className="mr-1.5"
+                              />
+                              {t.handle || t.profileName || t.platform}
+                              <Edit2
+                                size={10}
+                                className="ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                              />
+                            </Button>
+                            {idx < rule.targets.length - 1 && (
+                              <span className="w-1 h-1 rounded-full bg-white/10" />
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>

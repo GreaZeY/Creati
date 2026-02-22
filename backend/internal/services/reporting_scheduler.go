@@ -12,12 +12,14 @@ import (
 type ReportingScheduler struct {
 	db               *sql.DB
 	analyticsService *AnalyticsService
+	notifyService    *NotificationService
 }
 
-func NewReportingScheduler(db *sql.DB, analytics *AnalyticsService) *ReportingScheduler {
+func NewReportingScheduler(db *sql.DB, analytics *AnalyticsService, notify *NotificationService) *ReportingScheduler {
 	return &ReportingScheduler{
 		db:               db,
 		analyticsService: analytics,
+		notifyService:    notify,
 	}
 }
 
@@ -52,16 +54,21 @@ func (s *ReportingScheduler) RunWeeklyRoundup(ctx context.Context) error {
 		}
 
 		// 3. Dispatch Notification / Email
-		// For Phase 6, we'll log the "Send" action as a placeholder for the notification layer.
+		var userEmail string
+		err = s.db.QueryRowContext(ctx, "SELECT email FROM users WHERE id = $1", userID).Scan(&userEmail)
+		if err == nil {
+			err = s.notifyService.DispatchWeeklyImpact(ctx, userEmail, clientName, summary.TotalViews, summary.TotalLikes+summary.TotalComments)
+			if err != nil {
+				logger.Get("reporting").WithError(err).Error("Failed to dispatch email")
+			}
+		}
+
 		logger.Get("reporting").WithFields(logrus.Fields{
 			"client_id":   clientID,
 			"client_name": clientName,
 			"total_views": summary.TotalViews,
 			"engagement":  summary.TotalLikes + summary.TotalComments,
-		}).Info("Weekly Impact Snapshot dispatched to agency owner")
-
-		// In a full implementation, this would trigger an email via SendGrid/SES
-		// or an in-app notification.
+		}).Info("Weekly Impact Snapshot dispatched via NotificationService")
 	}
 
 	return nil

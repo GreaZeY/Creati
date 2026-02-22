@@ -159,20 +159,20 @@ export const ContentApproval = () => {
             <CommentThread token={token} isAgency={false} />
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 pt-4">
+          <div className="flex flex-col sm:flex-row gap-4 pt-4 sticky bottom-6 z-50 sm:relative sm:bottom-0">
             <button
               onClick={() => handleDecision("approved")}
-              className="flex-1 flex items-center justify-center gap-3 bg-white text-black font-bold h-16 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]"
+              className="flex-1 flex items-center justify-center gap-3 bg-white text-black font-bold h-14 md:h-16 rounded-2xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-glow-white/20"
             >
-              <CheckCircle2 className="w-6 h-6" />
-              Approve for Posting
+              <CheckCircle2 className="w-5 h-5 md:w-6 md:h-6" />
+              Approve
             </button>
             <button
               onClick={() => handleDecision("rejected")}
-              className="flex-1 flex items-center justify-center gap-3 bg-white/[0.05] border border-white/10 text-white font-bold h-16 rounded-2xl hover:bg-white/[0.08] transition-all"
+              className="flex-1 flex items-center justify-center gap-3 bg-white/[0.05] border border-white/10 text-white font-bold h-14 md:h-16 rounded-2xl hover:bg-white/[0.08] transition-all"
             >
-              <XCircle className="w-6 h-6 text-red-500" />
-              Reject & Send Feedback
+              <XCircle className="w-5 h-5 md:w-6 md:h-6 text-red-500" />
+              Send Feedback
             </button>
           </div>
 
