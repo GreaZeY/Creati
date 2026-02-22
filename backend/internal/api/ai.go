@@ -47,6 +47,7 @@ func (h *AiHandler) GeneratePost(c *fiber.Ctx) error {
 		Tone     string `json:"tone"`     // Gen Z, professional, casual
 		Goal     string `json:"goal"`     // engagement, announcement, promo
 		Platform string `json:"platform"` // optional context
+		ClientID *int   `json:"clientId"` // To fetch Brand Voice
 	}
 
 	if err := c.BodyParser(&req); err != nil {
@@ -88,8 +89,23 @@ func (h *AiHandler) GeneratePost(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to commit transaction", err)
 	}
 
-	// 2. Mock AI generation (Replace with LLM service in production)
-	mockResponse := fmt.Sprintf("AI Post for %s in %s tone: Check out our new announcement about %s! #%s #vision", req.Platform, req.Tone, req.Topic, req.Goal)
+	// 2. Fetch Brand Voice Context
+	brandVoiceContext := ""
+	if req.ClientID != nil {
+		var bv, ta sql.NullString
+		err := h.db.QueryRow("SELECT brand_voice, target_audience FROM clients WHERE id = $1", *req.ClientID).Scan(&bv, &ta)
+		if err == nil {
+			if bv.Valid && bv.String != "" {
+				brandVoiceContext = fmt.Sprintf(" [Brand Voice: %s]", bv.String)
+			}
+			if ta.Valid && ta.String != "" {
+				brandVoiceContext += fmt.Sprintf(" [Target Audience: %s]", ta.String)
+			}
+		}
+	}
+
+	// 3. Mock AI generation
+	mockResponse := fmt.Sprintf("AI Post for %s%s in %s tone: Check out our new announcement about %s! #%s #vision", req.Platform, brandVoiceContext, req.Tone, req.Topic, req.Goal)
 
 	return utils.SuccessResponse(c, fiber.Map{
 		"text":             mockResponse,

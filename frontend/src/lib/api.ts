@@ -319,6 +319,9 @@ export const agencyAPI = {
   removeMember: (memberId: number) => api.delete(`/agency/team/${memberId}`),
   generateReport: () => api.get<ApiResponse<any>>('/agency/reports'),
   listApprovals: () => api.get<ApiResponse<any[]>>('/agency/approvals'),
+  getIdentity: (clientId: number) => api.get<ApiResponse<any>>(`/agency/clients/${clientId}/identity`),
+  updateIdentity: (clientId: number, data: any) => api.put(`/agency/clients/${clientId}/identity`, data),
+  generateIdentity: (clientId: number, url: string) => api.post<ApiResponse<any>>(`/agency/clients/${clientId}/identity/generate`, { url }),
 };
 
 export const paymentsAPI = {

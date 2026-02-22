@@ -10,14 +10,16 @@ import (
 )
 
 type AnalyticsHandler struct {
-	service *services.AnalyticsService
-	queue   *services.QueueService
+	service          *services.AnalyticsService
+	recyclingService *services.RecyclingService
+	queue            *services.QueueService
 }
 
 func NewAnalyticsHandler(db *sql.DB, queue *services.QueueService, cache *services.CacheService) *AnalyticsHandler {
 	return &AnalyticsHandler{
-		service: services.NewAnalyticsService(db, cache),
-		queue:   queue,
+		service:          services.NewAnalyticsService(db, cache),
+		recyclingService: services.NewRecyclingService(db),
+		queue:            queue,
 	}
 }
 
@@ -48,6 +50,22 @@ func (h *AnalyticsHandler) GetOverview(c *fiber.Ctx) error {
 	}
 
 	return utils.SuccessResponse(c, stats, "")
+}
+
+// GetEvergreenSuggestions returns high-performing content for recycling
+func (h *AnalyticsHandler) GetEvergreenSuggestions(c *fiber.Ctx) error {
+	clientID := middleware.GetClientID(c)
+	if clientID == nil || *clientID == 0 {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "Client context required")
+	}
+
+	limit := c.QueryInt("limit", 5)
+	suggestions, err := h.recyclingService.GetEvergreenSuggestions(c.Context(), *clientID, limit)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to fetch evergreen suggestions", err)
+	}
+
+	return utils.SuccessResponse(c, suggestions, "")
 }
 
 // GetQueueStatus returns the current depth of the upload queue (for autoscaling)

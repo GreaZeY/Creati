@@ -56,6 +56,47 @@ type VideoStats struct {
 	LastUpdated   time.Time `json:"lastUpdated"`
 }
 
+// GetClientMetrics fetches aggregated stats for a specific client (public or private)
+func (s *AnalyticsService) GetClientMetrics(ctx context.Context, clientID int) (*UserStats, error) {
+	stats := &UserStats{
+		PlatformBreakdown: []PlatformStat{},
+		PulseData:         []PulsePoint{},
+	}
+
+	// 1. Get owner ID for this client to reuse logic if needed, or query directly
+	// For purity, we query by client_id strictly
+	query := "SELECT total_videos, total_views, total_likes, total_comments, total_shares FROM vw_user_stats WHERE client_id = $1"
+	err := s.db.QueryRowContext(ctx, query, clientID).Scan(
+		&stats.TotalVideos, &stats.TotalViews, &stats.TotalLikes, &stats.TotalComments, &stats.TotalShares,
+	)
+
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+
+	// 2. Fetch platform breakdown for this client
+	pbQuery := `
+		SELECT platform, COALESCE(SUM(views), 0)
+		FROM (
+			SELECT DISTINCT ON (video_id, account_id) platform, views
+			FROM video_analytics
+			WHERE video_id IN (SELECT id FROM videos WHERE client_id = $1)
+		) t GROUP BY platform
+	`
+	rows, err := s.db.QueryContext(ctx, pbQuery, clientID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var p PlatformStat
+			if err := rows.Scan(&p.Platform, &p.Views); err == nil {
+				stats.PlatformBreakdown = append(stats.PlatformBreakdown, p)
+			}
+		}
+	}
+
+	return stats, nil
+}
+
 // GetUserStats fetches aggregated stats from view (Fast)
 func (s *AnalyticsService) GetUserStats(userID int, clientID *int) (*UserStats, error) {
 	stats := &UserStats{

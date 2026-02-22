@@ -9,6 +9,8 @@ import {
   LayoutDashboard,
   ArrowRight,
   BarChart,
+  RefreshCcw,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Link, useNavigate } from "react-router-dom";
@@ -40,12 +42,24 @@ export const Dashboard = () => {
     },
   });
 
-  const { data: analytics, isLoading: analyticsLoading } = useQuery({
-    queryKey: ["analytics-overview", selectedClient?.id],
-    queryFn: async () => {
-      const res = await analyticsAPI.getOverview(selectedClient?.id);
-      return res.data.data;
     },
+  });
+
+  const { data: evergreen = [], isLoading: evergreenLoading } = useQuery({
+    queryKey: ["evergreen-suggestions", selectedClient?.id],
+    queryFn: async () => {
+      const resp = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/analytics/evergreen`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "X-Client-ID": selectedClient?.id?.toString() || "",
+          },
+        },
+      ).then((res) => res.json());
+      return resp.data;
+    },
+    enabled: !!selectedClient,
   });
 
   const isLoading = videosLoading || platformsLoading;
@@ -173,6 +187,78 @@ export const Dashboard = () => {
             </motion.div>
           </div>
         </LensedCard>
+      </div>
+
+      {/* Evergreen Strategy Suggester */}
+      <div className="pt-8 space-y-6">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-neon-lime/20 flex items-center justify-center text-neon-lime border border-neon-lime/30 shadow-glow-lime">
+              <RefreshCcw className="w-5 h-5" />
+            </div>
+            <h3 className="text-2xl font-black font-display tracking-tight text-foreground dark:text-white uppercase italic">
+              Recycling Strategy
+            </h3>
+          </div>
+          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60 px-4 py-2 bg-white/5 rounded-full border border-white/10">
+            Top 10% Performance
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {evergreenLoading ? (
+            [1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-48 bg-white/5 rounded-3xl animate-pulse border border-white/5"
+              />
+            ))
+          ) : evergreen && evergreen.length > 0 ? (
+            evergreen.map((item: any) => (
+              <motion.div
+                key={item.videoId}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileHover={{ y: -4 }}
+              >
+                <LensedCard className="p-6 bg-charcoal/40 border border-white/5 hover:border-neon-lime/30 transition-all group overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-30 transition-opacity">
+                    <Sparkles className="w-12 h-12 text-neon-lime" />
+                  </div>
+                  <div className="flex items-start justify-between mb-4 relative z-10">
+                    <div className="p-2 rounded-lg bg-white/5">
+                      <PlatformLogo platform={item.platform} size={14} />
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-neon-lime uppercase tracking-widest">
+                        High Yield
+                      </p>
+                      <p className="text-xs font-bold text-white">
+                        {formatNumber(item.totalViews)} Views
+                      </p>
+                    </div>
+                  </div>
+                  <h4 className="text-sm font-bold text-white/90 mb-6 line-clamp-1 group-hover:text-neon-lime transition-colors">
+                    {item.title}
+                  </h4>
+                  <Button
+                    variant="outline"
+                    className="w-full border-neon-lime/20 text-neon-lime hover:bg-neon-lime/10 font-black uppercase tracking-widest text-[10px] h-9"
+                    onClick={() => navigate(`/create/${item.platform}?source=${item.externalId}`)}
+                  >
+                    Reschedule Asset
+                  </Button>
+                </LensedCard>
+              </motion.div>
+            ))
+          ) : (
+            <div className="col-span-full py-12 bg-white/5 rounded-[2rem] border border-dashed border-white/10 flex flex-col items-center justify-center text-center">
+              <p className="text-xs font-bold text-muted-foreground/40 uppercase tracking-widest">
+                Analytics pending for deep insights
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Recent Activity Section */}

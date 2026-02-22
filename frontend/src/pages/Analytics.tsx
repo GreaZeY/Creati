@@ -52,7 +52,7 @@ export const Analytics = () => {
     "intelligence",
   );
 
-  const { data: analytics, isLoading } = useQuery({
+  const { data: analyticsData, isLoading } = useQuery({
     queryKey: ["analytics-overview", selectedClient?.id, isGlobal],
     queryFn: async () => {
       const res = await analyticsAPI.getOverview(selectedClient?.id, isGlobal);
@@ -89,26 +89,35 @@ export const Analytics = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `report_${reportData.clientName}_${new Date().toISOString().split("T")[0]}.json`;
+    a.download = `report_${
+      reportData.clientName
+    }_${new Date().toISOString().split("T")[0]}.json`;
     a.click();
     toast.success("Intelligence snapshot downloaded");
   };
 
-  const totalViews = analytics?.totalViews || 0;
+  const copyShareLink = () => {
+    if (!selectedClient) return;
+    const url = `${window.location.origin}/shared/${selectedClient.id}`;
+    navigator.clipboard.writeText(url);
+    toast.success("Live Report link copied! Share it with your client.");
+  };
+
+  const totalViews = analyticsData?.totalViews || 0;
   const totalEngagement =
-    (analytics?.totalLikes || 0) +
-    (analytics?.totalComments || 0) +
-    (analytics?.totalShares || 0);
+    (analyticsData?.totalLikes || 0) +
+    (analyticsData?.totalComments || 0) +
+    (analyticsData?.totalShares || 0);
 
   const viralityCoef =
     totalViews > 0
-      ? (((analytics?.totalShares || 0) / totalViews) * 1000).toFixed(1)
+      ? (((analyticsData?.totalShares || 0) / totalViews) * 1000).toFixed(1)
       : "0.0";
   const engagementDensity =
     totalViews > 0 ? ((totalEngagement / totalViews) * 100).toFixed(1) : "0.0";
   const projectedRevenue =
-    analytics?.projectedRevenue !== undefined
-      ? analytics.projectedRevenue.toFixed(2)
+    analyticsData?.projectedRevenue !== undefined
+      ? analyticsData.projectedRevenue.toFixed(2)
       : (totalViews * 0.002).toFixed(2);
 
   return (
@@ -293,8 +302,8 @@ export const Analytics = () => {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                       data={
-                        analytics?.pulseData?.length
-                          ? analytics.pulseData
+                        analyticsData?.pulseData?.length
+                          ? analyticsData.pulseData
                           : mockPulseData
                       }
                       margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
@@ -403,8 +412,8 @@ export const Analytics = () => {
                 </div>
 
                 <div className="flex-1 space-y-4">
-                  {analytics?.platformBreakdown?.length ? (
-                    analytics.platformBreakdown.map((platform: any) => (
+                  {analyticsData?.platformBreakdown?.length ? (
+                    analyticsData.platformBreakdown.map((platform: any) => (
                       <div key={platform.platform} className="space-y-2">
                         <div className="flex justify-between items-end">
                           <div className="flex items-center gap-2">
@@ -481,6 +490,15 @@ export const Analytics = () => {
                     >
                       <RefreshCw className="w-3 h-3 mr-2" />
                       Regenerate
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={copyShareLink}
+                      className="rounded-xl border-primary/20 text-primary hover:bg-primary/5 transition-all font-black uppercase tracking-widest text-[9px]"
+                    >
+                      <Globe className="w-3 h-3 mr-2" />
+                      Share Live
                     </Button>
                     <Button
                       size="sm"

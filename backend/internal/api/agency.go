@@ -20,15 +20,17 @@ type AgencyHandler struct {
 	approvalSvc *services.ApprovalService
 	teamSvc     *services.TeamService
 	reportSvc   *services.ReportingService
+	identitySvc *services.BrandIdentityService
 }
 
-func NewAgencyHandler(db *sql.DB, intake *services.IntakeService, approval *services.ApprovalService, team *services.TeamService, reporting *services.ReportingService) *AgencyHandler {
+func NewAgencyHandler(db *sql.DB, intake *services.IntakeService, approval *services.ApprovalService, team *services.TeamService, reporting *services.ReportingService, identity *services.BrandIdentityService) *AgencyHandler {
 	return &AgencyHandler{
 		db:          db,
 		intakeSvc:   intake,
 		approvalSvc: approval,
 		teamSvc:     team,
 		reportSvc:   reporting,
+		identitySvc: identity,
 	}
 }
 
@@ -640,4 +642,60 @@ func (h *AgencyHandler) ListPendingApprovals(c *fiber.Ctx) error {
 	}
 
 	return utils.SuccessResponse(c, approvals, "")
+}
+
+// GetClientIdentity returns the brand persona for a client
+func (h *AgencyHandler) GetClientIdentity(c *fiber.Ctx) error {
+	clientID, _ := strconv.Atoi(c.Params("id"))
+	if clientID == 0 {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid client id")
+	}
+
+	identity, err := h.identitySvc.GetIdentity(c.Context(), clientID)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to fetch identity", err)
+	}
+
+	return utils.SuccessResponse(c, identity, "")
+}
+
+// UpdateClientIdentity saves the brand persona for a client
+func (h *AgencyHandler) UpdateClientIdentity(c *fiber.Ctx) error {
+	clientID, _ := strconv.Atoi(c.Params("id"))
+	if clientID == 0 {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid client id")
+	}
+
+	var identity services.BrandIdentity
+	if err := c.BodyParser(&identity); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
+	}
+
+	err := h.identitySvc.UpdateIdentity(c.Context(), clientID, identity)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update identity", err)
+	}
+
+	return utils.SuccessResponse(c, nil, "Identity updated")
+}
+
+// GenerateClientIdentity uses AI to extract a brand persona from a URL
+func (h *AgencyHandler) GenerateClientIdentity(c *fiber.Ctx) error {
+	var req struct {
+		URL string `json:"url"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
+	}
+
+	if req.URL == "" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "url is required")
+	}
+
+	identity, err := h.identitySvc.GenerateFromURL(c.Context(), req.URL)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to generate identity", err)
+	}
+
+	return utils.SuccessResponse(c, identity, "Identity generated from website")
 }

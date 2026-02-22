@@ -23,6 +23,7 @@ type AutomationService struct {
 type RuleTarget struct {
 	AccountID       int    `json:"accountId"`
 	CaptionTemplate string `json:"captionTemplate"`
+	DelaySeconds    int    `json:"delaySeconds"`
 }
 
 func NewAutomationService(db *sql.DB, q *QueueService) *AutomationService {
@@ -116,6 +117,7 @@ func (s *AutomationService) ProcessYouTubeEvent(payload []byte) error {
 		var targets []struct {
 			AccountID       int    `json:"accountId"`
 			CaptionTemplate string `json:"captionTemplate"`
+			DelaySeconds    int    `json:"delaySeconds"`
 			Platform        string `json:"targetPlatform"`   // For notify
 			Identifier      string `json:"targetIdentifier"` // For notify
 		}
@@ -123,12 +125,19 @@ func (s *AutomationService) ProcessYouTubeEvent(payload []byte) error {
 
 		if action == "notify" {
 			for _, target := range targets {
+				// createNotificationJob needs to be updated to support scheduling if needed,
+				// but for now we'll just handle automation sync jobs.
 				s.createNotificationJob(ruleID, videoID, target.AccountID, target.Platform, target.Identifier, title, traceID)
 			}
 		} else {
 			// Default to sync
 			for _, target := range targets {
-				s.createAutomationJob(ruleID, videoID, target.AccountID, title, traceID, nil, nil)
+				var scheduledAt *time.Time
+				if target.DelaySeconds > 0 {
+					t := time.Now().Add(time.Duration(target.DelaySeconds) * time.Second)
+					scheduledAt = &t
+				}
+				s.createAutomationJob(ruleID, videoID, target.AccountID, title, traceID, nil, scheduledAt)
 			}
 		}
 

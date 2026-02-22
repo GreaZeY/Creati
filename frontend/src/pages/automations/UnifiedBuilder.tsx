@@ -51,14 +51,14 @@ export function UnifiedBuilder({ initialType }: UnifiedBuilderProps) {
 
   // Form State - Sync Specific
   const [selectedTargetsSync, setSelectedTargetsSync] = useState<
-    { accountId: number; captionTemplate: string }[]
+    { accountId: number; captionTemplate: string; delaySeconds: number }[]
   >([]);
   const [keywords, setKeywords] = useState<string[]>([]);
   const [currentKeyword, setCurrentKeyword] = useState("");
 
   // Form State - Announcement Specific
   const [selectedTargetAccountsAnnounce, setSelectedTargetAccountsAnnounce] =
-    useState<number[]>([]);
+    useState<{ accountId: number; delaySeconds: number }[]>([]);
   const [announcementTemplates, setAnnouncementTemplates] = useState<
     Record<number, { title: string; body: string }>
   >({});
@@ -133,7 +133,11 @@ export function UnifiedBuilder({ initialType }: UnifiedBuilderProps) {
     } else {
       setSelectedTargetsSync([
         ...selectedTargetsSync,
-        { accountId: Number(accountId), captionTemplate: "{title}" },
+        {
+          accountId: Number(accountId),
+          captionTemplate: "{title}",
+          delaySeconds: 0,
+        },
       ]);
     }
   };
@@ -146,19 +150,38 @@ export function UnifiedBuilder({ initialType }: UnifiedBuilderProps) {
     );
   };
 
+  const updateDelaySync = (accountId: number, seconds: number) => {
+    setSelectedTargetsSync(
+      selectedTargetsSync.map((t) =>
+        t.accountId === accountId ? { ...t, delaySeconds: seconds } : t,
+      ),
+    );
+  };
+
   // Handlers - Announcement
   const toggleTargetAnnounce = (accountId: number) => {
     const id = Number(accountId);
-    if (selectedTargetAccountsAnnounce.includes(id)) {
+    const exists = selectedTargetAccountsAnnounce.find(
+      (t) => t.accountId === id,
+    );
+    if (exists) {
       setSelectedTargetAccountsAnnounce(
-        selectedTargetAccountsAnnounce.filter((aId) => aId !== id),
+        selectedTargetAccountsAnnounce.filter((t) => t.accountId !== id),
       );
     } else {
       setSelectedTargetAccountsAnnounce([
         ...selectedTargetAccountsAnnounce,
-        id,
+        { accountId: id, delaySeconds: 0 },
       ]);
     }
+  };
+
+  const updateDelayAnnounce = (accountId: number, seconds: number) => {
+    setSelectedTargetAccountsAnnounce(
+      selectedTargetAccountsAnnounce.map((t) =>
+        t.accountId === accountId ? { ...t, delaySeconds: seconds } : t,
+      ),
+    );
   };
 
   const handleSaveAnnouncement = () => {
@@ -173,18 +196,19 @@ export function UnifiedBuilder({ initialType }: UnifiedBuilderProps) {
       sourceAccountId: Number(sourceAccountId),
       triggerType: "new_upload",
       filters: {},
-      targets: selectedTargetAccountsAnnounce.map((id) => {
-        const targetAccount = accounts.find((a: any) => a.id === id);
-        const template = announcementTemplates[id] || {
+      targets: selectedTargetAccountsAnnounce.map((t) => {
+        const targetAccount = accounts.find((a: any) => a.id === t.accountId);
+        const template = announcementTemplates[t.accountId] || {
           title: "",
           body: "🔥 New video dropped!\n\n{{title}}\n\nWatch here 👇\n{{url}}",
         };
         return {
-          accountId: Number(id),
+          accountId: Number(t.accountId),
           captionTemplate: template.body,
           titleTemplate: template.title, // Extra info for notify
           targetPlatform: targetAccount?.platform || "",
-          targetIdentifier: id.toString(),
+          targetIdentifier: t.accountId.toString(),
+          delaySeconds: t.delaySeconds,
         };
       }),
     });
@@ -416,7 +440,9 @@ export function UnifiedBuilder({ initialType }: UnifiedBuilderProps) {
                 const accId = Number(account.id);
                 const isSelected = isSync
                   ? !!selectedTargetsSync.find((t) => t.accountId === accId)
-                  : selectedTargetAccountsAnnounce.includes(accId);
+                  : !!selectedTargetAccountsAnnounce.find(
+                      (t) => t.accountId === accId,
+                    );
 
                 return (
                   <button
@@ -522,14 +548,41 @@ export function UnifiedBuilder({ initialType }: UnifiedBuilderProps) {
                               {account?.profileName}
                             </span>
                           </div>
-                          <Input
-                            value={t.captionTemplate}
-                            onChange={(e) =>
-                              updateTemplateSync(t.accountId, e.target.value)
-                            }
-                            placeholder="Use {title} for original title"
-                            className="text-xs h-10 bg-background/50"
-                          />
+                          <div className="flex items-center gap-4">
+                            <div className="flex-1 space-y-2">
+                              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                Caption Template
+                              </Label>
+                              <Input
+                                value={t.captionTemplate}
+                                onChange={(e) =>
+                                  updateTemplateSync(
+                                    t.accountId,
+                                    e.target.value,
+                                  )
+                                }
+                                placeholder="Use {title} for original title"
+                                className="text-xs h-10 bg-background/50"
+                              />
+                            </div>
+                            <div className="w-32 space-y-2">
+                              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                Delay (Days)
+                              </Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={Math.floor(t.delaySeconds / 86400)}
+                                onChange={(e) =>
+                                  updateDelaySync(
+                                    t.accountId,
+                                    Number(e.target.value) * 86400,
+                                  )
+                                }
+                                className="text-xs h-10 bg-background/50 text-center"
+                              />
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
@@ -538,30 +591,52 @@ export function UnifiedBuilder({ initialType }: UnifiedBuilderProps) {
               </>
             ) : (
               <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                {selectedTargetAccountsAnnounce.map((id) => {
-                  const account = accounts.find((a: any) => a.id === id);
+                {selectedTargetAccountsAnnounce.map((target) => {
+                  const account = accounts.find(
+                    (a: any) => a.id === target.accountId,
+                  );
                   return (
                     <div
-                      key={id}
+                      key={target.accountId}
                       className="border border-border/50 rounded-2xl overflow-hidden bg-background/30 px-6 py-4"
                     >
-                      <div className="flex items-center gap-3 mb-4">
-                        <PlatformLogo
-                          platform={account?.platform}
-                          size={16}
-                          className="text-primary"
-                        />
-                        <h4 className="text-xs font-black uppercase tracking-[0.2em]">
-                          {account?.profileName || account?.handle || "Account"}{" "}
-                          Template
-                        </h4>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <PlatformLogo
+                            platform={account?.platform}
+                            size={16}
+                            className="text-primary"
+                          />
+                          <h4 className="text-xs font-black uppercase tracking-[0.2em]">
+                            {account?.profileName ||
+                              account?.handle ||
+                              "Account"}
+                          </h4>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                            Delay (Days)
+                          </Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={Math.floor(target.delaySeconds / 86400)}
+                            onChange={(e) =>
+                              updateDelayAnnounce(
+                                target.accountId,
+                                Number(e.target.value) * 86400,
+                              )
+                            }
+                            className="text-xs h-7 w-16 bg-background/50 text-center"
+                          />
+                        </div>
                       </div>
                       <TemplateEditor
                         platform={account?.platform}
                         onSave={(template) => {
                           setAnnouncementTemplates({
                             ...announcementTemplates,
-                            [id]: template,
+                            [target.accountId]: template,
                           });
                           toast.success(`Saved for ${account?.platform}`);
                         }}

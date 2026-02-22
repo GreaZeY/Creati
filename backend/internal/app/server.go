@@ -112,11 +112,13 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	approvalService := services.NewApprovalService(db)
 	teamService := services.NewTeamService(db)
 	reportingService := services.NewReportingService(db, analyticsService)
-	agencyHandler := api.NewAgencyHandler(db, intakeService, approvalService, teamService, reportingService)
+	brandIdentityService := services.NewBrandIdentityService(db)
+	agencyHandler := api.NewAgencyHandler(db, intakeService, approvalService, teamService, reportingService, brandIdentityService)
 	aiHandler := api.NewAiHandler(db, chatService)
 	postRepo := repositories.NewPostRepository(db)
 	postService := services.NewPostService(postRepo)
 	postsHandler := api.NewPostsHandler(postService, storageService, queueService, db)
+	publicAnalyticsHandler := api.NewPublicAnalyticsHandler(db, analyticsService)
 	proxyHandler := api.NewProxyHandler(db, mediaService)
 	// audienceHandler := api.NewAudienceHandler(db)
 
@@ -137,6 +139,8 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	apiRoutes.Post("/auth/google", authHandler.GoogleLogin)
 	apiRoutes.Post("/platforms/:platform/callback", platformHandler.HandleCallback)
 	apiRoutes.Get("/proxy/video", proxyHandler.HandleProxyVideo)
+
+	apiRoutes.Get("/pub/analytics/:clientId", publicAnalyticsHandler.GetPublicReport)
 
 	// Public Agency/Client Portals
 	apiRoutes.Get("/agency/intake/:token", agencyHandler.GetClientPublicContext)
@@ -180,6 +184,10 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	agencyRoutes.Get("/calendar", postsHandler.GetGlobalCalendar)
 	agencyRoutes.Put("/calendar/batch", postsHandler.BatchUpdateStatus)
 
+	agencyRoutes.Get("/clients/:id/identity", agencyHandler.GetClientIdentity)
+	agencyRoutes.Put("/clients/:id/identity", agencyHandler.UpdateClientIdentity)
+	agencyRoutes.Post("/clients/:id/identity/generate", agencyHandler.GenerateClientIdentity)
+
 	protected.Get("/realtime/blasts", func(c *fiber.Ctx) error {
 		userID := middleware.GetUserID(c)
 		return realtimeService.HandleConnection(c, userID)
@@ -197,6 +205,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	protected.Get("/videos/:id/status", videosHandler.GetVideoStatus)
 	protected.Get("/videos/:id/analytics", videosHandler.GetVideoAnalytics)
 	protected.Get("/analytics/overview", analyticsHandler.GetOverview)
+	protected.Get("/analytics/evergreen", analyticsHandler.GetEvergreenSuggestions)
 	protected.Get("/events", webhookHandler.ListEvents)
 	protected.Get("/events/:id", webhookHandler.GetEvent)
 	protected.Post("/events/:id/replay", webhookHandler.ReplayEvent)

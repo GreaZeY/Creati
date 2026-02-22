@@ -105,6 +105,9 @@ const ContentApproval = lazy(() =>
 const Calendar = lazy(() =>
   import("./pages/Calendar").then((m) => ({ default: m.Calendar })),
 );
+const SharedReport = lazy(() =>
+  import("./pages/SharedReport").then((m) => ({ default: m.SharedReport })),
+);
 
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PublicRoute } from "./components/PublicRoute";
@@ -229,6 +232,14 @@ const router = createBrowserRouter([
         element: (
           <PageTransition>
             <ContentApproval />
+          </PageTransition>
+        ),
+      },
+      {
+        path: "shared/:clientId",
+        element: (
+          <PageTransition>
+            <SharedReport />
           </PageTransition>
         ),
       },

@@ -1,10 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Sparkles, Target, Flag, ShieldAlert, Save } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { useClient } from "@/context/ClientContext";
 import { toast } from "@/lib/events";
+import { agencyAPI } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import { Link2 } from "lucide-react";
+import { Modal } from "@/components/ui/Modal";
 
 export const IdentityManager = () => {
   const { selectedClient } = useClient();
@@ -12,14 +16,37 @@ export const IdentityManager = () => {
   const [audience, setAudience] = useState("");
   const [keywords, setKeywords] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [url, setUrl] = useState("");
 
-  // In a real app, we'd fetch these from the client object
-  // For now, we'll simulate local state for the demo
+  const { data: identity } = useQuery({
+    queryKey: ["client-identity", selectedClient?.id],
+    queryFn: async () => {
+      const resp = await agencyAPI.getIdentity(selectedClient!.id);
+      return resp.data.data;
+    },
+    enabled: !!selectedClient,
+  });
+
+  // Sync state with fetched data
+  useEffect(() => {
+    if (identity) {
+      setVoice(identity.brandVoice || "");
+      setAudience(identity.targetAudience || "");
+      setKeywords(identity.avoidKeywords || "");
+    }
+  }, [identity]);
+
   const handleSave = async () => {
+    if (!selectedClient) return;
     setIsSaving(true);
     try {
-      // Simulate API call to update client metadata
-      await new Promise((r) => setTimeout(r, 1000));
+      await agencyAPI.updateIdentity(selectedClient.id, {
+        brandVoice: voice,
+        targetAudience: audience,
+        avoidKeywords: keywords,
+      });
       toast.success(
         "Brand identity updated! AI will now generate content with this context.",
       );
@@ -27,6 +54,24 @@ export const IdentityManager = () => {
       toast.error("Failed to save identity");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!selectedClient || !url) return;
+    setIsGenerating(true);
+    try {
+      const resp = await agencyAPI.generateIdentity(selectedClient.id, url);
+      const data = resp.data.data;
+      setVoice(data.brandVoice);
+      setAudience(data.targetAudience);
+      setKeywords(data.avoidKeywords);
+      setIsModalOpen(false);
+      toast.success("Identity generated from website!");
+    } catch (err) {
+      toast.error("Failed to generate identity. Use a valid URL.");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -53,21 +98,72 @@ export const IdentityManager = () => {
             Fine-tune how AI perceives and speaks for {selectedClient.name}.
           </p>
         </div>
-        <Button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="gap-2 rounded-xl h-10 px-6 font-bold uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20"
-        >
-          {isSaving ? (
-            "Syncing..."
-          ) : (
-            <>
-              <Save size={14} />
-              Save Identity
-            </>
-          )}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsModalOpen(true)}
+            className="gap-2 rounded-xl h-10 px-4 font-bold border-primary/20 text-primary hover:bg-primary/5 uppercase tracking-widest text-[10px]"
+          >
+            <Sparkles size={14} />
+            Auto-Generate
+          </Button>
+          <Button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="gap-2 rounded-xl h-10 px-6 font-bold uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20"
+          >
+            {isSaving ? (
+              "Syncing..."
+            ) : (
+              <>
+                <Save size={14} />
+                Save Identity
+              </>
+            )}
+          </Button>
+        </div>
       </div>
+
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="AI Persona Extractor"
+      >
+        <div className="p-8 space-y-6 max-w-md">
+          <div className="w-16 h-16 rounded-[2rem] bg-neon-purple/20 flex items-center justify-center text-neon-purple border border-neon-purple/30 shadow-glow-purple mx-auto">
+            <Link2 size={32} />
+          </div>
+          <div className="text-center space-y-2">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white uppercase italic tracking-tight">
+              Instant Brand Voice
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-muted-foreground">
+              Paste your client's website URL and we'll use AI to extract their
+              brand persona, values, and audience.
+            </p>
+          </div>
+          <div className="space-y-4">
+            <input
+              type="url"
+              placeholder="https://client-website.com"
+              className="w-full bg-slate-50 dark:bg-black/40 border border-slate-100 dark:border-white/5 rounded-2xl p-4 text-sm focus:ring-2 ring-primary/40 outline-none transition-all"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+            <Button
+              onClick={handleGenerate}
+              isLoading={isGenerating}
+              disabled={!url || isGenerating}
+              className="w-full h-12 rounded-xl font-bold uppercase tracking-widest text-[10px]"
+            >
+              {isGenerating ? "Analyzing Brand..." : "Generate Persona"}
+            </Button>
+          </div>
+          <p className="text-[10px] text-center font-black uppercase tracking-[0.2em] text-slate-400 dark:text-muted-foreground/40 pt-4 border-t border-slate-100 dark:border-white/5">
+            Powered by Deep Content Analysis
+          </p>
+        </div>
+      </Modal>
 
       <div className="grid grid-cols-1 gap-4">
         <IdentityCard
