@@ -124,7 +124,8 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	evergreenWorker := workers.NewEvergreenWorker(recyclingService, 6*time.Hour)
 	evergreenHandler := api.NewEvergreenHandler(db)
 	invoiceHandler := api.NewInvoiceHandler(db)
-	aiHandler := api.NewAiHandler(db, chatService)
+	aiService := services.NewAIService()
+	aiHandler := api.NewAiHandler(db, chatService, aiService)
 	postRepo := repositories.NewPostRepository(db)
 	postService := services.NewPostService(postRepo)
 	postsHandler := api.NewPostsHandler(postService, storageService, queueService, db)
@@ -183,6 +184,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	// Agency Routes
 	agencyRoutes := protected.Group("/agency")
 	agencyRoutes.Get("/clients", agencyHandler.ListClients)
+	agencyRoutes.Get("/clients/:id", agencyHandler.GetClient)
 	agencyRoutes.Post("/clients", agencyHandler.CreateClient)
 	agencyRoutes.Put("/clients/reorder", agencyHandler.ReorderClients)
 	agencyRoutes.Put("/clients/commit", agencyHandler.BatchUpdateClients)
@@ -285,6 +287,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	aiRoutes.Post("/generate", aiHandler.GeneratePost)
 	aiRoutes.Post("/rewrite", aiHandler.RewritePost)
 	aiRoutes.Post("/chat", aiHandler.Chat)
+	aiRoutes.Post("/creative-lab/generate", aiHandler.GenerateCreative)
 
 	// Posts & Media
 	protected.Post("/media/upload", postsHandler.UploadMedia)

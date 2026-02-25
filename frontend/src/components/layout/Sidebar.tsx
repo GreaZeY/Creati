@@ -13,6 +13,7 @@ import {
   Video,
   User as UserIcon,
   FileText,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { label: "Automations", icon: Zap, href: "/automations" },
   { label: "Post", icon: MessageSquare, href: "/create/post" },
   { label: "Push Video", icon: Video, href: "/push" },
+  { label: "Creative Lab", icon: Sparkles, href: "/creative-lab" },
   { label: "Queue", icon: List, href: "/queued" },
   { label: "Calendar", icon: CalendarIcon, href: "/calendar" },
   { label: "Platforms", icon: Link2, href: "/platforms" },

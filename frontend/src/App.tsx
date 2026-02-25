@@ -111,6 +111,9 @@ const SharedReport = lazy(() =>
 const Invoices = lazy(() =>
   import("./pages/Invoices").then((m) => ({ default: m.Invoices })),
 );
+const CreativeLab = lazy(() =>
+  import("./pages/CreativeLab").then((m) => ({ default: m.CreativeLab })),
+);
 
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PublicRoute } from "./components/PublicRoute";
@@ -304,6 +307,14 @@ const router = createBrowserRouter([
             element: (
               <PageTransition>
                 <Invoices />
+              </PageTransition>
+            ),
+          },
+          {
+            path: "creative-lab",
+            element: (
+              <PageTransition>
+                <CreativeLab />
               </PageTransition>
             ),
           },

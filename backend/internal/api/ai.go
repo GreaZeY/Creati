@@ -13,12 +13,14 @@ import (
 type AiHandler struct {
 	db          *sql.DB
 	chatService *services.ChatService
+	aiService   *services.AIService
 }
 
-func NewAiHandler(db *sql.DB, chatService *services.ChatService) *AiHandler {
+func NewAiHandler(db *sql.DB, chatService *services.ChatService, aiService *services.AIService) *AiHandler {
 	return &AiHandler{
 		db:          db,
 		chatService: chatService,
+		aiService:   aiService,
 	}
 }
 
@@ -90,25 +92,31 @@ func (h *AiHandler) GeneratePost(c *fiber.Ctx) error {
 	}
 
 	// 2. Fetch Brand Voice Context
-	brandVoiceContext := ""
+	var brandVoice, targetAudience string
 	if req.ClientID != nil {
 		var bv, ta sql.NullString
 		err := h.db.QueryRow("SELECT brand_voice, target_audience FROM clients WHERE id = $1", *req.ClientID).Scan(&bv, &ta)
 		if err == nil {
-			if bv.Valid && bv.String != "" {
-				brandVoiceContext = fmt.Sprintf(" [Brand Voice: %s]", bv.String)
+			if bv.Valid {
+				brandVoice = bv.String
 			}
-			if ta.Valid && ta.String != "" {
-				brandVoiceContext += fmt.Sprintf(" [Target Audience: %s]", ta.String)
+			if ta.Valid {
+				targetAudience = ta.String
 			}
 		}
 	}
 
-	// 3. Mock AI generation
-	mockResponse := fmt.Sprintf("AI Post for %s%s in %s tone: Check out our new announcement about %s! #%s #vision", req.Platform, brandVoiceContext, req.Tone, req.Topic, req.Goal)
+	// 3. Real AI generation
+	prompt := fmt.Sprintf("Topic: %s\nTone: %s\nGoal: %s\nPlatform: %s", req.Topic, req.Tone, req.Goal, req.Platform)
+	response, err := h.aiService.GenerateCreative(c.Context(), prompt, brandVoice, targetAudience, "")
+	if err != nil {
+		// Refund credit on failure
+		h.db.Exec("UPDATE users SET ai_credits = ai_credits + 1 WHERE id = $1", userID)
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "AI generation failed", err)
+	}
 
 	return utils.SuccessResponse(c, fiber.Map{
-		"text":             mockResponse,
+		"text":             response,
 		"creditsRemaining": credits - 1,
 	}, "Post generated successfully")
 }
@@ -163,11 +171,16 @@ func (h *AiHandler) RewritePost(c *fiber.Ctx) error {
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to commit transaction", err)
 	}
 
-	// 2. Mock AI rewrite
-	mockResponse := fmt.Sprintf("[%s Optimized] %s (Tone: %s)", req.Platform, req.OriginalText, req.Tone)
+	// 2. Real AI rewrite
+	prompt := fmt.Sprintf("Rewrite the following text for %s with a %s tone:\n\n%s", req.Platform, req.Tone, req.OriginalText)
+	response, err := h.aiService.GenerateCreative(c.Context(), prompt, "", "", "")
+	if err != nil {
+		h.db.Exec("UPDATE users SET ai_credits = ai_credits + 1 WHERE id = $1", userID)
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "AI rewrite failed", err)
+	}
 
 	return utils.SuccessResponse(c, fiber.Map{
-		"text":             mockResponse,
+		"text":             response,
 		"creditsRemaining": credits - 1,
 	}, "Post rewritten for "+req.Platform)
 }
@@ -195,4 +208,32 @@ func (h *AiHandler) Chat(c *fiber.Ctx) error {
 	}
 
 	return utils.SuccessResponse(c, result, "")
+}
+
+// GenerateCreative handles the /creative-lab/generate endpoint
+func (h *AiHandler) GenerateCreative(c *fiber.Ctx) error {
+	var req struct {
+		Prompt         string `json:"prompt"`
+		BrandVoice     string `json:"brandVoice"`
+		TargetAudience string `json:"targetAudience"`
+		Constraints    string `json:"constraints"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid request body")
+	}
+
+	if req.Prompt == "" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "prompt is required")
+	}
+
+	// Generate 3 variations using the new AIService
+	result, err := h.aiService.GenerateCreative(c.Context(), req.Prompt, req.BrandVoice, req.TargetAudience, req.Constraints)
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "ai generation failed", err)
+	}
+
+	return utils.SuccessResponse(c, fiber.Map{
+		"output": result,
+	}, "Variations generated successfully")
 }

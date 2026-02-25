@@ -53,7 +53,8 @@ func (h *AgencyHandler) ListClients(c *fiber.Ctx) error {
 	// Using the schema: User -> TeamMember -> Org -> Client
 
 	query := `
-		SELECT c.id, c.name, c.color, COALESCE(c.logo_url, '') as logo_url, c.created_at, o.name as org_name
+		SELECT c.id, c.name, c.color, COALESCE(c.logo_url, '') as logo_url, c.created_at, o.name as org_name,
+		       COALESCE(c.brand_voice, '') as brand_voice, COALESCE(c.target_audience, '') as target_audience, COALESCE(c.avoid_keywords, '') as avoid_keywords
 		FROM clients c
 		JOIN organizations o ON c.org_id = o.id
 		JOIN team_members tm ON o.id = tm.org_id
@@ -68,18 +69,21 @@ func (h *AgencyHandler) ListClients(c *fiber.Ctx) error {
 	defer rows.Close()
 
 	type ClientResponse struct {
-		ID        int       `json:"id"`
-		Name      string    `json:"name"`
-		Color     string    `json:"color"`
-		LogoURL   string    `json:"logoUrl"`
-		OrgName   string    `json:"orgName"`
-		CreatedAt time.Time `json:"createdAt"`
+		ID             int       `json:"id"`
+		Name           string    `json:"name"`
+		Color          string    `json:"color"`
+		LogoURL        string    `json:"logoUrl"`
+		OrgName        string    `json:"orgName"`
+		BrandVoice     string    `json:"brandVoice"`
+		TargetAudience string    `json:"targetAudience"`
+		AvoidKeywords  string    `json:"avoidKeywords"`
+		CreatedAt      time.Time `json:"createdAt"`
 	}
 
 	clients := make([]ClientResponse, 0)
 	for rows.Next() {
 		var c ClientResponse
-		if err := rows.Scan(&c.ID, &c.Name, &c.Color, &c.LogoURL, &c.CreatedAt, &c.OrgName); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Color, &c.LogoURL, &c.CreatedAt, &c.OrgName, &c.BrandVoice, &c.TargetAudience, &c.AvoidKeywords); err != nil {
 			continue
 		}
 		clients = append(clients, c)
@@ -190,14 +194,53 @@ func (h *AgencyHandler) CreateClient(c *fiber.Ctx) error {
 	return utils.SuccessResponse(c, fiber.Map{"id": clientID, "orgId": orgID}, "Client workspace created")
 }
 
+// GetClient returns a specific client workspace
+func (h *AgencyHandler) GetClient(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	clientID := c.Params("id")
+
+	var response struct {
+		ID             int       `json:"id"`
+		Name           string    `json:"name"`
+		Color          string    `json:"color"`
+		LogoURL        string    `json:"logoUrl"`
+		OrgName        string    `json:"orgName"`
+		BrandVoice     string    `json:"brandVoice"`
+		TargetAudience string    `json:"targetAudience"`
+		AvoidKeywords  string    `json:"avoidKeywords"`
+		CreatedAt      time.Time `json:"createdAt"`
+	}
+
+	err := h.db.QueryRow(`
+		SELECT c.id, c.name, c.color, COALESCE(c.logo_url, '') as logo_url, c.created_at, o.name as org_name,
+		       COALESCE(c.brand_voice, '') as brand_voice, COALESCE(c.target_audience, '') as target_audience, COALESCE(c.avoid_keywords, '') as avoid_keywords
+		FROM clients c
+		JOIN organizations o ON c.org_id = o.id
+		JOIN team_members tm ON o.id = tm.org_id
+		WHERE c.id = $1 AND tm.user_id = $2 AND tm.status = 'active'
+	`, clientID, userID).Scan(
+		&response.ID, &response.Name, &response.Color, &response.LogoURL, &response.CreatedAt,
+		&response.OrgName, &response.BrandVoice, &response.TargetAudience, &response.AvoidKeywords,
+	)
+
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "client not found", err)
+	}
+
+	return utils.SuccessResponse(c, response, "")
+}
+
 // UpdateClient updates a client's name and/or color
 func (h *AgencyHandler) UpdateClient(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	clientID := c.Params("id")
 
 	var payload struct {
-		Name  string `json:"name"`
-		Color string `json:"color"`
+		Name           string `json:"name"`
+		Color          string `json:"color"`
+		BrandVoice     string `json:"brandVoice"`
+		TargetAudience string `json:"targetAudience"`
+		AvoidKeywords  string `json:"avoidKeywords"`
 	}
 
 	if err := c.BodyParser(&payload); err != nil {
@@ -232,6 +275,33 @@ func (h *AgencyHandler) UpdateClient(c *fiber.Ctx) error {
 	if payload.Color != "" {
 		updates = append(updates, fmt.Sprintf("color = $%d", argIdx))
 		args = append(args, payload.Color)
+		argIdx++
+	}
+	if payload.BrandVoice != "" {
+		updates = append(updates, fmt.Sprintf("brand_voice = $%d", argIdx))
+		args = append(args, payload.BrandVoice)
+		argIdx++
+	} else if c.Body() != nil && strings.Contains(string(c.Body()), `"brandVoice"`) {
+		updates = append(updates, fmt.Sprintf("brand_voice = $%d", argIdx))
+		args = append(args, nil)
+		argIdx++
+	}
+	if payload.TargetAudience != "" {
+		updates = append(updates, fmt.Sprintf("target_audience = $%d", argIdx))
+		args = append(args, payload.TargetAudience)
+		argIdx++
+	} else if c.Body() != nil && strings.Contains(string(c.Body()), `"targetAudience"`) {
+		updates = append(updates, fmt.Sprintf("target_audience = $%d", argIdx))
+		args = append(args, nil)
+		argIdx++
+	}
+	if payload.AvoidKeywords != "" {
+		updates = append(updates, fmt.Sprintf("avoid_keywords = $%d", argIdx))
+		args = append(args, payload.AvoidKeywords)
+		argIdx++
+	} else if c.Body() != nil && strings.Contains(string(c.Body()), `"avoidKeywords"`) {
+		updates = append(updates, fmt.Sprintf("avoid_keywords = $%d", argIdx))
+		args = append(args, nil)
 		argIdx++
 	}
 

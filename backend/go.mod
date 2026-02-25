@@ -14,6 +14,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/razorpay/razorpay-go v1.4.0
 	github.com/redis/go-redis/v9 v9.17.2
+	github.com/sashabaranov/go-openai v1.41.2
 	github.com/sirupsen/logrus v1.9.4
 	github.com/u2takey/ffmpeg-go v0.5.0
 	golang.org/x/crypto v0.33.0
