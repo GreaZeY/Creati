@@ -82,18 +82,21 @@ type PlatformAccount struct {
 
 // Video model
 type Video struct {
-	ID             int       `json:"id" db:"id"`
-	UserID         int       `json:"user_id" db:"user_id"`
-	ClientID       *int      `json:"client_id,omitempty" db:"client_id"` // Nullable for personal workspace
-	Title          string    `json:"title" db:"title"`
-	Description    string    `json:"description" db:"description"`
-	S3URL          string    `json:"s3_url" db:"s3_url"`
-	ThumbnailURL   string    `json:"thumbnail_url" db:"thumbnail_url"`
-	Duration       int       `json:"duration" db:"duration"`
-	Status         string    `json:"status" db:"status"`
-	PlatformID     string    `json:"platform_id,omitempty" db:"platform_id"`
-	SourcePlatform string    `json:"source_platform,omitempty" db:"source_platform"`
-	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+	ID             int             `json:"id" db:"id"`
+	UserID         int             `json:"user_id" db:"user_id"`
+	ClientID       *int            `json:"client_id,omitempty" db:"client_id"` // Nullable for personal workspace
+	Title          string          `json:"title" db:"title"`
+	Description    string          `json:"description" db:"description"`
+	S3URL          string          `json:"s3_url" db:"s3_url"`
+	ThumbnailURL   string          `json:"thumbnail_url" db:"thumbnail_url"`
+	Duration       int             `json:"duration" db:"duration"`
+	Status         string          `json:"status" db:"status"`
+	PlatformID     string          `json:"platform_id,omitempty" db:"platform_id"`
+	SourcePlatform string          `json:"source_platform,omitempty" db:"source_platform"`
+	ParentID       *int            `json:"parent_id,omitempty" db:"parent_id"`
+	IsShort        bool            `json:"is_short" db:"is_short"`
+	Transcript     json.RawMessage `json:"transcript,omitempty" db:"transcript"`
+	CreatedAt      time.Time       `json:"created_at" db:"created_at"`
 }
 
 // VideoPlatformJob model

@@ -42,8 +42,9 @@ func main() {
 
 	// 2. Initialize Throttler
 	throttleService := services.NewThrottleService(queueService.Client)
+	whatsappService := services.NewWhatsAppService()
 
-	if err := app.RunWorker(ctx, db, throttleService); err != nil {
+	if err := app.RunWorker(ctx, db, throttleService, whatsappService); err != nil {
 		logger.Get("worker").Fatal(err)
 	}
 }

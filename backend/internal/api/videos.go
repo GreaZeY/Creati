@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"encoding/json"
 	"strconv"
 	"time"
 
@@ -14,13 +15,47 @@ import (
 type VideosHandler struct {
 	db               *sql.DB
 	analyticsService *services.AnalyticsService
+	queueService     *services.QueueService
 }
 
-func NewVideosHandler(db *sql.DB, cache *services.CacheService) *VideosHandler {
+func NewVideosHandler(db *sql.DB, cache *services.CacheService, queue *services.QueueService) *VideosHandler {
 	return &VideosHandler{
 		db:               db,
 		analyticsService: services.NewAnalyticsService(db, cache),
+		queueService:     queue,
 	}
+}
+
+// TriggerShortsGeneration enqueues a job to generate AI shorts from a video
+func (h *VideosHandler) TriggerShortsGeneration(c *fiber.Ctx) error {
+	videoID, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "Invalid video ID")
+	}
+
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		return utils.ErrorResponse(c, fiber.StatusUnauthorized, "User not found")
+	}
+
+	// Verify ownership
+	var exists bool
+	err = h.db.QueryRow("SELECT EXISTS(SELECT 1 FROM videos WHERE id = $1 AND user_id = $2)", videoID, userID).Scan(&exists)
+	if err != nil || !exists {
+		return utils.ErrorResponse(c, fiber.StatusNotFound, "Video not found")
+	}
+
+	// Enqueue job
+	payload, _ := json.Marshal(map[string]interface{}{
+		"video_id": videoID,
+	})
+
+	err = h.queueService.Client.LPush(c.Context(), services.QueueShortsGeneration, payload).Err()
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to enqueued job", err)
+	}
+
+	return utils.SuccessResponse(c, nil, "Magic Shorts generation started!")
 }
 
 type VideoListItem struct {
@@ -30,6 +65,7 @@ type VideoListItem struct {
 	S3URL       string    `json:"s3URL"`
 	Status      string    `json:"status"`
 	CreatedAt   time.Time `json:"createdAt"`
+	IsShort     bool      `json:"isShort"`
 	JobStatus   string    `json:"jobStatus"` // Aggregated status: 'pending', 'processing', 'completed', 'failed'
 }
 
@@ -47,7 +83,7 @@ func (h *VideosHandler) ListVideos(c *fiber.Ctx) error {
 	}
 
 	query := `
-		SELECT v.id, v.title, v.description, v.s3_url, v.status, v.created_at,
+		SELECT v.id, v.title, v.description, v.s3_url, v.status, v.created_at, v.is_short,
 		       COALESCE(
 		           (SELECT CASE 
 		               WHEN EXISTS (SELECT 1 FROM video_platform_jobs WHERE video_id = v.id AND status = 'failed') THEN 'failed'
@@ -79,7 +115,7 @@ func (h *VideosHandler) ListVideos(c *fiber.Ctx) error {
 	videos := []VideoListItem{}
 	for rows.Next() {
 		var v VideoListItem
-		if err := rows.Scan(&v.ID, &v.Title, &v.Description, &v.S3URL, &v.Status, &v.CreatedAt, &v.JobStatus); err != nil {
+		if err := rows.Scan(&v.ID, &v.Title, &v.Description, &v.S3URL, &v.Status, &v.CreatedAt, &v.IsShort, &v.JobStatus); err != nil {
 			return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to parse videos", err)
 		}
 		videos = append(videos, v)

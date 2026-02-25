@@ -25,13 +25,14 @@ type UploadJob struct {
 }
 
 const (
-	QueueIngestion     = "ingestion_queue"
-	QueueOrchestration = "orchestration_queue"
-	QueueUpload        = "upload_queue"
-	QueuePostProcess   = "post_process_queue"
-	QueueNotification  = "notification_queue"
-	QueueUploadDLQ     = "upload_dlq"
-	QueueNotifyDLQ     = "notify_dlq"
+	QueueIngestion        = "ingestion_queue"
+	QueueOrchestration    = "orchestration_queue"
+	QueueUpload           = "upload_queue"
+	QueuePostProcess      = "post_process_queue"
+	QueueNotification     = "notification_queue"
+	QueueShortsGeneration = "shorts_generation_queue"
+	QueueUploadDLQ        = "upload_dlq"
+	QueueNotifyDLQ        = "notify_dlq"
 )
 
 func NewQueueService() (*QueueService, error) {

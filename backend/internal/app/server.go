@@ -106,7 +106,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	authHandler := api.NewAuthHandler(db)
 	platformHandler := api.NewPlatformHandler(db, cacheService, storageService)
 	uploadHandler := api.NewUploadHandler(storageService, queueService, db)
-	videosHandler := api.NewVideosHandler(db, cacheService)
+	videosHandler := api.NewVideosHandler(db, cacheService, queueService)
 	analyticsHandler := api.NewAnalyticsHandler(db, queueService, cacheService)
 	automationService := services.NewAutomationService(db, queueService)
 	automationHandler := api.NewAutomationHandler(db, automationService)
@@ -299,6 +299,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 
 	// Posts & Media
 	protected.Post("/media/upload", postsHandler.UploadMedia)
+	protected.Post("/videos/:id/shorts", videosHandler.TriggerShortsGeneration)
 	protected.Post("/posts", postsHandler.CreatePost)
 
 	// Graceful shutdown

@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { LensedCard } from "@/components/ui/LensedCard";
 import { StatusBadge } from "./StatusBadge";
-import { Calendar, ExternalLink, BarChart2 } from "lucide-react";
+import { Calendar, ExternalLink, BarChart2, Zap } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { VideoAnalytics } from "./VideoAnalytics";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { videosAPI } from "@/lib/api";
+import { toast } from "@/lib/events";
 
 interface VideoCardProps {
   video: {
@@ -16,11 +18,27 @@ interface VideoCardProps {
     status: string;
     createdAt: string;
     jobStatus: string;
+    isShort?: boolean;
   };
 }
 
 export const VideoCard = ({ video }: VideoCardProps) => {
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerateShorts = async () => {
+    setIsGenerating(true);
+    try {
+      await videosAPI.triggerShorts(video.id);
+      toast.success("Magic Shorts generation started! Check back soon.");
+    } catch (error) {
+      toast.error("Failed to start Magic Shorts generation.");
+      console.error(error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const date = new Date(video.createdAt).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -64,6 +82,20 @@ export const VideoCard = ({ video }: VideoCardProps) => {
         </div>
 
         <div className="flex items-center gap-3 pt-6 border-t border-border/50 dark:border-white/5">
+          {!video.isShort && (
+            <Button
+              variant="outline"
+              size="sm"
+              isLoading={isGenerating}
+              className="h-11 gap-2 rounded-2xl font-bold transition-all hover:bg-yellow-500/10 hover:text-yellow-500 text-[10px] uppercase tracking-widest border border-transparent hover:border-yellow-500/30"
+              onClick={handleGenerateShorts}
+              disabled={video.jobStatus !== "completed"}
+            >
+              <Zap className="w-4 h-4 fill-current" />
+              Magic Shorts
+            </Button>
+          )}
+
           <Button
             variant="ghost"
             size="sm"

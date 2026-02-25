@@ -40,6 +40,7 @@ func RunWorker(ctx context.Context, db *sql.DB, throttle *services.ThrottleServi
 	logger.Get("worker").Info("V2 Worker Pipeline starting...")
 
 	// 1. Initial	// Audience Service
+	aiService := services.NewAIService() // Added
 	audienceService := services.NewAudienceService(db, queueService)
 	mediaService := services.NewMediaService(db, storageService)
 
@@ -48,6 +49,7 @@ func RunWorker(ctx context.Context, db *sql.DB, throttle *services.ThrottleServi
 		workers.NewIngestionWorker(db, queueService),
 		workers.NewOrchestrationWorker(db, queueService, audienceService),
 		workers.NewUploadWorker(db, queueService, storageService, throttle, mediaService, whatsappSvc),
+		workers.NewShortsWorker(db, queueService, aiService, storageService), // Added
 		workers.NewPostProcessWorker(db, queueService),
 		workers.NewNotificationWorker(db, queueService),
 		workers.NewAudienceNotificationWorker(audienceService, db, queueService),

@@ -140,3 +140,56 @@ func (vp *VideoProcessor) GetDuration(inputPath string) (float64, error) {
 	_ = probe
 	return 0, nil
 }
+
+// VerticalCrop center-crops a horizontal video to 9:16 aspect ratio
+func (vp *VideoProcessor) VerticalCrop(ctx context.Context, inputPath string) (string, error) {
+	outputPath := inputPath + "_916.mp4"
+
+	// crop=ih*9/16:ih:(iw-ih*9/16)/2:0
+	// This takes the full height (ih) and crops width to 9/16 of it, centered.
+	cropFilter := "crop=ih*9/16:ih:(iw-ih*9/16)/2:0"
+
+	err := ffmpeg.Input(inputPath).
+		Filter("crop", ffmpeg.Args{cropFilter}).
+		Output(outputPath, ffmpeg.KwArgs{"c:a": "copy", "movflags": "+faststart"}).
+		OverWriteOutput().
+		Run()
+
+	if err != nil {
+		return "", fmt.Errorf("vertical crop failed: %w", err)
+	}
+
+	return outputPath, nil
+}
+
+// OverlaySubtitles burns stylized text into the video.
+// Usually we'd use .ass or .srt, but for automated shorts,
+// using drawtext per-segment is faster for small clips.
+func (vp *VideoProcessor) OverlaySubtitles(ctx context.Context, inputPath string, transcript string) (string, error) {
+	outputPath := inputPath + "_captioned.mp4"
+
+	// For a real app, we'd split transcript into timed segments.
+	fontPath := "C:/Windows/Fonts/arialbd.ttf" // Use Bold for shorts
+
+	err := ffmpeg.Input(inputPath).
+		Filter("drawtext", ffmpeg.Args{}, ffmpeg.KwArgs{
+			"text":       transcript,
+			"x":          "(w-text_w)/2",
+			"y":          "h*0.8",
+			"fontfile":   fontPath,
+			"fontsize":   "48",
+			"fontcolor":  "yellow", // TikTok style
+			"box":        "1",
+			"boxcolor":   "black@0.5",
+			"boxborderw": "5",
+		}).
+		Output(outputPath, ffmpeg.KwArgs{"c:a": "copy"}).
+		OverWriteOutput().
+		Run()
+
+	if err != nil {
+		return "", fmt.Errorf("subtitle overlay failed: %w", err)
+	}
+
+	return outputPath, nil
+}
