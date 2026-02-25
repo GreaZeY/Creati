@@ -165,67 +165,71 @@ func (r *RedditService) Upload(video *models.Video, accountID int) (string, erro
 
 	// Step 1: Initialize media asset
 	// Reddit requires videos to be uploaded to their S3 lease first.
-	assetURL := "https://oauth.reddit.com/api/media/asset.json"
-	assetData := url.Values{}
-	assetData.Set("filepath", "video.mp4")
-	assetData.Set("mimetype", "video/mp4")
-	assetData.Set("resettable", "true")
+	var assetID string
+	if video.S3URL != "" {
+		assetURL := "https://oauth.reddit.com/api/media/asset.json"
+		assetData := url.Values{}
+		assetData.Set("filepath", "video.mp4")
+		assetData.Set("mimetype", "video/mp4")
+		assetData.Set("resettable", "true")
 
-	assetReq, _ := http.NewRequest("POST", assetURL, strings.NewReader(assetData.Encode()))
-	assetReq.Header.Set("Authorization", "Bearer "+accessToken)
-	assetReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	assetReq.Header.Set("User-Agent", r.userAgent)
+		assetReq, _ := http.NewRequest("POST", assetURL, strings.NewReader(assetData.Encode()))
+		assetReq.Header.Set("Authorization", "Bearer "+accessToken)
+		assetReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		assetReq.Header.Set("User-Agent", r.userAgent)
 
-	assetResp, err := http.DefaultClient.Do(assetReq)
-	if err != nil {
-		return "", fmt.Errorf("failed to initialize reddit asset: %w", err)
-	}
-	defer assetResp.Body.Close()
+		assetResp, err := http.DefaultClient.Do(assetReq)
+		if err != nil {
+			return "", fmt.Errorf("failed to initialize reddit asset: %w", err)
+		}
+		defer assetResp.Body.Close()
 
-	var assetResult struct {
-		Args struct {
-			Action string `json:"action"`
-			Fields []struct {
-				Name  string `json:"name"`
-				Value string `json:"value"`
-			} `json:"fields"`
-		} `json:"args"`
-		AssetID string `json:"asset_id"`
-	}
+		var assetResult struct {
+			Args struct {
+				Action string `json:"action"`
+				Fields []struct {
+					Name  string `json:"name"`
+					Value string `json:"value"`
+				} `json:"fields"`
+			} `json:"args"`
+			AssetID string `json:"asset_id"`
+		}
 
-	if err := json.NewDecoder(assetResp.Body).Decode(&assetResult); err != nil {
-		return "", fmt.Errorf("failed to parse reddit asset lease: %w", err)
-	}
+		if err := json.NewDecoder(assetResp.Body).Decode(&assetResult); err != nil {
+			return "", fmt.Errorf("failed to parse reddit asset lease: %w", err)
+		}
+		assetID = assetResult.AssetID
 
-	// Step 2: Download video from S3 and upload to Reddit's S3
-	tmpFile, err := utils.DownloadToTempFile(video.S3URL)
-	if err != nil {
-		return "", fmt.Errorf("failed to download video to temp file: %w", err)
-	}
-	defer func() {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
-	}()
+		// Step 2: Download video from S3 and upload to Reddit's S3
+		tmpFile, err := utils.DownloadToTempFile(video.S3URL)
+		if err != nil {
+			return "", fmt.Errorf("failed to download video to temp file: %w", err)
+		}
+		defer func() {
+			tmpFile.Close()
+			os.Remove(tmpFile.Name())
+		}()
 
-	body := &bytes.Buffer{}
-	writer := multipart.NewWriter(body)
-	for _, field := range assetResult.Args.Fields {
-		_ = writer.WriteField(field.Name, field.Value)
-	}
-	part, err := writer.CreateFormFile("file", "video.mp4")
-	if err != nil {
-		return "", err
-	}
-	_, _ = io.Copy(part, tmpFile)
-	_ = writer.Close()
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		for _, field := range assetResult.Args.Fields {
+			_ = writer.WriteField(field.Name, field.Value)
+		}
+		part, err := writer.CreateFormFile("file", "video.mp4")
+		if err != nil {
+			return "", err
+		}
+		_, _ = io.Copy(part, tmpFile)
+		_ = writer.Close()
 
-	uploadReq, _ := http.NewRequest("POST", "https:"+assetResult.Args.Action, body)
-	uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
-	uploadResp, err := http.DefaultClient.Do(uploadReq)
-	if err != nil {
-		return "", fmt.Errorf("failed to upload video to reddit s3: %w", err)
+		uploadReq, _ := http.NewRequest("POST", "https:"+assetResult.Args.Action, body)
+		uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
+		uploadResp, err := http.DefaultClient.Do(uploadReq)
+		if err != nil {
+			return "", fmt.Errorf("failed to upload video to reddit s3: %w", err)
+		}
+		uploadResp.Body.Close()
 	}
-	uploadResp.Body.Close()
 
 	// Step 3: Submit the video post
 	var handle string
@@ -238,11 +242,17 @@ func (r *RedditService) Upload(video *models.Video, accountID int) (string, erro
 	submitURL := "https://oauth.reddit.com/api/submit"
 	submitData := url.Values{}
 	submitData.Set("sr", subreddit)
-	submitData.Set("kind", "video")
 	submitData.Set("title", video.Title)
-	submitData.Set("video_poster_url", "") // models.Video has no thumbnail field yet
-	submitData.Set("video_asset_id", assetResult.AssetID)
 	submitData.Set("resubmit", "true")
+
+	if assetID != "" {
+		submitData.Set("kind", "video")
+		submitData.Set("video_poster_url", "") // models.Video has no thumbnail field yet
+		submitData.Set("video_asset_id", assetID)
+	} else {
+		submitData.Set("kind", "self")
+		submitData.Set("text", video.Description)
+	}
 
 	req, _ := http.NewRequest("POST", submitURL, strings.NewReader(submitData.Encode()))
 	req.Header.Set("Authorization", "Bearer "+accessToken)

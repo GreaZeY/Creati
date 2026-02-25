@@ -133,18 +133,17 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 			WHERE content_id = $1 AND platform = 'creati'
 		`, job.ContentID).Scan(&sourceS3URL)
 
-		if err != nil {
-			if err == sql.ErrNoRows {
-				return w.fail(ctx, job, payload, fmt.Errorf("content source not found"))
-			}
+		if err != nil && err != sql.ErrNoRows {
 			return w.fail(ctx, job, payload, err)
 		}
-		sourceKey = sourceS3URL.String
-		finalS3URL = w.Storage.GetObjectURL(sourceKey)
+		if err == nil && sourceS3URL.Valid && sourceS3URL.String != "" {
+			sourceKey = sourceS3URL.String
+			finalS3URL = w.Storage.GetObjectURL(sourceKey)
+		}
 	}
 
 	// 4. Processing Phase
-	if settings != nil {
+	if settings != nil && finalS3URL != "" {
 		w.DB.ExecContext(ctx, "UPDATE automation_executions SET status = 'processing' WHERE id = $1", job.ExecutionID)
 		// Download source to temp
 		stream, err := w.Storage.GetStream(ctx, sourceKey)

@@ -161,109 +161,114 @@ func (l *LinkedInService) Upload(video *models.Video, accountID int) (string, er
 		return "", fmt.Errorf("failed to decrypt access token: %w", err)
 	}
 
-	// Step 1: Register video upload
-	registerURL := "https://api.linkedin.com/v2/videos?action=initializeUpload"
-	registerBody := map[string]interface{}{
-		"initializeUploadRequest": map[string]interface{}{
-			"owner":           fmt.Sprintf("urn:li:person:%s", profileID),
-			"fileSizeBytes":   0, // Will be determined during upload
-			"uploadCaptions":  false,
-			"uploadThumbnail": false,
-		},
-	}
-
-	bodyBytes, _ := json.Marshal(registerBody)
-	req, err := http.NewRequest("POST", registerURL, bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Restli-Protocol-Version", "2.0.0")
-
 	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to register upload: %w", err)
-	}
-	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	var registerResult struct {
-		Value struct {
-			UploadInstructions []struct {
-				UploadURL string `json:"uploadUrl"`
-			} `json:"uploadInstructions"`
-			Video string `json:"video"`
-		} `json:"value"`
-	}
+	// Only upload if video exists
+	var videoURN string
+	if video.S3URL != "" {
+		// Step 1: Register video upload
+		registerURL := "https://api.linkedin.com/v2/videos?action=initializeUpload"
+		registerBody := map[string]interface{}{
+			"initializeUploadRequest": map[string]interface{}{
+				"owner":           fmt.Sprintf("urn:li:person:%s", profileID),
+				"fileSizeBytes":   0, // Will be determined during upload
+				"uploadCaptions":  false,
+				"uploadThumbnail": false,
+			},
+		}
 
-	if err := json.Unmarshal(body, &registerResult); err != nil {
-		return "", fmt.Errorf("failed to parse register response: %w", err)
-	}
-
-	videoURN := registerResult.Value.Video
-
-	// Step 2: Download video to temp file and upload to LinkedIn
-	tmpFile, err := utils.DownloadToTempFile(video.S3URL)
-	if err != nil {
-		return "", fmt.Errorf("failed to download video to temp file: %w", err)
-	}
-	defer func() {
-		tmpFile.Close()
-		os.Remove(tmpFile.Name())
-	}()
-
-	if len(registerResult.Value.UploadInstructions) > 0 {
-		uploadURL := registerResult.Value.UploadInstructions[0].UploadURL
-		uploadReq, err := http.NewRequest("PUT", uploadURL, tmpFile)
+		bodyBytes, _ := json.Marshal(registerBody)
+		req, err := http.NewRequest("POST", registerURL, bytes.NewBuffer(bodyBytes))
 		if err != nil {
 			return "", err
 		}
-		uploadReq.Header.Set("Content-Type", "application/octet-stream")
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Restli-Protocol-Version", "2.0.0")
 
-		uploadResp, err := client.Do(uploadReq)
+		resp, err := client.Do(req)
 		if err != nil {
-			return "", fmt.Errorf("failed to upload video: %w", err)
+			return "", fmt.Errorf("failed to register upload: %w", err)
 		}
-		uploadResp.Body.Close()
+		defer resp.Body.Close()
 
-		// Step 2.5: Poll for video processing status
-		// LinkedIn videos must be 'AVAILABLE' before they can be used in a post.
-		maxRetries := 30 // 5 minutes (30 * 10s)
-		pollURL := fmt.Sprintf("https://api.linkedin.com/v2/videos/%s", videoURN)
+		body, _ := io.ReadAll(resp.Body)
+		var registerResult struct {
+			Value struct {
+				UploadInstructions []struct {
+					UploadURL string `json:"uploadUrl"`
+				} `json:"uploadInstructions"`
+				Video string `json:"video"`
+			} `json:"value"`
+		}
 
-		for i := 0; i < maxRetries; i++ {
-			time.Sleep(10 * time.Second)
+		if err := json.Unmarshal(body, &registerResult); err != nil {
+			return "", fmt.Errorf("failed to parse register response: %w", err)
+		}
 
-			pollReq, _ := http.NewRequest("GET", pollURL, nil)
-			pollReq.Header.Set("Authorization", "Bearer "+accessToken)
-			pollReq.Header.Set("X-Restli-Protocol-Version", "2.0.0")
+		videoURN := registerResult.Value.Video
 
-			pollResp, err := client.Do(pollReq)
+		// Step 2: Download video to temp file and upload to LinkedIn
+		tmpFile, err := utils.DownloadToTempFile(video.S3URL)
+		if err != nil {
+			return "", fmt.Errorf("failed to download video to temp file: %w", err)
+		}
+		defer func() {
+			tmpFile.Close()
+			os.Remove(tmpFile.Name())
+		}()
+
+		if len(registerResult.Value.UploadInstructions) > 0 {
+			uploadURL := registerResult.Value.UploadInstructions[0].UploadURL
+			uploadReq, err := http.NewRequest("PUT", uploadURL, tmpFile)
 			if err != nil {
-				continue
+				return "", err
 			}
+			uploadReq.Header.Set("Content-Type", "application/octet-stream")
 
-			var pollResult struct {
-				Status string `json:"status"`
-			}
-			err = json.NewDecoder(pollResp.Body).Decode(&pollResult)
-			pollResp.Body.Close()
+			uploadResp, err := client.Do(uploadReq)
 			if err != nil {
-				continue
+				return "", fmt.Errorf("failed to upload video: %w", err)
 			}
+			uploadResp.Body.Close()
 
-			if pollResult.Status == "AVAILABLE" {
-				break
-			}
+			// Step 2.5: Poll for video processing status
+			// LinkedIn videos must be 'AVAILABLE' before they can be used in a post.
+			maxRetries := 30 // 5 minutes (30 * 10s)
+			pollURL := fmt.Sprintf("https://api.linkedin.com/v2/videos/%s", videoURN)
 
-			if pollResult.Status == "FAILED" {
-				return "", fmt.Errorf("linkedin video processing failed")
-			}
+			for i := 0; i < maxRetries; i++ {
+				time.Sleep(10 * time.Second)
 
-			if i == maxRetries-1 {
-				return "", fmt.Errorf("linkedin video processing timed out after 5 minutes")
+				pollReq, _ := http.NewRequest("GET", pollURL, nil)
+				pollReq.Header.Set("Authorization", "Bearer "+accessToken)
+				pollReq.Header.Set("X-Restli-Protocol-Version", "2.0.0")
+
+				pollResp, err := client.Do(pollReq)
+				if err != nil {
+					continue
+				}
+
+				var pollResult struct {
+					Status string `json:"status"`
+				}
+				err = json.NewDecoder(pollResp.Body).Decode(&pollResult)
+				pollResp.Body.Close()
+				if err != nil {
+					continue
+				}
+
+				if pollResult.Status == "AVAILABLE" {
+					break
+				}
+
+				if pollResult.Status == "FAILED" {
+					return "", fmt.Errorf("linkedin video processing failed")
+				}
+
+				if i == maxRetries-1 {
+					return "", fmt.Errorf("linkedin video processing timed out after 5 minutes")
+				}
 			}
 		}
 	}
@@ -279,14 +284,17 @@ func (l *LinkedInService) Upload(video *models.Video, accountID int) (string, er
 			"targetEntities":                 []interface{}{},
 			"thirdPartyDistributionChannels": []interface{}{},
 		},
-		"content": map[string]interface{}{
+		"lifecycleState":            "PUBLISHED",
+		"isReshareDisabledByAuthor": false,
+	}
+
+	if videoURN != "" {
+		postBody["content"] = map[string]interface{}{
 			"media": map[string]interface{}{
 				"title": video.Title,
 				"id":    videoURN,
 			},
-		},
-		"lifecycleState":            "PUBLISHED",
-		"isReshareDisabledByAuthor": false,
+		}
 	}
 
 	postBytes, _ := json.Marshal(postBody)

@@ -178,19 +178,25 @@ func (t *TwitterService) Upload(video *models.Video, accountID int) (string, err
 		return "", fmt.Errorf("failed to decrypt access token: %w", err)
 	}
 
-	// Step 1: Initialize media upload
-	mediaID, err := t.uploadMedia(accessToken, video)
-	if err != nil {
-		return "", fmt.Errorf("media upload failed: %w", err)
+	// Step 1: Initialize media upload (if video attached)
+	var mediaID string
+	if video.S3URL != "" {
+		mediaID, err = t.uploadMedia(accessToken, video)
+		if err != nil {
+			return "", fmt.Errorf("media upload failed: %w", err)
+		}
 	}
 
 	// Step 2: Create tweet with media
 	tweetURL := "https://api.twitter.com/2/tweets"
 	tweetBody := map[string]interface{}{
 		"text": fmt.Sprintf("%s\n\n%s", video.Title, video.Description),
-		"media": map[string]interface{}{
+	}
+
+	if mediaID != "" {
+		tweetBody["media"] = map[string]interface{}{
 			"media_ids": []string{mediaID},
-		},
+		}
 	}
 
 	bodyBytes, _ := json.Marshal(tweetBody)
