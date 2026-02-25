@@ -27,14 +27,16 @@ type CreatorPreferences struct {
 
 // Organization model (Agency)
 type Organization struct {
-	ID           int       `json:"id" db:"id"`
-	Name         string    `json:"name" db:"name"`
-	LogoURL      string    `json:"logo_url" db:"logo_url"`
-	PrimaryColor string    `json:"primary_color" db:"primary_color"`
-	Subdomain    *string   `json:"subdomain" db:"subdomain"`
-	CustomDomain *string   `json:"custom_domain" db:"custom_domain"`
-	OwnerID      int       `json:"owner_id" db:"owner_id"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+	ID               int       `json:"id" db:"id"`
+	Name             string    `json:"name" db:"name"`
+	LogoURL          string    `json:"logo_url" db:"logo_url"`
+	PrimaryColor     string    `json:"primary_color" db:"primary_color"`
+	Subdomain        *string   `json:"subdomain" db:"subdomain"`
+	CustomDomain     *string   `json:"custom_domain" db:"custom_domain"`
+	OwnerID          int       `json:"owner_id" db:"owner_id"`
+	StorageUsedBytes int64     `json:"storageUsedBytes" db:"storage_used_bytes"`
+	StorageQuotaGB   int       `json:"storageQuotaGB" db:"storage_quota_gb"`
+	CreatedAt        time.Time `json:"created_at" db:"created_at"`
 }
 
 // Client model (Workspace)
@@ -47,6 +49,8 @@ type Client struct {
 	BrandVoice     string    `json:"brand_voice" db:"brand_voice"`
 	TargetAudience string    `json:"target_audience" db:"target_audience"`
 	AvoidKeywords  string    `json:"avoid_keywords" db:"avoid_keywords"`
+	DropToken      string    `json:"dropToken" db:"drop_token"`
+	DropEnabled    bool      `json:"dropEnabled" db:"drop_enabled"`
 	UserID         int       `json:"user_id" db:"user_id"`
 	CreatedAt      time.Time `json:"created_at" db:"created_at"`
 }
@@ -95,6 +99,8 @@ type Video struct {
 	SourcePlatform string          `json:"source_platform,omitempty" db:"source_platform"`
 	ParentID       *int            `json:"parent_id,omitempty" db:"parent_id"`
 	IsShort        bool            `json:"is_short" db:"is_short"`
+	IsGuest        bool            `json:"isGuest" db:"is_guest"`
+	SizeBytes      int64           `json:"sizeBytes" db:"size_bytes"`
 	Transcript     json.RawMessage `json:"transcript,omitempty" db:"transcript"`
 	CreatedAt      time.Time       `json:"created_at" db:"created_at"`
 }
@@ -231,4 +237,14 @@ type TopVideo struct {
 	Likes          int64  `json:"likes"`
 	Comments       int64  `json:"comments"`
 	SourcePlatform string `json:"sourcePlatform"`
+}
+
+// OrganizationStorageConfig represents BYO storage settings
+type OrganizationStorageConfig struct {
+	ID           int             `json:"id" db:"id"`
+	OrgID        int             `json:"orgId" db:"org_id"`
+	ProviderType string          `json:"providerType" db:"provider_type"` // 's3_custom', 'gdrive', 'dropbox'
+	Credentials  json.RawMessage `json:"credentials" db:"credentials"`    // Encrypted
+	IsActive     bool            `json:"isActive" db:"is_active"`
+	CreatedAt    time.Time       `json:"createdAt" db:"created_at"`
 }

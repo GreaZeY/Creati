@@ -119,6 +119,9 @@ const Invoices = lazy(() =>
 const CreativeLab = lazy(() =>
   import("./pages/CreativeLab").then((m) => ({ default: m.CreativeLab })),
 );
+const AssetDrop = lazy(() =>
+  import("./pages/AssetDrop").then((m) => ({ default: m.AssetDrop })),
+);
 
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { PublicRoute } from "./components/PublicRoute";
@@ -251,6 +254,14 @@ const router = createBrowserRouter([
         element: (
           <PageTransition>
             <SharedReport />
+          </PageTransition>
+        ),
+      },
+      {
+        path: "drop/:token",
+        element: (
+          <PageTransition>
+            <AssetDrop />
           </PageTransition>
         ),
       },

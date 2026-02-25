@@ -21,10 +21,12 @@ import (
 
 func RunServer(ctx context.Context, db *sql.DB) error {
 	// Initialize services
-	storageService, err := services.NewStorageService()
+	storageService, err := services.NewStorageService(db)
 	if err != nil {
 		logger.Get("server").WithError(err).Warn("Storage service failed to initialize")
 	}
+
+	storageUsageService := services.NewStorageUsageService(db)
 
 	queueService, err := services.NewQueueService()
 	if err != nil {
@@ -105,7 +107,8 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	// Initialize handlers
 	authHandler := api.NewAuthHandler(db)
 	platformHandler := api.NewPlatformHandler(db, cacheService, storageService)
-	uploadHandler := api.NewUploadHandler(storageService, queueService, db)
+	uploadHandler := api.NewUploadHandler(storageService, storageUsageService, queueService, db)
+	assetDropHandler := api.NewAssetDropHandler(db, storageService, storageUsageService)
 	videosHandler := api.NewVideosHandler(db, cacheService, queueService)
 	analyticsHandler := api.NewAnalyticsHandler(db, queueService, cacheService)
 	automationService := services.NewAutomationService(db, queueService)
@@ -168,6 +171,11 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	apiRoutes.Post("/agency/approval/:token", agencyHandler.SubmitApprovalDecision)
 	apiRoutes.Get("/pub/videos/approval/:token/comments", agencyHandler.GetPublicComments)
 	apiRoutes.Post("/pub/videos/approval/:token/comments", agencyHandler.AddPublicComment)
+
+	// Content Queue (Guest Assets)
+	apiRoutes.Get("/drop/:token", assetDropHandler.GetDropContext)
+	apiRoutes.Post("/drop/:token/init", assetDropHandler.InitDropUpload)
+	apiRoutes.Post("/drop/:token/confirm", assetDropHandler.ConfirmDropUpload)
 
 	webhooks := app.Group("/webhooks")
 	webhooks.Get("/youtube", webhookHandler.YouTubeWebhookVerification)

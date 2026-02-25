@@ -14,13 +14,15 @@ import (
 
 type UploadHandler struct {
 	Storage *services.StorageService
+	Usage   *services.StorageUsageService
 	Queue   *services.QueueService
 	db      *sql.DB
 }
 
-func NewUploadHandler(s *services.StorageService, q *services.QueueService, db *sql.DB) *UploadHandler {
+func NewUploadHandler(s *services.StorageService, u *services.StorageUsageService, q *services.QueueService, db *sql.DB) *UploadHandler {
 	return &UploadHandler{
 		Storage: s,
+		Usage:   u,
 		Queue:   q,
 		db:      db,
 	}
@@ -45,6 +47,15 @@ func (h *UploadHandler) InitUpload(c *fiber.Ctx) error {
 
 	// Generate unique key: uploads/{user_id}/{timestamp}_{filename}
 	key := fmt.Sprintf("uploads/%d/%d_%s", userID, time.Now().Unix(), req.Filename)
+
+	// Quota Check (Skip if org has BYO, or check bypass)
+	var orgID int
+	err := h.db.QueryRow("SELECT organization_id FROM user_organizations WHERE user_id = $1 AND role = 'owner' LIMIT 1", userID).Scan(&orgID)
+	if err == nil {
+		if err := h.Usage.CheckQuota(c.Context(), orgID, req.Size); err != nil {
+			return utils.ErrorResponse(c, fiber.StatusForbidden, err.Error())
+		}
+	}
 
 	// Generate presigned URL
 	if h.Storage == nil {

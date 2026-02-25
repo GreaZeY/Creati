@@ -49,6 +49,7 @@ interface SortableItemProps {
   onDelete: (id: number) => void;
   onColorChange: (id: number, color: string) => void;
   onToggleSharing: (id: number, enabled: boolean) => void;
+  onToggleDrop: (id: number, enabled: boolean) => void;
 }
 
 const SortableWorkspaceItem = ({
@@ -57,6 +58,7 @@ const SortableWorkspaceItem = ({
   onDelete,
   onColorChange,
   onToggleSharing,
+  onToggleDrop,
 }: SortableItemProps) => {
   const {
     attributes,
@@ -368,6 +370,74 @@ const SortableWorkspaceItem = ({
                   </p>
                 </div>
               )}
+
+              <hr className="border-white/5 mx-2" />
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <h5 className="text-[10px] font-black uppercase tracking-widest">
+                    The Content Queue
+                  </h5>
+                  <p className="text-[9px] text-muted-foreground font-bold uppercase">
+                    Accept guest assets via portal
+                  </p>
+                </div>
+                <button
+                  onClick={() => onToggleDrop(client.id, !client.dropEnabled)}
+                  className={cn(
+                    "w-10 h-5 rounded-full transition-all relative p-1 ring-1 ring-inset",
+                    client.dropEnabled
+                      ? "bg-primary ring-primary"
+                      : "bg-muted ring-border",
+                  )}
+                >
+                  <motion.div
+                    animate={{ x: client.dropEnabled ? 20 : 0 }}
+                    className="w-3 h-3 bg-white rounded-full shadow-lg"
+                  />
+                </button>
+              </div>
+
+              {client.dropEnabled && client.dropToken && (
+                <div className="space-y-2">
+                  <div className="p-2 bg-black/20 rounded-xl border border-white/5 flex items-center gap-2">
+                    <Input
+                      readOnly
+                      value={`${window.location.origin}/drop/${client.dropToken}`}
+                      className="h-8 py-0 bg-transparent border-0 text-[10px] font-bold text-muted-foreground focus-visible:ring-0"
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 shrink-0"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `${window.location.origin}/drop/${client.dropToken}`,
+                        );
+                        toast.success("Ingest link copied");
+                      }}
+                    >
+                      <Copy className="w-3 h-3" />
+                    </Button>
+                    <a
+                      href={`/drop/${client.dropToken}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 shrink-0"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </Button>
+                    </a>
+                  </div>
+                  <p className="text-[8px] font-bold text-primary/60 uppercase text-center italic">
+                    Clients can upload raw media directly to this workspace.
+                  </p>
+                </div>
+              )}
             </Card>
           </motion.div>
         )}
@@ -452,6 +522,12 @@ export const WorkspaceManager = () => {
   const handleToggleSharing = (id: number, enabled: boolean) => {
     setDraftWorkspaces((prev) =>
       prev.map((w) => (w.id === id ? { ...w, shareEnabled: enabled } : w)),
+    );
+  };
+
+  const handleToggleDrop = (id: number, enabled: boolean) => {
+    setDraftWorkspaces((prev) =>
+      prev.map((w) => (w.id === id ? { ...w, dropEnabled: enabled } : w)),
     );
   };
 
@@ -660,6 +736,7 @@ export const WorkspaceManager = () => {
                       onDelete={handleDelete}
                       onColorChange={handleColorChange}
                       onToggleSharing={handleToggleSharing}
+                      onToggleDrop={handleToggleDrop}
                     />
                   ))}
                   {draftWorkspaces.length === 0 && (

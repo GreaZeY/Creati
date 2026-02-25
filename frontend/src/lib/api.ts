@@ -60,6 +60,8 @@ export interface Client {
   avoidKeywords?: string;
   shareToken?: string;
   shareEnabled?: boolean;
+  dropToken?: string;
+  dropEnabled?: boolean;
   createdAt: string;
 }
 
@@ -353,7 +355,7 @@ export const agencyAPI = {
   listClients: () => api.get<ApiResponse<Client[]>>('/agency/clients'),
   getClient: (id: number) => api.get<ApiResponse<Client>>(`/agency/clients/${id}`),
   createClient: (name: string, color?: string) => api.post('/agency/clients', { name, color }),
-  updateClient: (id: number, data: { name?: string; color?: string; brandVoice?: string; targetAudience?: string; avoidKeywords?: string }) =>
+  updateClient: (id: number, data: { name?: string; color?: string; brandVoice?: string; targetAudience?: string; avoidKeywords?: string; shareEnabled?: boolean; dropEnabled?: boolean }) =>
     api.put(`/agency/clients/${id}`, data),
   deleteClient: (id: number) => api.delete(`/agency/clients/${id}`),
   reorderClients: (order: number[]) => api.put('/agency/clients/reorder', { order }),
