@@ -61,6 +61,11 @@ const IdentityManager = lazy(() =>
     default: m.IdentityManager,
   })),
 );
+const NotificationManager = lazy(() =>
+  import("./components/settings/NotificationManager").then((m) => ({
+    default: m.NotificationManager,
+  })),
+);
 const Upload = lazy(() =>
   import("./pages/Upload").then((m) => ({ default: m.Upload })),
 );
@@ -330,6 +335,7 @@ const router = createBrowserRouter([
               { path: "profile", element: <ProfileManager /> },
               { path: "workspaces", element: <WorkspaceManager /> },
               { path: "identity", element: <IdentityManager /> },
+              { path: "notifications", element: <NotificationManager /> },
               { path: "*", element: <SettingsSectionPlaceholder /> },
             ],
           },

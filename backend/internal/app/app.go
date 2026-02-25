@@ -58,8 +58,9 @@ func Run(cfg Config) error {
 			}
 			// Throttle service primarily uses the queue client for global rate limiting
 			throttle := services.NewThrottleService(queueService.Client)
+			whatsappSvc := services.NewWhatsAppService()
 
-			return RunWorker(ctx, db, throttle)
+			return RunWorker(ctx, db, throttle, whatsappSvc)
 		})
 	}
 

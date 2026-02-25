@@ -26,7 +26,7 @@ func getMaxRetries() int {
 	return retries
 }
 
-func RunWorker(ctx context.Context, db *sql.DB, throttle *services.ThrottleService) error {
+func RunWorker(ctx context.Context, db *sql.DB, throttle *services.ThrottleService, whatsappSvc *services.WhatsAppService) error {
 	queueService, err := services.NewQueueService()
 	if err != nil {
 		return err
@@ -47,7 +47,7 @@ func RunWorker(ctx context.Context, db *sql.DB, throttle *services.ThrottleServi
 	pipeline := []workers.Worker{
 		workers.NewIngestionWorker(db, queueService),
 		workers.NewOrchestrationWorker(db, queueService, audienceService),
-		workers.NewUploadWorker(db, queueService, storageService, throttle, mediaService),
+		workers.NewUploadWorker(db, queueService, storageService, throttle, mediaService, whatsappSvc),
 		workers.NewPostProcessWorker(db, queueService),
 		workers.NewNotificationWorker(db, queueService),
 		workers.NewAudienceNotificationWorker(audienceService, db, queueService),

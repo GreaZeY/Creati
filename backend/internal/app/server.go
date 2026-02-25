@@ -31,6 +31,8 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 		logger.Get("server").WithError(err).Warn("Queue service failed to initialize")
 	}
 
+	whatsappService := services.NewWhatsAppService()
+
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
 		DisableStartupMessage: true,
@@ -109,7 +111,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	automationService := services.NewAutomationService(db, queueService)
 	automationHandler := api.NewAutomationHandler(db, automationService)
 	paymentHandler := api.NewPaymentHandler(db)
-	webhookHandler := api.NewWebhookHandler(db)
+	webhookHandler := api.NewWebhookHandler(db, whatsappService, queueService)
 	analyticsService := services.NewAnalyticsService(db, cacheService)
 	intakeService := services.NewIntakeService(db)
 	approvalService := services.NewApprovalService(db)
@@ -172,6 +174,8 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	webhooks.Post("/youtube", webhookHandler.YouTubeWebhookNotification)
 	webhooks.Post("/razorpay", paymentHandler.HandleWebhook)
 	webhooks.Post("/razorpay-invoice", invoiceHandler.HandlePaymentLinkWebhook)
+	webhooks.Get("/whatsapp", webhookHandler.WhatsAppWebhookVerification)
+	webhooks.Post("/whatsapp", webhookHandler.WhatsAppWebhook)
 
 	protected := apiRoutes.Use(middleware.AuthMiddleware)
 
@@ -213,6 +217,10 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	agencyRoutes.Post("/clients/:id/identity/generate", agencyHandler.GenerateClientIdentity)
 	agencyRoutes.Get("/videos/:id/comments", agencyHandler.GetVideoComments)
 	agencyRoutes.Post("/videos/:id/comments", agencyHandler.AddVideoComment)
+
+	// WhatsApp Alerts Settings
+	agencyRoutes.Get("/settings/whatsapp-alerts", agencyHandler.GetWhatsAppAlerts)
+	agencyRoutes.Put("/settings/whatsapp-alerts", agencyHandler.UpdateWhatsAppAlerts)
 
 	// Notifications
 	notifications := protected.Group("/notifications")

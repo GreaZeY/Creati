@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -924,4 +925,59 @@ func (h *AgencyHandler) TriggerWeeklyRoundup(c *fiber.Ctx) error {
 	}
 
 	return utils.SuccessResponse(c, nil, "Weekly impact snapshots dispatched successfully")
+}
+
+// GetWhatsAppAlerts returns the organization's WhatsApp alert configuration
+func (h *AgencyHandler) GetWhatsAppAlerts(c *fiber.Ctx) error {
+	orgID := middleware.GetOrgID(c)
+	if orgID == nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no active organization context")
+	}
+
+	var alertJSON []byte
+	err := h.db.QueryRowContext(c.Context(), `
+		SELECT whatsapp_alert_numbers FROM organizations WHERE id = $1
+	`, *orgID).Scan(&alertJSON)
+
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to fetch alerts", err)
+	}
+
+	var phones []services.AlertPhone
+	if len(alertJSON) > 0 {
+		_ = json.Unmarshal(alertJSON, &phones)
+	}
+
+	return utils.SuccessResponse(c, phones, "")
+}
+
+// UpdateWhatsAppAlerts updates the organization's WhatsApp alert configuration
+func (h *AgencyHandler) UpdateWhatsAppAlerts(c *fiber.Ctx) error {
+	orgID := middleware.GetOrgID(c)
+	if orgID == nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "no active organization context")
+	}
+
+	var phones []services.AlertPhone
+	if err := c.BodyParser(&phones); err != nil {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid payload", err)
+	}
+
+	// Validate phones (simple check)
+	for _, p := range phones {
+		if p.Phone == "" {
+			return utils.ErrorResponse(c, fiber.StatusBadRequest, "phone number is required for all alerts", nil)
+		}
+	}
+
+	phonesJSON, _ := json.Marshal(phones)
+	_, err := h.db.ExecContext(c.Context(), `
+		UPDATE organizations SET whatsapp_alert_numbers = $1 WHERE id = $2
+	`, phonesJSON, *orgID)
+
+	if err != nil {
+		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "failed to update alerts", err)
+	}
+
+	return utils.SuccessResponse(c, phones, "WhatsApp alert contacts updated successfully")
 }

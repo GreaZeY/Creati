@@ -31,19 +31,21 @@ const (
 
 type UploadWorker struct {
 	BaseWorker
-	DB       *sql.DB
-	Storage  *services.StorageService
-	Throttle *services.ThrottleService
-	MediaSvc *services.MediaService
+	DB          *sql.DB
+	Storage     *services.StorageService
+	Throttle    *services.ThrottleService
+	MediaSvc    *services.MediaService
+	WhatsAppSvc *services.WhatsAppService
 }
 
-func NewUploadWorker(db *sql.DB, queueSvc *services.QueueService, storage *services.StorageService, throttle *services.ThrottleService, mediaSvc *services.MediaService) *UploadWorker {
+func NewUploadWorker(db *sql.DB, queueSvc *services.QueueService, storage *services.StorageService, throttle *services.ThrottleService, mediaSvc *services.MediaService, whatsappSvc *services.WhatsAppService) *UploadWorker {
 	return &UploadWorker{
-		BaseWorker: BaseWorker{QueueSvc: queueSvc},
-		DB:         db,
-		Storage:    storage,
-		Throttle:   throttle,
-		MediaSvc:   mediaSvc,
+		BaseWorker:  BaseWorker{QueueSvc: queueSvc},
+		DB:          db,
+		Storage:     storage,
+		Throttle:    throttle,
+		MediaSvc:    mediaSvc,
+		WhatsAppSvc: whatsappSvc,
 	}
 }
 
@@ -280,8 +282,40 @@ func (w *UploadWorker) fail(ctx context.Context, job UploadJob, payload []byte, 
 	logger.Get("worker").WithError(err).Error("Upload worker failed")
 
 	// Update DB
-	w.DB.ExecContext(ctx, "UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", err.Error(), job.ExecutionID)
+	_, _ = w.DB.ExecContext(ctx, "UPDATE automation_executions SET status = 'failed', error = $1 WHERE id = $2", err.Error(), job.ExecutionID)
 
 	// Send to DLQ
-	return w.SendToDLQ(ctx, services.QueueUploadDLQ, payload, err)
+	_ = w.SendToDLQ(ctx, services.QueueUploadDLQ, payload, err)
+
+	// Send WhatsApp Alert
+	if w.WhatsAppSvc != nil {
+		go func() {
+			// Fetch alert numbers
+			var alertJSON []byte
+			err := w.DB.QueryRowContext(context.Background(), `
+				SELECT o.whatsapp_alert_numbers 
+				FROM automation_executions e
+				JOIN automation_rules r ON e.rule_id = r.id
+				JOIN clients cl ON r.client_id = cl.id
+				JOIN organizations o ON cl.org_id = o.id
+				WHERE e.id = $1
+			`, job.ExecutionID).Scan(&alertJSON)
+
+			if err != nil {
+				logger.Get("whatsapp").WithError(err).Warn("Failed to fetch alert numbers for execution")
+				return
+			}
+
+			var phones []services.AlertPhone
+			if err := json.Unmarshal(alertJSON, &phones); err != nil {
+				return
+			}
+
+			if len(phones) > 0 {
+				_ = w.WhatsAppSvc.SendFailureAlert(context.Background(), phones, job.ExecutionID, job.TargetPlatform, err.Error())
+			}
+		}()
+	}
+
+	return err
 }

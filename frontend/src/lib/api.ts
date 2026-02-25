@@ -43,6 +43,11 @@ export interface ApiResponse<T = any> {
   error?: string;
 }
 
+export interface AlertPhone {
+  label: string;
+  phone: string;
+}
+
 export interface Client {
   id: number;
   name: string;
@@ -329,6 +334,8 @@ export const agencyAPI = {
   getComments: (videoId: number) => api.get<ApiResponse<any[]>>(`/agency/videos/${videoId}/comments`),
   addComment: (videoId: number, content: string, isInternal: boolean) => api.post(`/agency/videos/${videoId}/comments`, { content, isInternal }),
   search: (query: string) => api.get<ApiResponse<any[]>>(`/agency/search?q=${query}`),
+  getWhatsAppAlerts: () => api.get<ApiResponse<AlertPhone[]>>('/agency/settings/whatsapp-alerts'),
+  updateWhatsAppAlerts: (phones: AlertPhone[]) => api.put<ApiResponse<AlertPhone[]>>('/agency/settings/whatsapp-alerts', phones),
 };
 
 export const publicAPI = {

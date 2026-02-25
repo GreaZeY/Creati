@@ -1,13 +1,18 @@
 package api
 
 import (
+	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"os"
+	"time"
 
 	"creati.in/creati/backend/internal/events"
 	"creati.in/creati/backend/internal/middleware"
+	"creati.in/creati/backend/internal/services"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 )
@@ -19,14 +24,18 @@ import (
  */
 
 type WebhookHandler struct {
-	db         *sql.DB
-	eventStore *events.Store
+	db          *sql.DB
+	eventStore  *events.Store
+	WhatsAppSvc *services.WhatsAppService
+	QueueSvc    *services.QueueService
 }
 
-func NewWebhookHandler(db *sql.DB) *WebhookHandler {
+func NewWebhookHandler(db *sql.DB, whatsappSvc *services.WhatsAppService, queueSvc *services.QueueService) *WebhookHandler {
 	return &WebhookHandler{
-		db:         db,
-		eventStore: events.NewStore(db),
+		db:          db,
+		eventStore:  events.NewStore(db),
+		WhatsAppSvc: whatsappSvc,
+		QueueSvc:    queueSvc,
 	}
 }
 
@@ -322,4 +331,96 @@ func (h *WebhookHandler) SimulateEvent(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
 		"data": event,
 	})
+}
+
+// ====== WHATSAPP HANDLERS ======
+
+// WhatsAppWebhookVerification handles Meta's webhook verification challenge (GET)
+func (h *WebhookHandler) WhatsAppWebhookVerification(c *fiber.Ctx) error {
+	mode := c.Query("hub.mode")
+	token := c.Query("hub.verify_token")
+	challenge := c.Query("hub.challenge")
+
+	if mode == "subscribe" && token == os.Getenv("WHATSAPP_VERIFY_TOKEN") {
+		return c.SendString(challenge)
+	}
+
+	return c.SendStatus(fiber.StatusForbidden)
+}
+
+// WhatsAppWebhook handles incoming WhatsApp messages and interactive replies (POST)
+func (h *WebhookHandler) WhatsAppWebhook(c *fiber.Ctx) error {
+	var body struct {
+		Entry []struct {
+			Changes []struct {
+				Value struct {
+					Messages []struct {
+						Type        string `json:"type"`
+						Interactive struct {
+							ButtonReply struct {
+								ID string `json:"id"`
+							} `json:"button_reply"`
+						} `json:"interactive"`
+					} `json:"messages"`
+				} `json:"value"`
+			} `json:"changes"`
+		} `json:"entry"`
+	}
+
+	if err := c.BodyParser(&body); err != nil {
+		return c.SendStatus(fiber.StatusOK)
+	}
+
+	for _, entry := range body.Entry {
+		for _, change := range entry.Changes {
+			for _, msg := range change.Value.Messages {
+				if msg.Type == "interactive" && msg.Interactive.ButtonReply.ID != "" {
+					h.handleRetryReply(c.Context(), msg.Interactive.ButtonReply.ID)
+				}
+			}
+		}
+	}
+
+	return c.SendStatus(fiber.StatusOK)
+}
+
+func (h *WebhookHandler) handleRetryReply(ctx context.Context, token string) {
+	if h.WhatsAppSvc == nil || h.QueueSvc == nil {
+		return
+	}
+
+	executionID, valid := h.WhatsAppSvc.VerifyRetryToken(token)
+	if !valid {
+		log.Printf("Invalid WhatsApp retry token: %s", token)
+		return
+	}
+
+	// Fetch execution details for re-queueing
+	var contentID, targetPlatform string
+	var accountID int
+	err := h.db.QueryRowContext(ctx, `
+		SELECT content_id, target_platform, target_account_id 
+		FROM automation_executions 
+		WHERE id = $1
+	`, executionID).Scan(&contentID, &targetPlatform, &accountID)
+
+	if err != nil {
+		log.Printf("Failed to fetch execution for retry: %v", err)
+		return
+	}
+
+	// Update status to re-queued
+	_, _ = h.db.ExecContext(ctx, "UPDATE automation_executions SET status = 'queued', error = NULL WHERE id = $1", executionID)
+
+	// Re-enqueue
+	payload, _ := json.Marshal(map[string]interface{}{
+		"content_id":      contentID,
+		"target_platform": targetPlatform,
+		"account_id":      accountID,
+		"execution_id":    executionID,
+		"enqueued_at":     time.Now(),
+	})
+
+	_ = h.QueueSvc.Client.LPush(ctx, services.QueueUpload, payload).Err()
+	log.Printf("WhatsApp Remote Retry Triggered: %s", executionID)
 }
