@@ -217,3 +217,15 @@ type VideoComment struct {
 	IsInternal bool      `json:"isInternal" db:"is_internal"` // Comments only visible to agency team
 	CreatedAt  time.Time `json:"createdAt" db:"created_at"`
 }
+
+// TopVideo represents a high-performing video for reporting
+type TopVideo struct {
+	ID             int    `json:"id"`
+	Title          string `json:"title"`
+	ThumbnailURL   string `json:"thumbnailUrl"`
+	Platform       string `json:"platform"`
+	Views          int64  `json:"views"`
+	Likes          int64  `json:"likes"`
+	Comments       int64  `json:"comments"`
+	SourcePlatform string `json:"sourcePlatform"`
+}

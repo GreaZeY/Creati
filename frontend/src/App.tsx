@@ -247,7 +247,7 @@ const router = createBrowserRouter([
         ),
       },
       {
-        path: "shared/:clientId",
+        path: "report/:token",
         element: (
           <PageTransition>
             <SharedReport />

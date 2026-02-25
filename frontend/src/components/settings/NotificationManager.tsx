@@ -7,7 +7,6 @@ import { agencyAPI } from "@/lib/api";
 import type { AlertPhone } from "@/lib/api";
 import { toast } from "@/lib/events";
 import {
-  Bell,
   Plus,
   Trash2,
   Info,

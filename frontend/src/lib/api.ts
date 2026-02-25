@@ -58,7 +58,20 @@ export interface Client {
   brandVoice?: string;
   targetAudience?: string;
   avoidKeywords?: string;
+  shareToken?: string;
+  shareEnabled?: boolean;
   createdAt: string;
+}
+
+export interface TopVideo {
+  id: number;
+  title: string;
+  thumbnailUrl: string;
+  platform: string;
+  views: number;
+  likes: number;
+  comments: number;
+  sourcePlatform: string;
 }
 
 export interface User {
@@ -254,6 +267,29 @@ export const analyticsAPI = {
     return api.get(url);
   },
 };
+
+export interface PublicReportData {
+  clientName: string;
+  logoUrl: string;
+  brandColor: string;
+  metrics: {
+    totalVideos: number;
+    totalViews: number;
+    totalLikes: number;
+    totalComments: number;
+    totalShares: number;
+    platformBreakdown: Array<{
+      platform: string;
+      views: number;
+    }>;
+    pulseData: Array<{
+      name: string;
+      reach: number;
+      engagement: number;
+    }>;
+    topVideos: TopVideo[];
+  };
+}
 export const automationAPI = {
   list: (clientId?: number) =>
     api.get<ApiResponse<any[]>>(
@@ -339,6 +375,7 @@ export const agencyAPI = {
 };
 
 export const publicAPI = {
+  getReport: (token: string) => api.get<ApiResponse<PublicReportData>>(`/pub/reports/${token}`),
   getBranding: () => api.get<ApiResponse<any>>('/pub/branding'),
   getComments: (token: string) => api.get<ApiResponse<any[]>>(`/pub/videos/approval/${token}/comments`),
   addComment: (token: string, content: string) => api.post(`/pub/videos/approval/${token}/comments`, { content }),

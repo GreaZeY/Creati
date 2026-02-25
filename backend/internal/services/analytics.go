@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"creati.in/creati/backend/internal/db/models"
 	"creati.in/creati/backend/internal/logger"
 	"github.com/sirupsen/logrus"
 )
@@ -29,14 +30,15 @@ type PlatformStat struct {
 
 // UserStats represents aggregated user metrics
 type UserStats struct {
-	TotalVideos       int            `json:"totalVideos"`
-	TotalViews        int64          `json:"totalViews"`
-	TotalLikes        int64          `json:"totalLikes"`
-	TotalComments     int64          `json:"totalComments"`
-	TotalShares       int64          `json:"totalShares"`
-	PlatformBreakdown []PlatformStat `json:"platformBreakdown"`
-	ProjectedRevenue  float64        `json:"projectedRevenue"`
-	PulseData         []PulsePoint   `json:"pulseData"`
+	TotalVideos       int               `json:"totalVideos"`
+	TotalViews        int64             `json:"totalViews"`
+	TotalLikes        int64             `json:"totalLikes"`
+	TotalComments     int64             `json:"totalComments"`
+	TotalShares       int64             `json:"totalShares"`
+	PlatformBreakdown []PlatformStat    `json:"platformBreakdown"`
+	ProjectedRevenue  float64           `json:"projectedRevenue"`
+	PulseData         []PulsePoint      `json:"pulseData"`
+	TopVideos         []models.TopVideo `json:"topVideos"`
 }
 
 type PulsePoint struct {
@@ -61,10 +63,10 @@ func (s *AnalyticsService) GetClientMetrics(ctx context.Context, clientID int) (
 	stats := &UserStats{
 		PlatformBreakdown: []PlatformStat{},
 		PulseData:         []PulsePoint{},
+		TopVideos:         []models.TopVideo{},
 	}
 
-	// 1. Get owner ID for this client to reuse logic if needed, or query directly
-	// For purity, we query by client_id strictly
+	// 1. Get core aggregates
 	query := "SELECT total_videos, total_views, total_likes, total_comments, total_shares FROM vw_user_stats WHERE client_id = $1"
 	err := s.db.QueryRowContext(ctx, query, clientID).Scan(
 		&stats.TotalVideos, &stats.TotalViews, &stats.TotalLikes, &stats.TotalComments, &stats.TotalShares,
@@ -81,6 +83,7 @@ func (s *AnalyticsService) GetClientMetrics(ctx context.Context, clientID int) (
 			SELECT DISTINCT ON (video_id, account_id) platform, views
 			FROM video_analytics
 			WHERE video_id IN (SELECT id FROM videos WHERE client_id = $1)
+			ORDER BY video_id, account_id, fetched_at DESC
 		) t GROUP BY platform
 	`
 	rows, err := s.db.QueryContext(ctx, pbQuery, clientID)
@@ -94,6 +97,32 @@ func (s *AnalyticsService) GetClientMetrics(ctx context.Context, clientID int) (
 		}
 	}
 
+	// 3. Pulse Data (last 30 days for reporting)
+	pulse, err := s.GetGrowthPulse(0, &clientID) // Pass 0 as userID since we filter by clientID
+	if err == nil {
+		stats.PulseData = pulse
+	}
+
+	// 4. Top Videos
+	rows, err = s.db.QueryContext(ctx, `
+		SELECT 
+			v.id, v.title, v.thumbnail_url, va.platform, va.views, va.likes, va.comments, v.source_platform
+		FROM video_analytics va
+		JOIN videos v ON va.video_id = v.id
+		WHERE v.client_id = $1
+		ORDER BY va.views DESC
+		LIMIT 5
+	`, clientID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var v models.TopVideo
+			if err := rows.Scan(&v.ID, &v.Title, &v.ThumbnailURL, &v.Platform, &v.Views, &v.Likes, &v.Comments, &v.SourcePlatform); err == nil {
+				stats.TopVideos = append(stats.TopVideos, v)
+			}
+		}
+	}
+
 	return stats, nil
 }
 
@@ -102,6 +131,7 @@ func (s *AnalyticsService) GetUserStats(userID int, clientID *int) (*UserStats, 
 	stats := &UserStats{
 		PlatformBreakdown: []PlatformStat{},
 		PulseData:         []PulsePoint{},
+		TopVideos:         []models.TopVideo{},
 	}
 
 	// 1. Core aggregates
@@ -174,6 +204,7 @@ func (s *AnalyticsService) GetOrgStats(userID int) (*UserStats, error) {
 	stats := &UserStats{
 		PlatformBreakdown: []PlatformStat{},
 		PulseData:         []PulsePoint{},
+		TopVideos:         []models.TopVideo{},
 	}
 
 	// 1. Core aggregates across all clients the user has access to

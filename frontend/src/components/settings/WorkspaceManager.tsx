@@ -30,6 +30,9 @@ import {
   Mail,
   Shield,
   UserPlus,
+  Share2,
+  ExternalLink,
+  Copy,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -45,6 +48,7 @@ interface SortableItemProps {
   onRename: (id: number, newName: string) => void;
   onDelete: (id: number) => void;
   onColorChange: (id: number, color: string) => void;
+  onToggleSharing: (id: number, enabled: boolean) => void;
 }
 
 const SortableWorkspaceItem = ({
@@ -52,6 +56,7 @@ const SortableWorkspaceItem = ({
   onRename,
   onDelete,
   onColorChange,
+  onToggleSharing,
 }: SortableItemProps) => {
   const {
     attributes,
@@ -66,7 +71,10 @@ const SortableWorkspaceItem = ({
   const [editName, setEditName] = useState(client.name);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [localColor, setLocalColor] = useState(client.color || "#000000");
+  const [showSharing, setShowSharing] = useState(false);
+  const [copied, setCopied] = useState(false);
   const confirmRef = useRef<HTMLDivElement>(null);
+  const shareRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (showDeleteConfirm) {
@@ -79,6 +87,18 @@ const SortableWorkspaceItem = ({
       return () => clearTimeout(timer);
     }
   }, [showDeleteConfirm]);
+
+  useEffect(() => {
+    if (showSharing) {
+      const timer = setTimeout(() => {
+        shareRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [showSharing]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -143,47 +163,63 @@ const SortableWorkspaceItem = ({
           </div>
         </div>
 
-        <div className="flex-1 min-w-0">
-          {isEditing ? (
-            <div className="flex items-center gap-1.5">
-              <Input
-                autoFocus
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSave()}
-                className="h-6 py-0 text-xs font-bold bg-muted/50 border-0 ring-1 ring-primary/30"
-              />
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6 shrink-0"
-                onClick={handleSave}
-              >
-                <Check className="w-3 h-3 text-emerald-500" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6 shrink-0"
-                onClick={() => {
-                  setIsEditing(false);
-                  setEditName(client.name);
-                }}
-              >
-                <X className="w-3 h-3 text-destructive" />
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 overflow-hidden">
-              <h4 className="font-bold text-xs truncate">{client.name}</h4>
-              <button
-                onClick={() => setIsEditing(true)}
-                className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-muted rounded transition-all"
-              >
-                <Pencil className="w-3 h-3 text-muted-foreground" />
-              </button>
-            </div>
-          )}
+        <div className="flex-1 min-w-0 flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            {isEditing ? (
+              <div className="flex items-center gap-1.5">
+                <Input
+                  autoFocus
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSave()}
+                  className="h-6 py-0 text-xs font-bold bg-muted/50 border-0 ring-1 ring-primary/30"
+                />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6 shrink-0"
+                  onClick={handleSave}
+                >
+                  <Check className="w-3 h-3 text-emerald-500" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6 shrink-0"
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditName(client.name);
+                  }}
+                >
+                  <X className="w-3 h-3 text-destructive" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 overflow-hidden">
+                <h4 className="font-bold text-xs truncate">{client.name}</h4>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-muted rounded transition-all"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setShowSharing(!showSharing)}
+            className={cn(
+              "h-6 w-6 shrink-0 transition-all",
+              showSharing
+                ? "text-primary bg-primary/10"
+                : "text-muted-foreground hover:text-primary hover:bg-primary/5",
+            )}
+          >
+            <Share2 className="w-4 h-4" />
+          </Button>
         </div>
 
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -242,6 +278,96 @@ const SortableWorkspaceItem = ({
                   </div>
                 </div>
               </div>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showSharing && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <Card
+              ref={shareRef}
+              className="mt-2 p-4 border-primary/20 bg-primary/5 backdrop-blur-xl ring-1 ring-primary/20 rounded-2xl space-y-4"
+            >
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <h5 className="text-[10px] font-black uppercase tracking-widest">
+                    Live Portal Sharing
+                  </h5>
+                  <p className="text-[9px] text-muted-foreground font-bold uppercase">
+                    Toggle public report access
+                  </p>
+                </div>
+                <button
+                  onClick={() =>
+                    onToggleSharing(client.id, !client.shareEnabled)
+                  }
+                  className={cn(
+                    "w-10 h-5 rounded-full transition-all relative p-1 ring-1 ring-inset",
+                    client.shareEnabled
+                      ? "bg-primary ring-primary"
+                      : "bg-muted ring-border",
+                  )}
+                >
+                  <motion.div
+                    animate={{ x: client.shareEnabled ? 20 : 0 }}
+                    className="w-3 h-3 bg-white rounded-full shadow-lg"
+                  />
+                </button>
+              </div>
+
+              {client.shareEnabled && client.shareToken && (
+                <div className="space-y-2">
+                  <div className="p-2 bg-black/20 rounded-xl border border-white/5 flex items-center gap-2">
+                    <Input
+                      readOnly
+                      value={`${window.location.origin}/report/${client.shareToken}`}
+                      className="h-8 py-0 bg-transparent border-0 text-[10px] font-bold text-muted-foreground focus-visible:ring-0"
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 shrink-0"
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `${window.location.origin}/report/${client.shareToken}`,
+                        );
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                        toast.success("Link copied to clipboard");
+                      }}
+                    >
+                      {copied ? (
+                        <Check className="w-3 h-3 text-emerald-500" />
+                      ) : (
+                        <Copy className="w-3 h-3" />
+                      )}
+                    </Button>
+                    <a
+                      href={`/report/${client.shareToken}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 shrink-0"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </Button>
+                    </a>
+                  </div>
+                  <p className="text-[8px] font-bold text-primary/60 uppercase text-center italic">
+                    Clients can view live analytics without logging in.
+                  </p>
+                </div>
+              )}
             </Card>
           </motion.div>
         )}
@@ -321,6 +447,12 @@ export const WorkspaceManager = () => {
       }));
       setDraftWorkspaces(withNewOrders);
     }
+  };
+
+  const handleToggleSharing = (id: number, enabled: boolean) => {
+    setDraftWorkspaces((prev) =>
+      prev.map((w) => (w.id === id ? { ...w, shareEnabled: enabled } : w)),
+    );
   };
 
   const handleRename = (id: number, name: string) => {
@@ -527,6 +659,7 @@ export const WorkspaceManager = () => {
                       onRename={handleRename}
                       onDelete={handleDelete}
                       onColorChange={handleColorChange}
+                      onToggleSharing={handleToggleSharing}
                     />
                   ))}
                   {draftWorkspaces.length === 0 && (

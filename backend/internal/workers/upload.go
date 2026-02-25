@@ -289,10 +289,10 @@ func (w *UploadWorker) fail(ctx context.Context, job UploadJob, payload []byte, 
 
 	// Send WhatsApp Alert
 	if w.WhatsAppSvc != nil {
-		go func() {
+		go func(jobErr error) {
 			// Fetch alert numbers
 			var alertJSON []byte
-			err := w.DB.QueryRowContext(context.Background(), `
+			dbErr := w.DB.QueryRowContext(context.Background(), `
 				SELECT o.whatsapp_alert_numbers 
 				FROM automation_executions e
 				JOIN automation_rules r ON e.rule_id = r.id
@@ -301,8 +301,8 @@ func (w *UploadWorker) fail(ctx context.Context, job UploadJob, payload []byte, 
 				WHERE e.id = $1
 			`, job.ExecutionID).Scan(&alertJSON)
 
-			if err != nil {
-				logger.Get("whatsapp").WithError(err).Warn("Failed to fetch alert numbers for execution")
+			if dbErr != nil {
+				logger.Get("whatsapp").WithError(dbErr).Warn("Failed to fetch alert numbers for execution")
 				return
 			}
 
@@ -312,9 +312,13 @@ func (w *UploadWorker) fail(ctx context.Context, job UploadJob, payload []byte, 
 			}
 
 			if len(phones) > 0 {
-				_ = w.WhatsAppSvc.SendFailureAlert(context.Background(), phones, job.ExecutionID, job.TargetPlatform, err.Error())
+				errMsg := "Unknown error"
+				if jobErr != nil {
+					errMsg = jobErr.Error()
+				}
+				_ = w.WhatsAppSvc.SendFailureAlert(context.Background(), phones, job.ExecutionID, job.TargetPlatform, errMsg)
 			}
-		}()
+		}(err)
 	}
 
 	return err

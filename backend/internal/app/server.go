@@ -160,7 +160,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	apiRoutes.Post("/platforms/:platform/callback", platformHandler.HandleCallback)
 	apiRoutes.Get("/proxy/video", proxyHandler.HandleProxyVideo)
 
-	apiRoutes.Get("/pub/analytics/:clientId", publicAnalyticsHandler.GetPublicReport)
+	apiRoutes.Get("/pub/reports/:token", publicAnalyticsHandler.GetPublicReport)
 
 	// Public Agency/Client Portals
 	apiRoutes.Get("/agency/intake/:token", agencyHandler.GetClientPublicContext)

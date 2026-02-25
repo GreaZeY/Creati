@@ -89,3 +89,29 @@ func (r *PostRepository) BatchUpdateStatus(ctx context.Context, orgID int, userI
 
 	return err
 }
+
+func (r *PostRepository) GetTopPerformingVideos(ctx context.Context, clientID int, limit int) ([]models.TopVideo, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT 
+			v.id, v.title, v.thumbnail_url, va.platform, va.views, va.likes, va.comments, v.source_platform
+		FROM video_analytics va
+		JOIN videos v ON va.video_id = v.id
+		WHERE v.client_id = $1
+		ORDER BY va.views DESC
+		LIMIT $2
+	`, clientID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var videos []models.TopVideo
+	for rows.Next() {
+		var v models.TopVideo
+		if err := rows.Scan(&v.ID, &v.Title, &v.ThumbnailURL, &v.Platform, &v.Views, &v.Likes, &v.Comments, &v.SourcePlatform); err != nil {
+			return nil, err
+		}
+		videos = append(videos, v)
+	}
+	return videos, nil
+}

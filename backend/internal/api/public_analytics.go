@@ -2,7 +2,6 @@ package api
 
 import (
 	"database/sql"
-	"strconv"
 
 	"creati.in/creati/backend/internal/services"
 	"creati.in/creati/backend/internal/utils"
@@ -21,20 +20,30 @@ func NewPublicAnalyticsHandler(db *sql.DB, analyticsSvc *services.AnalyticsServi
 	}
 }
 
-// GetPublicReport returns high-level analytics for a client workspace
-// In a real app, this would require a secure share_token from the clients table
+// GetPublicReport returns high-level analytics for a client workspace via secure token
 func (h *PublicAnalyticsHandler) GetPublicReport(c *fiber.Ctx) error {
-	clientID, _ := strconv.Atoi(c.Params("clientId"))
-	if clientID == 0 {
-		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid client id")
+	token := c.Params("token")
+	if token == "" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "invalid report token")
 	}
 
-	// For MVP: We allow access if the client exists.
-	// Production path: Check if shareLinkEnabled is TRUE and token matches.
+	// Fetch client by share_token and verify sharing is enabled
+	var clientID int
 	var clientName, logoURL, brandColor string
-	err := h.db.QueryRow("SELECT name, COALESCE(logo_url, ''), COALESCE(color, '#08cea8') FROM clients WHERE id = $1", clientID).Scan(&clientName, &logoURL, &brandColor)
+	var shareEnabled bool
+
+	err := h.db.QueryRow(`
+		SELECT id, name, COALESCE(logo_url, ''), COALESCE(color, '#08cea8'), share_enabled 
+		FROM clients 
+		WHERE share_token = $1
+	`, token).Scan(&clientID, &clientName, &logoURL, &brandColor, &shareEnabled)
+
 	if err != nil {
 		return utils.ErrorResponse(c, fiber.StatusNotFound, "report not found")
+	}
+
+	if !shareEnabled {
+		return utils.ErrorResponse(c, fiber.StatusForbidden, "this report is not shared publicly")
 	}
 
 	// Fetch actual metrics
