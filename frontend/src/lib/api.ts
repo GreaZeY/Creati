@@ -444,6 +444,7 @@ export const mediaAPI = {
       }
     );
   },
+  listAssets: (type?: string) => api.get<ApiResponse<any[]>>(`/media/assets${type ? `?type=${type}` : ""}`),
 };
 
 export const postsAPI = {

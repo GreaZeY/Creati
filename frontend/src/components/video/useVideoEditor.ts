@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import type Moveable from "react-moveable";
 import type { OverlayItem, ProcessingSettings } from "./VideoEditorModal";
+import { useStudio } from "../../context/StudioProvider";
 
 let overlayIdCounter = 0;
 function generateId() {
@@ -26,24 +27,22 @@ export function useVideoEditor({
   onSave,
   onClose,
 }: UseVideoEditorArgs) {
+  const { 
+    state, 
+    updateVideo, 
+    addOverlay, 
+    updateOverlay: studioUpdateOverlay, 
+    removeOverlay: studioRemoveOverlay,
+    setCurrentTime: studioSetCurrentTime,
+    togglePlayback: studioTogglePlayback,
+    setIsPlaying: studioSetIsPlaying,
+    selectElement
+  } = useStudio();
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const moveableRef = useRef<Moveable>(null);
 
-  // Playback
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-
-  // Trim
-  const [trimStart, setTrimStart] = useState(0);
-  const [trimEnd, setTrimEnd] = useState(0);
-
-  // Overlays
-  const [overlays, setOverlays] = useState<OverlayItem[]>(
-    initialSettings?.overlays || [],
-  );
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [moveableTarget, setMoveableTarget] = useState<HTMLElement | null>(
     null,
   );
@@ -69,34 +68,36 @@ export function useVideoEditor({
   }, [isOpen]);
 
   useEffect(() => {
-    if (isOpen) {
-      setIsPlaying(false);
-      setSelectedId(null);
-      setMoveableTarget(null);
-      setOverlays(initialSettings?.overlays || []);
+    if (isOpen && initialSettings) {
+      updateVideo({
+        trimStart: initialSettings.trim_start || 0,
+        trimEnd: initialSettings.trim_end || state.video.duration,
+      });
+      // Import existing overlays into studio
+      initialSettings.overlays.forEach(ov => addOverlay(ov));
     }
-  }, [isOpen, initialSettings]);
+  }, [isOpen, initialSettings?.overlays.length]);
 
   useEffect(() => {
-    if (selectedId) {
+    if (state.selectedElementId) {
       requestAnimationFrame(() => {
-        const el = document.getElementById(`overlay-${selectedId}`);
+        const el = document.getElementById(`overlay-${state.selectedElementId}`);
         setMoveableTarget(el || null);
       });
     } else {
       setMoveableTarget(null);
     }
-  }, [selectedId]);
+  }, [state.selectedElementId]);
 
-  const selected = overlays.find((o) => o.id === selectedId);
+  const selected = state.overlays.find((o) => o.id === state.selectedElementId);
   useEffect(() => {
-    if (moveableRef.current && selectedId) {
+    if (moveableRef.current && state.selectedElementId) {
       requestAnimationFrame(() => {
         moveableRef.current?.updateRect();
       });
     }
   }, [
-    selectedId,
+    state.selectedElementId,
     selected?.fontSize,
     selected?.width,
     selected?.height,
@@ -111,43 +112,44 @@ export function useVideoEditor({
   const handleLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
       const dur = videoRef.current.duration;
-      setDuration(dur);
-      setTrimStart(initialSettings?.trim_start ?? 0);
-      setTrimEnd(initialSettings?.trim_end ?? dur);
+      updateVideo({
+        duration: dur,
+        trimEnd: initialSettings?.trim_end ?? dur,
+        trimStart: initialSettings?.trim_start ?? 0,
+      });
     }
   }, [initialSettings]);
 
   const handleTimeUpdate = useCallback(() => {
     if (videoRef.current) {
       const curr = videoRef.current.currentTime;
-      setCurrentTime(curr);
-      if (trimEnd > 0 && curr > trimEnd) {
-        videoRef.current.currentTime = trimStart;
+      studioSetCurrentTime(curr);
+      if (state.video.trimEnd > 0 && curr > state.video.trimEnd) {
+        videoRef.current.currentTime = state.video.trimStart;
       }
     }
-  }, [trimStart, trimEnd]);
+  }, [state.video.trimStart, state.video.trimEnd, studioSetCurrentTime]);
 
   const togglePlay = useCallback(() => {
     if (!videoRef.current) return;
-    if (isPlaying) {
+    if (state.isPlaying) {
       videoRef.current.pause();
     } else {
       if (
-        trimEnd > 0 &&
-        (videoRef.current.currentTime < trimStart ||
-          videoRef.current.currentTime >= trimEnd)
+        state.video.trimEnd > 0 &&
+        (videoRef.current.currentTime < state.video.trimStart ||
+          videoRef.current.currentTime >= state.video.trimEnd)
       ) {
-        videoRef.current.currentTime = trimStart;
+        videoRef.current.currentTime = state.video.trimStart;
       }
       videoRef.current.play();
     }
-    setIsPlaying((p) => !p);
-  }, [isPlaying, trimStart, trimEnd]);
+    studioTogglePlayback();
+  }, [state.isPlaying, state.video.trimStart, state.video.trimEnd, studioTogglePlayback]);
 
   const handleTrimChange = useCallback((start: number, end: number) => {
-    setTrimStart(start);
-    setTrimEnd(end);
-  }, []);
+    updateVideo({ trimStart: start, trimEnd: end });
+  }, [updateVideo]);
 
   // ── Overlay CRUD ──
 
@@ -166,9 +168,8 @@ export function useVideoEditor({
       bgColor: "transparent",
       fontFamily: "sans-serif",
     };
-    setOverlays((prev) => [...prev, item]);
-    setSelectedId(item.id);
-  }, []);
+    addOverlay(item);
+  }, [addOverlay]);
 
   const addSticker = useCallback((emoji: string) => {
     const item: OverlayItem = {
@@ -184,9 +185,8 @@ export function useVideoEditor({
       bgColor: "transparent",
       fontFamily: "sans-serif",
     };
-    setOverlays((prev) => [...prev, item]);
-    setSelectedId(item.id);
-  }, []);
+    addOverlay(item);
+  }, [addOverlay]);
 
   const addImage = useCallback((dataUrl: string) => {
     const item: OverlayItem = {
@@ -202,47 +202,39 @@ export function useVideoEditor({
       bgColor: "transparent",
       fontFamily: "sans-serif",
     };
-    setOverlays((prev) => [...prev, item]);
-    setSelectedId(item.id);
-  }, []);
+    addOverlay(item);
+  }, [addOverlay]);
 
   const updateOverlay = useCallback(
     (id: string, updates: Partial<OverlayItem>) => {
-      setOverlays((prev) =>
-        prev.map((o) => (o.id === id ? { ...o, ...updates } : o)),
-      );
+      studioUpdateOverlay(id, updates);
     },
-    [],
+    [studioUpdateOverlay],
   );
 
   const deleteOverlay = useCallback(
     (id: string) => {
-      setOverlays((prev) => prev.filter((o) => o.id !== id));
-      if (selectedId === id) {
-        setSelectedId(null);
-        setMoveableTarget(null);
-      }
+      studioRemoveOverlay(id);
     },
-    [selectedId],
+    [studioRemoveOverlay],
   );
 
   const selectOverlay = useCallback((id: string) => {
-    setSelectedId(id);
-  }, []);
+    selectElement(id);
+  }, [selectElement]);
 
   const deselectAll = useCallback(() => {
-    setSelectedId(null);
-    setMoveableTarget(null);
-  }, []);
+    selectElement(null);
+  }, [selectElement]);
 
   const handleSave = useCallback(() => {
     onSave(video.id, {
-      trim_start: trimStart,
-      trim_end: trimEnd,
-      overlays,
+      trim_start: state.video.trimStart,
+      trim_end: state.video.trimEnd,
+      overlays: state.overlays,
     });
     onClose();
-  }, [video.id, trimStart, trimEnd, overlays, onSave, onClose]);
+  }, [video.id, state.video.trimStart, state.video.trimEnd, state.overlays, onSave, onClose]);
 
   const pctToPx = useCallback(
     (pct: number, dimension: number) => (pct / 100) * dimension,
@@ -281,20 +273,20 @@ export function useVideoEditor({
     canvasRef,
     moveableRef,
     // Playback
-    isPlaying,
-    setIsPlaying,
-    duration,
-    currentTime,
+    isPlaying: state.isPlaying,
+    setIsPlaying: studioSetIsPlaying,
+    duration: state.video.duration,
+    currentTime: state.currentTime,
     togglePlay,
     handleLoadedMetadata,
     handleTimeUpdate,
     // Trim
-    trimStart,
-    trimEnd,
+    trimStart: state.video.trimStart,
+    trimEnd: state.video.trimEnd,
     handleTrimChange,
     // Overlays
-    overlays,
-    selectedId,
+    overlays: state.overlays,
+    selectedId: state.selectedElementId,
     moveableTarget,
     addText,
     addSticker,

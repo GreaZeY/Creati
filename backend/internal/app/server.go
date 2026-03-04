@@ -110,6 +110,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	uploadHandler := api.NewUploadHandler(storageService, storageUsageService, queueService, db)
 	assetDropHandler := api.NewAssetDropHandler(db, storageService, storageUsageService)
 	orgHandler := api.NewOrgHandler(db)
+	mediaHandler := api.NewMediaHandler(db)
 
 	// Middlewares
 	videosHandler := api.NewVideosHandler(db, cacheService, queueService)
@@ -316,6 +317,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	aiRoutes.Post("/creative-lab/generate", aiHandler.GenerateCreative)
 
 	// Posts & Media
+	protected.Get("/media/assets", mediaHandler.ListAssets)
 	protected.Post("/media/upload", postsHandler.UploadMedia)
 	protected.Post("/videos/:id/shorts", videosHandler.TriggerShortsGeneration)
 	protected.Post("/posts", postsHandler.CreatePost)

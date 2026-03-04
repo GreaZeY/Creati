@@ -1,11 +1,13 @@
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
-import { Play, Pause, Check } from "lucide-react";
-import { TrimSlider } from "./TrimSlider";
+import { Play, Pause, Download } from "lucide-react";
 import { ConfigPanel } from "./ConfigPanel";
 import { useVideoEditor } from "./useVideoEditor";
 import { MoveableController } from "./MoveableController";
 import { OverlayElement } from "./OverlayElement";
+import { StudioProvider } from "../../context/StudioProvider";
+import { AssetSidebar } from "./AssetSidebar";
+import { TimelineView } from "./TimelineView";
 
 export interface OverlayItem {
   id: string;
@@ -44,7 +46,23 @@ interface VideoEditorModalProps {
   onSave: (id: string, settings: ProcessingSettings) => void;
 }
 
-export function VideoEditorModal({
+export function VideoEditorModal(props: VideoEditorModalProps) {
+  if (!props.isOpen) return null;
+
+  return (
+    <StudioProvider
+      initialVideo={{
+        id: props.video.id,
+        url: props.video.url || "",
+        duration: 0,
+      }}
+    >
+      <VideoEditorContent {...props} />
+    </StudioProvider>
+  );
+}
+
+function VideoEditorContent({
   isOpen,
   onClose,
   video,
@@ -54,7 +72,7 @@ export function VideoEditorModal({
   const editor = useVideoEditor({
     isOpen,
     initialSettings,
-    video, // Pass full video object
+    video,
     onSave,
     onClose,
   });
@@ -63,100 +81,124 @@ export function VideoEditorModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Editor Studio"
-      className="max-w-[90vw] w-full max-h-[90vh] !overflow-hidden"
+      title="Creative Studio"
+      className="max-w-[95vw] w-full max-h-[95vh] !overflow-hidden p-0"
     >
-      <div className="flex h-[75vh] -m-6">
-        {/* Canvas + Trim */}
-        <div className="flex-1 flex flex-col min-w-0 bg-black/20">
-          <div
-            ref={editor.canvasRef}
-            className="flex-1 relative overflow-hidden cursor-default"
-            onClick={(e) => {
-              if (e.target === e.currentTarget) editor.deselectAll();
-            }}
-          >
-            <video
-              ref={editor.videoRef}
-              src={editor.videoSrc}
-              className="w-full h-full object-contain"
-              onLoadedMetadata={editor.handleLoadedMetadata}
-              onTimeUpdate={editor.handleTimeUpdate}
-              onEnded={() => editor.setIsPlaying(false)}
-              crossOrigin="anonymous"
-            />
+      <div className="flex flex-col h-[85vh]">
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left: Asset Library */}
+          <AssetSidebar />
 
-            {/* Overlays */}
-            {editor.containerSize.width > 0 &&
-              editor.overlays.map((ov) => (
-                <OverlayElement
-                  key={ov.id}
-                  overlay={ov}
-                  isSelected={editor.selectedId === ov.id}
-                  containerSize={editor.containerSize}
-                  pctToPx={editor.pctToPx}
-                  onSelect={editor.selectOverlay}
+          {/* Center: Canvas Area */}
+          <div className="flex-1 flex flex-col min-w-0 bg-secondary/5 relative group">
+            <div
+              ref={editor.canvasRef}
+              className="flex-1 relative overflow-hidden cursor-default flex items-center justify-center p-8"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) editor.deselectAll();
+              }}
+            >
+              <div className="relative shadow-2xl rounded-lg overflow-hidden bg-black max-h-full aspect-[9/16]">
+                <video
+                  ref={editor.videoRef}
+                  src={editor.videoSrc}
+                  className="w-full h-full object-contain"
+                  onLoadedMetadata={editor.handleLoadedMetadata}
+                  onTimeUpdate={editor.handleTimeUpdate}
+                  onEnded={() => editor.setIsPlaying(false)}
+                  crossOrigin="anonymous"
                 />
-              ))}
 
-            {/* Moveable */}
-            {editor.moveableTarget && editor.selectedId && (
-              <MoveableController
-                moveableRef={editor.moveableRef}
-                target={editor.moveableTarget}
-                container={editor.canvasRef.current}
-                containerSize={editor.containerSize}
-                selectedId={editor.selectedId}
-                onUpdate={editor.updateOverlay}
-              />
-            )}
+                {/* Overlays */}
+                {editor.containerSize.width > 0 &&
+                  editor.overlays.map((ov) => (
+                    <OverlayElement
+                      key={ov.id}
+                      overlay={ov}
+                      isSelected={editor.selectedId === ov.id}
+                      containerSize={editor.containerSize}
+                      pctToPx={editor.pctToPx}
+                      onSelect={editor.selectOverlay}
+                    />
+                  ))}
 
-            {/* Play/Pause */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-              <button
-                onClick={editor.togglePlay}
-                className="p-3 rounded-full bg-black/50 backdrop-blur-md hover:bg-black/70 text-white transition-colors shadow-lg"
-              >
-                {editor.isPlaying ? (
-                  <Pause size={20} fill="currentColor" />
-                ) : (
-                  <Play size={20} fill="currentColor" />
+                {/* Moveable */}
+                {editor.moveableTarget && editor.selectedId && (
+                  <MoveableController
+                    moveableRef={editor.moveableRef}
+                    target={editor.moveableTarget}
+                    container={editor.canvasRef.current}
+                    containerSize={editor.containerSize}
+                    selectedId={editor.selectedId}
+                    onUpdate={editor.updateOverlay}
+                  />
                 )}
-              </button>
+              </div>
+
+              {/* Float Controls */}
+              <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-4 px-6 py-3 rounded-full bg-black/40 backdrop-blur-xl border border-white/10 shadow-2xl opacity-0 group-hover:opacity-100 transition-all">
+                <button
+                  onClick={editor.togglePlay}
+                  className="p-2 rounded-full hover:bg-white/10 text-white transition-colors"
+                >
+                  {editor.isPlaying ? (
+                    <Pause size={24} fill="currentColor" />
+                  ) : (
+                    <Play size={24} fill="currentColor" />
+                  )}
+                </button>
+                <div className="h-4 w-px bg-white/10" />
+                <span className="text-xs font-mono text-white/60">
+                  {Math.floor(editor.currentTime)}s /{" "}
+                  {Math.floor(editor.duration)}s
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Trim + Actions */}
-          <div className="p-4 bg-card/80 backdrop-blur-sm border-t border-border/30">
-            <TrimSlider
-              duration={editor.duration}
-              start={editor.trimStart}
-              end={editor.trimEnd}
-              currentTime={editor.currentTime}
-              onChange={editor.handleTrimChange}
-            />
-            <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-border/30">
-              <Button variant="ghost" size="sm" onClick={onClose}>
-                Cancel
+          {/* Right: Property Inspector */}
+          <ConfigPanel
+            overlays={editor.overlays}
+            selectedId={editor.selectedId}
+            onAddText={editor.addText}
+            onAddSticker={editor.addSticker}
+            onAddImage={editor.addImage}
+            onUpdateOverlay={editor.updateOverlay}
+            onDeleteOverlay={editor.deleteOverlay}
+            onSelectOverlay={editor.selectOverlay}
+          />
+        </div>
+
+        {/* Bottom: Timeline & Export Bar */}
+        <div className="flex flex-col bg-background border-t border-border/40">
+          <TimelineView />
+
+          <div className="h-16 px-6 flex items-center justify-between border-t border-border/20 bg-secondary/5">
+            <div className="flex items-center gap-4">
+              <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground opacity-40">
+                Creative Lab Alpha
+              </span>
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="font-bold uppercase tracking-wider text-[10px]"
+              >
+                Discard
               </Button>
-              <Button size="sm" onClick={editor.handleSave} className="gap-2">
-                <Check size={14} /> Save Changes
+              <Button
+                size="sm"
+                onClick={editor.handleSave}
+                className="gap-2 bg-primary hover:bg-primary/90 font-bold uppercase tracking-wider text-[10px]"
+              >
+                <Download size={14} /> Render & Export
               </Button>
             </div>
           </div>
         </div>
-
-        {/* Config Panel */}
-        <ConfigPanel
-          overlays={editor.overlays}
-          selectedId={editor.selectedId}
-          onAddText={editor.addText}
-          onAddSticker={editor.addSticker}
-          onAddImage={editor.addImage}
-          onUpdateOverlay={editor.updateOverlay}
-          onDeleteOverlay={editor.deleteOverlay}
-          onSelectOverlay={editor.selectOverlay}
-        />
       </div>
     </Modal>
   );
