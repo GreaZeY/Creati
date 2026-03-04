@@ -24,6 +24,9 @@ export interface OverlayItem {
   bgColor: string;
   fontFamily: string;
   preset?: string;
+  animationIn?: "fade" | "slide-up" | "zoom-in" | "none";
+  animationOut?: "fade" | "slide-down" | "zoom-out" | "none";
+  animationDuration?: number;
 }
 
 export interface ProcessingSettings {

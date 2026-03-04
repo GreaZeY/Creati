@@ -1,3 +1,4 @@
+import { motion } from "framer-motion";
 import type { OverlayItem } from "./VideoEditorModal";
 
 interface OverlayElementProps {
@@ -8,6 +9,39 @@ interface OverlayElementProps {
   onSelect: (id: string) => void;
 }
 
+const ANIMATION_VARIANTS = {
+  fade: {
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
+  },
+  "slide-up": {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -20 },
+  },
+  "slide-down": {
+    initial: { opacity: 0, y: -20 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: 20 },
+  },
+  "zoom-in": {
+    initial: { opacity: 0, scale: 0.5 },
+    animate: { opacity: 1, scale: 1 },
+    exit: { opacity: 0, scale: 0.5 },
+  },
+  "zoom-out": {
+    initial: { opacity: 1, scale: 1 },
+    animate: { opacity: 1, scale: 1 },
+    exit: { opacity: 0, scale: 1.5 },
+  },
+  none: {
+    initial: {},
+    animate: {},
+    exit: {},
+  },
+};
+
 export function OverlayElement({
   overlay: ov,
   isSelected,
@@ -16,9 +50,18 @@ export function OverlayElement({
   onSelect,
 }: OverlayElementProps) {
   const hasExplicitSize = ov.type === "sticker" || ov.type === "image";
+  const animationIn = ov.animationIn || "none";
+  const animationOut = ov.animationOut || "none";
+  const duration = ov.animationDuration || 0.5;
+
+  const variants = {
+    initial: ANIMATION_VARIANTS[animationIn]?.initial || {},
+    animate: ANIMATION_VARIANTS[animationIn]?.animate || {},
+    exit: ANIMATION_VARIANTS[animationOut]?.exit || {},
+  };
 
   return (
-    <div
+    <motion.div
       id={`overlay-${ov.id}`}
       className={`absolute cursor-move ${isSelected ? "outline outline-2 outline-primary outline-offset-2" : ""}`}
       style={{
@@ -34,6 +77,11 @@ export function OverlayElement({
             }
           : {}),
       }}
+      variants={variants}
+      initial="initial"
+      animate="animate"
+      exit="exit"
+      transition={{ duration }}
       onPointerDown={(e) => {
         e.stopPropagation();
         onSelect(ov.id);
@@ -76,6 +124,6 @@ export function OverlayElement({
           draggable={false}
         />
       )}
-    </div>
+    </motion.div>
   );
 }

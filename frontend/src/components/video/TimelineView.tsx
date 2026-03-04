@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import { useStudio } from "../../context/StudioProvider";
-import { Music, Layers, Scissors } from "lucide-react";
+import { Music, Layers, Scissors, Wand2 } from "lucide-react";
+import { AudioTrackComponent } from "./AudioTrackComponent";
 
 export const TimelineView: React.FC = () => {
   const { state, setCurrentTime } = useStudio();
@@ -19,7 +20,7 @@ export const TimelineView: React.FC = () => {
   };
 
   return (
-    <div className="h-48 bg-card/80 backdrop-blur-md border-t border-border/40 flex flex-col select-none">
+    <div className="h-48 bg-card/80 backdrop-blur-md border-t border-border/40 flex flex-col select-none overflow-hidden">
       {/* Ruler */}
       <div
         className="h-6 border-b border-border/20 relative overflow-hidden flex items-center bg-black/5"
@@ -53,61 +54,70 @@ export const TimelineView: React.FC = () => {
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar">
         {/* Video Track */}
-        <div className="flex items-center min-h-[40px] border-b border-border/10 relative group">
+        <div className="flex items-center min-h-[40px] border-b border-border/10 relative group bg-black/5">
           <div className="w-24 shrink-0 flex items-center gap-2 px-3 border-r border-border/10 bg-black/10 h-full">
             <Scissors size={12} className="text-muted-foreground" />
             <span className="text-[9px] font-black uppercase tracking-widest opacity-40">
               Video
             </span>
           </div>
-          <div
-            className="flex-1 relative h-8 mx-2 rounded bg-primary/10 border border-primary/20 overflow-hidden"
-            style={{
-              left: `${state.video.trimStart * pixelsPerSecond}px`,
-              width: `${(state.video.trimEnd - state.video.trimStart) * pixelsPerSecond}px`,
-            }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent" />
-            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[8px] font-bold truncate opacity-60">
-              {state.video.url.split("/").pop()}
-            </span>
+          <div className="flex-1 relative h-full flex items-center">
+            <div
+              className="relative h-8 mx-2 rounded bg-primary/10 border border-primary/20 overflow-hidden"
+              style={{
+                left: `${state.video.trimStart * pixelsPerSecond}px`,
+                width: `${(state.video.trimEnd - state.video.trimStart) * pixelsPerSecond}px`,
+              }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent" />
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[8px] font-bold truncate opacity-60 uppercase tracking-tighter">
+                {state.video.url.split("/").pop()}
+              </span>
+            </div>
+
+            {/* Transition Markers */}
+            {state.transitions.map((trans) => (
+              <div
+                key={trans.id}
+                className="absolute top-0 bottom-0 w-4 bg-primary/20 hover:bg-primary/40 flex items-center justify-center cursor-pointer border-x border-primary/20"
+                style={{ left: `${trans.offset * pixelsPerSecond}px` }}
+              >
+                <Wand2 size={10} className="text-primary" />
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Audio Tracks */}
-        {state.audioTracks.map((track, i) => (
-          <div
-            key={track.id}
-            className="flex items-center min-h-[40px] border-b border-border/10 relative group bg-cyan-500/5"
-          >
-            <div className="w-24 shrink-0 flex items-center gap-2 px-3 border-r border-border/10 h-full">
-              <Music size={12} className="text-cyan-400" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-cyan-400/60">
-                Audio {i + 1}
-              </span>
-            </div>
+        <div className="flex flex-col">
+          {state.audioTracks.map((track) => (
             <div
-              className="flex-1 relative h-6 mx-2 rounded bg-cyan-500/10 border border-cyan-500/20"
-              style={{
-                left: `${track.startTime * pixelsPerSecond}px`,
-                width: `${track.duration * pixelsPerSecond}px`,
-              }}
+              key={track.id}
+              className="flex items-center min-h-[40px] border-b border-border/10 relative group bg-cyan-500/5"
             >
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[8px] font-bold truncate text-cyan-400/60">
-                {track.name}
-              </span>
+              <div className="w-24 shrink-0 flex items-center gap-2 px-3 border-r border-border/10 h-full">
+                <Music size={12} className="text-cyan-400" />
+                <span className="text-[9px] font-black uppercase tracking-widest text-cyan-400/60">
+                  Audio
+                </span>
+              </div>
+              <div className="flex-1 relative h-6 mx-2">
+                <AudioTrackComponent
+                  track={track}
+                  pixelsPerSecond={pixelsPerSecond}
+                />
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {/* Placeholder for adding audio */}
-        {state.audioTracks.length === 0 && (
-          <div className="h-10 flex items-center justify-center border-b border-border/10 border-dashed">
-            <p className="text-[9px] font-bold text-muted-foreground/30 uppercase tracking-[0.2em]">
-              Drop music here
-            </p>
-          </div>
-        )}
+          {state.audioTracks.length === 0 && (
+            <div className="h-[40px] flex items-center justify-center border-b border-border/10 border-dashed bg-secondary/5">
+              <p className="text-[9px] font-bold text-muted-foreground/20 uppercase tracking-[0.2em]">
+                Drag music to this area
+              </p>
+            </div>
+          )}
+        </div>
 
         {/* Overlay Layers Track */}
         <div className="flex items-center min-h-[40px] border-b border-border/10 relative group bg-amber-500/5">
@@ -117,17 +127,27 @@ export const TimelineView: React.FC = () => {
               Overlays
             </span>
           </div>
-          <div className="flex-1 relative h-full">
+          <div className="flex-1 relative h-full flex flex-col gap-1 py-1">
             {state.overlays.map((ov) => (
               <div
                 key={ov.id}
-                className="absolute top-2 h-4 rounded bg-amber-500/20 border border-amber-500/30"
+                className="h-2 mx-2 rounded bg-amber-500/20 border border-amber-500/30 relative"
                 style={{
-                  left: `0px`, // Overlays currently span whole video in simple model
                   width: `${duration * pixelsPerSecond}px`,
                 }}
-              />
+              >
+                <span className="absolute -top-3 left-0 text-[7px] font-bold text-amber-500/40 uppercase tracking-tighter">
+                  {ov.type}: {ov.text || "asset"}
+                </span>
+              </div>
             ))}
+            {state.overlays.length === 0 && (
+              <div className="h-4 flex items-center px-4 opacity-20">
+                <span className="text-[8px] font-bold uppercase tracking-widest">
+                  No overlays added
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>

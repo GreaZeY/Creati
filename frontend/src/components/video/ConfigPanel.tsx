@@ -4,6 +4,7 @@ import type { OverlayItem } from "./VideoEditorModal";
 import { Textarea } from "@/components/ui/Textarea";
 import { Slider } from "@/components/ui/Slider";
 import { Dropdown } from "@/components/ui/Dropdown";
+import { TransitionGallery } from "./TransitionGallery";
 
 interface ConfigPanelProps {
   overlays: OverlayItem[];
@@ -433,6 +434,84 @@ export function ConfigPanel({
               </div>
             )}
 
+            {/* Animations */}
+            <div className="pt-4 border-t border-border/20 space-y-4">
+              <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">
+                Animations
+              </p>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-2">
+                    In
+                  </label>
+                  <Dropdown
+                    id="anim-in"
+                    items={[
+                      { id: "none", label: "None", value: "none" },
+                      { id: "fade", label: "Fade", value: "fade" },
+                      { id: "slide-up", label: "Slide Up", value: "slide-up" },
+                      { id: "zoom-in", label: "Zoom In", value: "zoom-in" },
+                    ]}
+                    value={selected.animationIn || "none"}
+                    onChange={(item) =>
+                      onUpdateOverlay(selected.id, {
+                        animationIn: item.value as any,
+                      })
+                    }
+                    placeholder="In"
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-2">
+                    Out
+                  </label>
+                  <Dropdown
+                    id="anim-out"
+                    items={[
+                      { id: "none", label: "None", value: "none" },
+                      { id: "fade", label: "Fade", value: "fade" },
+                      {
+                        id: "slide-down",
+                        label: "Slide Down",
+                        value: "slide-down",
+                      },
+                      { id: "zoom-out", label: "Zoom Out", value: "zoom-out" },
+                    ]}
+                    value={selected.animationOut || "none"}
+                    onChange={(item) =>
+                      onUpdateOverlay(selected.id, {
+                        animationOut: item.value as any,
+                      })
+                    }
+                    placeholder="Out"
+                    className="w-full"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-[10px] font-bold uppercase text-muted-foreground">
+                    Duration
+                  </label>
+                  <span className="text-xs font-mono text-muted-foreground">
+                    {(selected.animationDuration || 0.5).toFixed(1)}s
+                  </span>
+                </div>
+                <Slider
+                  min={0.1}
+                  max={2.0}
+                  step={0.1}
+                  value={selected.animationDuration || 0.5}
+                  onValueChange={(val) =>
+                    onUpdateOverlay(selected.id, { animationDuration: val })
+                  }
+                />
+              </div>
+            </div>
+
             {/* Rotation display */}
             <div>
               <div className="flex justify-between items-center mb-2">
@@ -461,9 +540,16 @@ export function ConfigPanel({
             <p className="text-sm text-muted-foreground/60">
               Select an element to edit
             </p>
-            <p className="text-xs text-muted-foreground/40 mt-1">
+            <p className="text-xs text-muted-foreground/40 mt-1 mb-6">
               or add a new one above
             </p>
+
+            <div className="w-full border-t border-border/20 pt-6">
+              <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest mb-4">
+                Quick Transitions
+              </p>
+              <TransitionGallery />
+            </div>
           </div>
         )}
       </div>

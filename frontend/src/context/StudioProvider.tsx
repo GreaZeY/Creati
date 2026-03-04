@@ -14,8 +14,8 @@ export interface AudioTrackItem {
 
 export interface TransitionItem {
   id: string;
-  type: "fade" | "zoom" | "slide" | "glitch";
-  timestamp: number;
+  type: "fade" | "zoom" | "slide" | "glitch" | "wipe";
+  offset: number; // Point in timeline
   duration: number;
 }
 
