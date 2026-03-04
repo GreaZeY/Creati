@@ -292,6 +292,15 @@ export function TimelineView() {
                                   : null,
                               );
 
+                              // Trigger silent update so useVideoEditor can see the trim for preview
+                              updateVideoSegment(
+                                seg.id,
+                                {
+                                  duration: newDuration,
+                                },
+                                { silent: true },
+                              );
+
                               // Live Preview: Update playhead locally
                               setCurrentTime(initialStartTime + newDuration);
                             };

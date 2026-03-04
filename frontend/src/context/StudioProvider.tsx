@@ -45,7 +45,11 @@ export interface StudioState {
 interface StudioContextType {
   state: StudioState;
   addVideoSegment: (segment: Omit<VideoSegment, "id" | "startTime">) => void;
-  updateVideoSegment: (id: string, updates: Partial<VideoSegment>) => void;
+  updateVideoSegment: (
+    id: string,
+    updates: Partial<VideoSegment>,
+    options?: { silent?: boolean },
+  ) => void;
   removeVideoSegment: (id: string) => void;
   reorderSegments: (startIndex: number, endIndex: number) => void;
   addAudioTrack: (audio: Omit<AudioTrackItem, "id">) => void;
@@ -127,11 +131,20 @@ export const StudioProvider: React.FC<{
   );
 
   const updateVideoSegment = useCallback(
-    (id: string, updates: Partial<VideoSegment>) => {
+    (
+      id: string,
+      updates: Partial<VideoSegment>,
+      options?: { silent?: boolean },
+    ) => {
       setState((prev) => {
         const newSegments = prev.videoSegments.map((seg) =>
           seg.id === id ? { ...seg, ...updates } : seg,
         );
+
+        if (options?.silent) {
+          return { ...prev, videoSegments: newSegments };
+        }
+
         const { segments: recalculated, totalDuration } =
           recalculateSegments(newSegments);
         return { ...prev, videoSegments: recalculated, totalDuration };
