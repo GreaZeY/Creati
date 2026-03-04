@@ -376,6 +376,10 @@ export const agencyAPI = {
   search: (query: string) => api.get<ApiResponse<any[]>>(`/agency/search?q=${query}`),
   getWhatsAppAlerts: () => api.get<ApiResponse<AlertPhone[]>>('/agency/settings/whatsapp-alerts'),
   updateWhatsAppAlerts: (phones: AlertPhone[]) => api.put<ApiResponse<AlertPhone[]>>('/agency/settings/whatsapp-alerts', phones),
+  getOrgSettings: () => api.get<ApiResponse<any>>('/agency/settings/org'),
+   updateOrgSettings: (data: { name?: string; customDomain?: string; logoUrl?: string; primaryColor?: string }) => api.put('/agency/settings/org', data),
+  getStorageConfig: () => api.get<ApiResponse<any>>('/agency/settings/storage'),
+  updateStorageConfig: (data: { providerType: string; credentials: any; isActive: boolean }) => api.put('/agency/settings/storage', data),
 };
 
 export const publicAPI = {

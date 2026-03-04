@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/Label";
 import { slideInBottom } from "@/lib/animations";
 import { useUI } from "@/context/UIContext";
 import { GoogleLogin } from "@react-oauth/google";
+import { useTenancy } from "@/context/TenancyContext";
 
 export const Login = () => {
   const [email, setEmail] = useState("");
@@ -20,6 +21,7 @@ export const Login = () => {
   const { login, googleLogin } = useAuth();
   const navigate = useNavigate();
   const { setInputFocused } = useUI();
+  const { branding } = useTenancy();
 
   const handleFocus = () => setInputFocused(true);
   const handleBlur = () => setInputFocused(false);
@@ -71,10 +73,12 @@ export const Login = () => {
       >
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary to-cyan-400 bg-clip-text text-transparent">
-            Welcome Back
+            {branding?.name ? `Welcome to ${branding.name}` : "Welcome Back"}
           </h1>
           <p className="text-muted-foreground">
-            Sign in to continue to your dashboard
+            {branding?.name
+              ? `Sign in to access the ${branding.name} portal`
+              : "Sign in to continue to your dashboard"}
           </p>
         </div>
 

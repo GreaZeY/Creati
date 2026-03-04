@@ -32,7 +32,7 @@ func RunWorker(ctx context.Context, db *sql.DB, throttle *services.ThrottleServi
 		return err
 	}
 
-	storageService, err := services.NewStorageService()
+	storageService, err := services.NewStorageService(db)
 	if err != nil {
 		return err
 	}

@@ -72,11 +72,25 @@ func (s *StorageService) GetProvider(ctx context.Context, orgID int) (storage.St
 			// Resolve custom provider
 			switch providerType {
 			case "s3_custom":
-				// Parse creds and return custom S3 provider
-				return s.defaultProvider, nil // Placeholder for now
+				// Parse creds for custom S3
+				// For now, reuse default if it's S3, or ideally create new S3 provider with these creds
+				return s.defaultProvider, nil
 			case "gdrive":
-				// Return GDrive provider
-				return s.defaultProvider, nil // Placeholder for now
+				var config struct {
+					Credentials []byte `json:"creds"`
+					FolderID    string `json:"folder_id"`
+				}
+				if err := json.Unmarshal(creds, &config); err == nil {
+					return storage.NewGoogleDriveProvider(config.Credentials, config.FolderID)
+				}
+			case "dropbox":
+				var config struct {
+					Token string `json:"token"`
+					Path  string `json:"path"`
+				}
+				if err := json.Unmarshal(creds, &config); err == nil {
+					return storage.NewDropboxProvider(config.Token, config.Path), nil
+				}
 			}
 		}
 	}

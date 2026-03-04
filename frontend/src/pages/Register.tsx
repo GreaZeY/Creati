@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/Label";
 import { slideInBottom } from "@/lib/animations";
 import { useUI } from "@/context/UIContext";
 import { GoogleLogin } from "@react-oauth/google";
+import { useTenancy } from "@/context/TenancyContext";
 
 export const Register = () => {
   const [email, setEmail] = useState("");
@@ -22,6 +23,7 @@ export const Register = () => {
   const { register, googleLogin } = useAuth();
   const navigate = useNavigate();
   const { setInputFocused } = useUI();
+  const { branding } = useTenancy();
 
   const handleFocus = () => setInputFocused(true);
   const handleBlur = () => setInputFocused(false);
@@ -75,10 +77,12 @@ export const Register = () => {
       >
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary to-cyan-400 bg-clip-text text-transparent">
-            Get Started
+            {branding?.name ? `Join ${branding.name}` : "Get Started"}
           </h1>
           <p className="text-muted-foreground">
-            Create your account and start uploading
+            {branding?.name
+              ? `Create your account to start collaborating with ${branding.name}`
+              : "Create your account and start uploading"}
           </p>
         </div>
 

@@ -109,6 +109,9 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	platformHandler := api.NewPlatformHandler(db, cacheService, storageService)
 	uploadHandler := api.NewUploadHandler(storageService, storageUsageService, queueService, db)
 	assetDropHandler := api.NewAssetDropHandler(db, storageService, storageUsageService)
+	orgHandler := api.NewOrgHandler(db)
+
+	// Middlewares
 	videosHandler := api.NewVideosHandler(db, cacheService, queueService)
 	analyticsHandler := api.NewAnalyticsHandler(db, queueService, cacheService)
 	automationService := services.NewAutomationService(db, queueService)
@@ -164,6 +167,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	apiRoutes.Get("/proxy/video", proxyHandler.HandleProxyVideo)
 
 	apiRoutes.Get("/pub/reports/:token", publicAnalyticsHandler.GetPublicReport)
+	apiRoutes.Get("/pub/branding", orgHandler.GetPublicBranding)
 
 	// Public Agency/Client Portals
 	apiRoutes.Get("/agency/intake/:token", agencyHandler.GetClientPublicContext)
@@ -203,7 +207,13 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	agencyRoutes.Put("/clients/:id", agencyHandler.UpdateClient)
 	agencyRoutes.Delete("/clients/:id", agencyHandler.DeleteClient)
 
-	// Pivot Features
+	// Organization & Storage Settings
+	agencyRoutes.Get("/settings/org", orgHandler.GetOrgSettings)
+	agencyRoutes.Put("/settings/org", orgHandler.UpdateOrgSettings)
+	agencyRoutes.Get("/settings/storage", orgHandler.GetStorageConfig)
+	agencyRoutes.Put("/settings/storage", orgHandler.UpdateStorageConfig)
+
+	// Video Analytics & Management
 	agencyRoutes.Post("/intake-link", agencyHandler.CreateIntakeLink)
 	agencyRoutes.Post("/approval-link/:id", agencyHandler.CreateApprovalLink)
 

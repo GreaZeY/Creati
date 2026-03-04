@@ -13,10 +13,22 @@ import (
 func TenancyMiddleware(db *sql.DB) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		userID := GetUserID(c)
+
+		// 1. Resolve Org by Domain (Subdomain/Custom Domain)
+		host := c.Hostname()
+		var domainOrgID int
+		// Check if host is not the main one (hardcoded example, should use config)
+		if host != "creati.in" && host != "localhost" && host != "127.0.0.1" {
+			err := db.QueryRow(`SELECT id FROM organizations WHERE custom_domain = $1 OR subdomain = $1`, host).Scan(&domainOrgID)
+			if err == nil {
+				c.Locals("orgID", domainOrgID)
+			}
+		}
+
 		if userID == 0 {
-			// This should theoretically not happen if AuthMiddleware is called first,
-			// but we check for safety.
-			return utils.ErrorResponse(c, fiber.StatusUnauthorized, "unauthorized")
+			// Public portals (Asset Drop, Reports) use token-based auth, so they might skip this
+			// but we still want to resolve the Org via domain if possible.
+			return c.Next()
 		}
 
 		// 1. Extract Workspace ID from Header or Query fallback

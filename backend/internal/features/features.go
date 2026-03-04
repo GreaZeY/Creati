@@ -14,6 +14,8 @@ const (
 	CanUseMagicSync             Capability = "can_use_magic_sync"
 	CanUseAudienceNotifications Capability = "can_use_audience_notifications"
 	CanUseAdvancedAnalytics     Capability = "can_use_advanced_analytics"
+	CanUseBYOStorage            Capability = "can_use_byo_storage"
+	CreatiStorageQuotaGB        Capability = "creati_storage_quota_gb"
 	MaxUploadsPerMonth          Capability = "max_uploads_per_month"
 	MaxConnectedAccounts        Capability = "max_connected_accounts"
 )
@@ -24,6 +26,8 @@ var planEntitlements = map[string]map[Capability]interface{}{
 		CanUseMagicSync:             false,
 		CanUseAudienceNotifications: false,
 		CanUseAdvancedAnalytics:     false,
+		CanUseBYOStorage:            false,
+		CreatiStorageQuotaGB:        1,
 		MaxUploadsPerMonth:          5,
 		MaxConnectedAccounts:        3,
 	},
@@ -31,6 +35,8 @@ var planEntitlements = map[string]map[Capability]interface{}{
 		CanUseMagicSync:             true,
 		CanUseAudienceNotifications: true,
 		CanUseAdvancedAnalytics:     false,
+		CanUseBYOStorage:            false,
+		CreatiStorageQuotaGB:        10,
 		MaxUploadsPerMonth:          -1, // Unlimited
 		MaxConnectedAccounts:        10,
 	},
@@ -38,6 +44,8 @@ var planEntitlements = map[string]map[Capability]interface{}{
 		CanUseMagicSync:             true,
 		CanUseAudienceNotifications: true,
 		CanUseAdvancedAnalytics:     true,
+		CanUseBYOStorage:            true,
+		CreatiStorageQuotaGB:        100,
 		MaxUploadsPerMonth:          -1, // Unlimited
 		MaxConnectedAccounts:        -1, // Unlimited
 	},

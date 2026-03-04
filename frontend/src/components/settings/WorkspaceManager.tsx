@@ -33,6 +33,9 @@ import {
   Share2,
   ExternalLink,
   Copy,
+  Settings,
+  Database,
+  Globe,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -447,7 +450,7 @@ const SortableWorkspaceItem = ({
 };
 
 export const WorkspaceManager = () => {
-  const [activeTab, setActiveTab] = useState<"workspaces" | "team">(
+  const [activeTab, setActiveTab] = useState<"workspaces" | "team" | "org">(
     "workspaces",
   );
   const [workspaces, setWorkspaces] = useState<Client[]>([]);
@@ -462,6 +465,11 @@ export const WorkspaceManager = () => {
   const [isInviting, setIsInviting] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("editor");
+
+  // Org Settings State
+  const [orgSettings, setOrgSettings] = useState<any>(null);
+  const [storageConfig, setStorageConfig] = useState<any>(null);
+  const [isSavingOrg, setIsSavingOrg] = useState(false);
 
   const isDirty =
     activeTab === "workspaces" &&
@@ -488,11 +496,18 @@ export const WorkspaceManager = () => {
           setWorkspaces(normalized);
           setDraftWorkspaces(normalized);
         }
-      } else {
+      } else if (activeTab === "team") {
         const resp = await agencyAPI.listTeam();
         if (resp.data.success) {
           setTeam(resp.data.data);
         }
+      } else if (activeTab === "org") {
+        const [orgResp, storageResp] = await Promise.all([
+          agencyAPI.getOrgSettings(),
+          agencyAPI.getStorageConfig(),
+        ]);
+        if (orgResp.data.success) setOrgSettings(orgResp.data.data);
+        if (storageResp.data.success) setStorageConfig(storageResp.data.data);
       }
     } catch (err) {
       toast.error(`Failed to load ${activeTab}`);
@@ -620,6 +635,26 @@ export const WorkspaceManager = () => {
     }
   };
 
+  const handleUpdateOrg = async () => {
+    setIsSavingOrg(true);
+    try {
+      await agencyAPI.updateOrgSettings({
+        name: orgSettings.name,
+        customDomain: orgSettings.customDomain,
+      });
+      await agencyAPI.updateStorageConfig({
+        providerType: storageConfig.providerType,
+        credentials: storageConfig.credentials,
+        isActive: storageConfig.isActive,
+      });
+      toast.success("Organization settings updated");
+    } catch (err) {
+      toast.error("Failed to update organization settings");
+    } finally {
+      setIsSavingOrg(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Tab Switcher */}
@@ -647,6 +682,18 @@ export const WorkspaceManager = () => {
         >
           <Users className="w-3.5 h-3.5" />
           Team Control
+        </button>
+        <button
+          onClick={() => setActiveTab("org")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+            activeTab === "org"
+              ? "bg-primary text-white shadow-xl shadow-primary/20"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          <Settings className="w-3.5 h-3.5" />
+          Organization
         </button>
       </div>
 
@@ -718,40 +765,42 @@ export const WorkspaceManager = () => {
               Syncing nodes...
             </div>
           ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={draftWorkspaces.map((w) => w.id)}
-                strategy={verticalListSortingStrategy}
+            <div className="space-y-3">
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
               >
-                <div className="space-y-3">
-                  {draftWorkspaces.map((workspace) => (
-                    <SortableWorkspaceItem
-                      key={workspace.id}
-                      client={workspace}
-                      onRename={handleRename}
-                      onDelete={handleDelete}
-                      onColorChange={handleColorChange}
-                      onToggleSharing={handleToggleSharing}
-                      onToggleDrop={handleToggleDrop}
-                    />
-                  ))}
-                  {draftWorkspaces.length === 0 && (
-                    <div className="p-12 text-center rounded-[2rem] border-2 border-dashed border-border/50 opacity-40">
-                      <p className="font-black uppercase tracking-widest text-xs">
-                        No active nodes
-                      </p>
-                      <p className="text-xs font-medium mt-2">
-                        Add a client workspace to begin orchestration.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </SortableContext>
-            </DndContext>
+                <SortableContext
+                  items={draftWorkspaces.map((w) => w.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-3">
+                    {draftWorkspaces.map((workspace) => (
+                      <SortableWorkspaceItem
+                        key={workspace.id}
+                        client={workspace}
+                        onRename={handleRename}
+                        onDelete={handleDelete}
+                        onColorChange={handleColorChange}
+                        onToggleSharing={handleToggleSharing}
+                        onToggleDrop={handleToggleDrop}
+                      />
+                    ))}
+                    {draftWorkspaces.length === 0 && (
+                      <div className="p-12 text-center rounded-[2rem] border-2 border-dashed border-border/50 opacity-40">
+                        <p className="font-black uppercase tracking-widest text-xs">
+                          No active nodes
+                        </p>
+                        <p className="text-xs font-medium mt-2">
+                          Add a client workspace to begin orchestration.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            </div>
           )}
 
           <SaveChangesBar
@@ -762,7 +811,7 @@ export const WorkspaceManager = () => {
             shake={shouldShake}
           />
         </div>
-      ) : (
+      ) : activeTab === "team" ? (
         <div className="space-y-6">
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-bold text-lg tracking-tight">
@@ -921,6 +970,209 @@ export const WorkspaceManager = () => {
               ))}
             </div>
           )}
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-lg tracking-tight">
+              Agency Configuration
+            </h3>
+            <Button
+              size="sm"
+              isLoading={isSavingOrg}
+              onClick={handleUpdateOrg}
+              className="rounded-xl h-8 px-6 font-bold uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20"
+            >
+              Save Core Settings
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="p-6 border-0 bg-white/40 dark:bg-card/40 backdrop-blur-xl ring-1 ring-border rounded-[2rem] space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                  <Globe className="w-4 h-4" />
+                </div>
+                <h4 className="font-bold text-sm uppercase tracking-wider">
+                  White-Label Domains
+                </h4>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Agency Name (Internal)
+                  </label>
+                  <Input
+                    value={orgSettings?.name || ""}
+                    onChange={(e) =>
+                      setOrgSettings({ ...orgSettings, name: e.target.value })
+                    }
+                    className="h-12 text-sm font-bold bg-secondary/30 border-0 ring-1 ring-border focus:ring-primary/50"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Custom Subdomain / CNAME
+                  </label>
+                  <div className="relative">
+                    <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="portal.youragency.com"
+                      value={orgSettings?.customDomain || ""}
+                      onChange={(e) =>
+                        setOrgSettings({
+                          ...orgSettings,
+                          customDomain: e.target.value,
+                        })
+                      }
+                      className="h-12 pl-10 text-sm font-bold bg-secondary/30 border-0 ring-1 ring-border focus:ring-primary/50"
+                    />
+                  </div>
+                  <p className="text-[9px] font-bold text-muted-foreground italic">
+                    Configure your DNS CNAME to point to `cname.creati.in`.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest opacity-40">
+                      Brand Color (Primary)
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="color"
+                        value={orgSettings?.primaryColor || "#6366f1"}
+                        onChange={(e) =>
+                          setOrgSettings({
+                            ...orgSettings,
+                            primaryColor: e.target.value,
+                          })
+                        }
+                        className="w-12 h-12 p-1 bg-secondary/30 border-0 ring-1 ring-border rounded-xl cursor-pointer"
+                      />
+                      <Input
+                        value={orgSettings?.primaryColor || "#6366f1"}
+                        onChange={(e) =>
+                          setOrgSettings({
+                            ...orgSettings,
+                            primaryColor: e.target.value,
+                          })
+                        }
+                        className="flex-1 h-12 text-sm font-mono font-bold bg-secondary/30 border-0 ring-1 ring-border focus:ring-primary/50"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest opacity-40">
+                      Agency Logo URL
+                    </label>
+                    <Input
+                      placeholder="https://youragency.com/logo.png"
+                      value={orgSettings?.logoUrl || ""}
+                      onChange={(e) =>
+                        setOrgSettings({
+                          ...orgSettings,
+                          logoUrl: e.target.value,
+                        })
+                      }
+                      className="h-12 text-sm font-bold bg-secondary/30 border-0 ring-1 ring-border focus:ring-primary/50"
+                    />
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-6 border-0 bg-white/40 dark:bg-card/40 backdrop-blur-xl ring-1 ring-border rounded-[2rem] space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 rounded-xl bg-primary/10 text-primary">
+                  <Database className="w-4 h-4" />
+                </div>
+                <h4 className="font-bold text-sm uppercase tracking-wider">
+                  Bring Your Own Storage (BYOS)
+                </h4>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black uppercase tracking-widest opacity-40">
+                    Storage Provider
+                  </label>
+                  <select
+                    value={storageConfig?.providerType || "managed"}
+                    onChange={(e) =>
+                      setStorageConfig({
+                        ...storageConfig,
+                        providerType: e.target.value,
+                      })
+                    }
+                    className="w-full h-12 rounded-xl bg-secondary/30 border-0 ring-1 ring-border px-4 text-sm font-bold focus:ring-primary/50 outline-none appearance-none"
+                  >
+                    <option value="managed">Creati Cloud (Managed S3)</option>
+                    <option value="s3_custom">Custom AWS S3 Bucket</option>
+                    <option value="gdrive">Google Drive</option>
+                    <option value="dropbox">Dropbox Business</option>
+                  </select>
+                </div>
+
+                {storageConfig?.providerType !== "managed" && (
+                  <div className="space-y-4 p-4 rounded-2xl bg-black/5 animate-in fade-in slide-in-from-top-2">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black uppercase tracking-widest opacity-40">
+                        Authentication Credentials (JSON / Token)
+                      </label>
+                      <textarea
+                        rows={5}
+                        value={
+                          typeof storageConfig.credentials === "string"
+                            ? storageConfig.credentials
+                            : JSON.stringify(storageConfig.credentials, null, 2)
+                        }
+                        onChange={(e) =>
+                          setStorageConfig({
+                            ...storageConfig,
+                            credentials: e.target.value,
+                          })
+                        }
+                        className="w-full p-4 text-xs font-mono bg-black/10 border-0 ring-1 ring-border rounded-xl focus:ring-primary/50 outline-none"
+                        placeholder='{ "creds": "..." } or access token'
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between p-4 bg-primary/5 rounded-2xl border border-primary/10">
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] font-black uppercase tracking-widest">
+                      Active Storage Logic
+                    </p>
+                    <p className="text-[9px] text-muted-foreground font-bold italic">
+                      When enabled, all NEW client assets use this provider.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() =>
+                      setStorageConfig({
+                        ...storageConfig,
+                        isActive: !storageConfig.isActive,
+                      })
+                    }
+                    className={cn(
+                      "w-10 h-5 rounded-full transition-all relative p-1 ring-1 ring-inset",
+                      storageConfig?.isActive
+                        ? "bg-primary ring-primary"
+                        : "bg-muted ring-border",
+                    )}
+                  >
+                    <motion.div
+                      animate={{ x: storageConfig?.isActive ? 20 : 0 }}
+                      className="w-3 h-3 bg-white rounded-full shadow-lg"
+                    />
+                  </button>
+                </div>
+              </div>
+            </Card>
+          </div>
         </div>
       )}
     </div>
