@@ -12,33 +12,42 @@ export interface AudioTrackItem {
   fadeOut: number;
 }
 
+export interface VideoSegment {
+  id: string;
+  url: string;
+  startTime: number; // Start time in the overall timeline
+  duration: number; // Actual duration after trim
+  trimStart: number;
+  trimEnd: number;
+  originalDuration: number;
+  volume: number;
+  filter?: string;
+}
+
 export interface TransitionItem {
   id: string;
   type: "fade" | "zoom" | "slide" | "glitch" | "wipe";
-  offset: number; // Point in timeline
+  offset: number; // Point in timeline where it begins
   duration: number;
 }
 
 export interface StudioState {
-  video: {
-    id: string;
-    url: string;
-    trimStart: number;
-    trimEnd: number;
-    duration: number;
-    volume: number;
-  };
+  videoSegments: VideoSegment[];
   audioTracks: AudioTrackItem[];
   overlays: OverlayItem[];
   transitions: TransitionItem[];
   currentTime: number;
   isPlaying: boolean;
   selectedElementId: string | null;
+  totalDuration: number;
 }
 
 interface StudioContextType {
   state: StudioState;
-  updateVideo: (updates: Partial<StudioState["video"]>) => void;
+  addVideoSegment: (segment: Omit<VideoSegment, "id" | "startTime">) => void;
+  updateVideoSegment: (id: string, updates: Partial<VideoSegment>) => void;
+  removeVideoSegment: (id: string) => void;
+  reorderSegments: (startIndex: number, endIndex: number) => void;
   addAudioTrack: (audio: Omit<AudioTrackItem, "id">) => void;
   updateAudioTrack: (id: string, updates: Partial<AudioTrackItem>) => void;
   removeAudioTrack: (id: string) => void;
@@ -60,19 +69,36 @@ export const StudioProvider: React.FC<{
   children: React.ReactNode;
 }> = ({ initialVideo, children }) => {
   const [state, setState] = useState<StudioState>({
-    video: {
-      ...initialVideo,
-      trimStart: 0,
-      trimEnd: initialVideo.duration,
-      volume: 1,
-    },
+    videoSegments: [
+      {
+        id: `seg-${initialVideo.id}`,
+        url: initialVideo.url,
+        startTime: 0,
+        duration: initialVideo.duration,
+        originalDuration: initialVideo.duration,
+        trimStart: 0,
+        trimEnd: initialVideo.duration,
+        volume: 1,
+      },
+    ],
     audioTracks: [],
     overlays: [],
     transitions: [],
     currentTime: 0,
     isPlaying: false,
     selectedElementId: null,
+    totalDuration: initialVideo.duration,
   });
+
+  const recalculateSegments = useCallback((segments: VideoSegment[]) => {
+    let currentOffset = 0;
+    const updated = segments.map((seg) => {
+      const newSeg = { ...seg, startTime: currentOffset };
+      currentOffset += seg.duration;
+      return newSeg;
+    });
+    return { segments: updated, totalDuration: currentOffset };
+  }, []);
 
   const togglePlayback = useCallback(() => {
     setState((prev) => ({ ...prev, isPlaying: !prev.isPlaying }));
@@ -82,12 +108,63 @@ export const StudioProvider: React.FC<{
     setState((prev) => ({ ...prev, currentTime: time }));
   }, []);
 
-  const updateVideo = useCallback((updates: Partial<StudioState["video"]>) => {
-    setState((prev) => ({
-      ...prev,
-      video: { ...prev.video, ...updates },
-    }));
-  }, []);
+  const addVideoSegment = useCallback(
+    (segmentBlueprint: Omit<VideoSegment, "id" | "startTime">) => {
+      setState((prev) => {
+        const id = `seg-${Date.now()}`;
+        const newSegments = [
+          ...prev.videoSegments,
+          { ...segmentBlueprint, id, startTime: prev.totalDuration },
+        ];
+        return {
+          ...prev,
+          videoSegments: newSegments,
+          totalDuration: prev.totalDuration + segmentBlueprint.duration,
+        };
+      });
+    },
+    [],
+  );
+
+  const updateVideoSegment = useCallback(
+    (id: string, updates: Partial<VideoSegment>) => {
+      setState((prev) => {
+        const newSegments = prev.videoSegments.map((seg) =>
+          seg.id === id ? { ...seg, ...updates } : seg,
+        );
+        const { segments: recalculated, totalDuration } =
+          recalculateSegments(newSegments);
+        return { ...prev, videoSegments: recalculated, totalDuration };
+      });
+    },
+    [recalculateSegments],
+  );
+
+  const removeVideoSegment = useCallback(
+    (id: string) => {
+      setState((prev) => {
+        const newSegments = prev.videoSegments.filter((seg) => seg.id !== id);
+        const { segments: recalculated, totalDuration } =
+          recalculateSegments(newSegments);
+        return { ...prev, videoSegments: recalculated, totalDuration };
+      });
+    },
+    [recalculateSegments],
+  );
+
+  const reorderSegments = useCallback(
+    (startIndex: number, endIndex: number) => {
+      setState((prev) => {
+        const result = Array.from(prev.videoSegments);
+        const [removed] = result.splice(startIndex, 1);
+        result.splice(endIndex, 0, removed);
+        const { segments: recalculated, totalDuration } =
+          recalculateSegments(result);
+        return { ...prev, videoSegments: recalculated, totalDuration };
+      });
+    },
+    [recalculateSegments],
+  );
 
   const addAudioTrack = useCallback((audio: Omit<AudioTrackItem, "id">) => {
     const id = `audio-${Date.now()}`;
@@ -175,7 +252,10 @@ export const StudioProvider: React.FC<{
     <StudioContext.Provider
       value={{
         state,
-        updateVideo,
+        addVideoSegment,
+        updateVideoSegment,
+        removeVideoSegment,
+        reorderSegments,
         addAudioTrack,
         updateAudioTrack,
         removeAudioTrack,

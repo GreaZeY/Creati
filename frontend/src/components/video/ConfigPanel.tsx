@@ -5,6 +5,8 @@ import { Textarea } from "@/components/ui/Textarea";
 import { Slider } from "@/components/ui/Slider";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { TransitionGallery } from "./TransitionGallery";
+import { FilterGallery } from "./FilterGallery";
+import { useStudio } from "../../context/StudioProvider";
 
 interface ConfigPanelProps {
   overlays: OverlayItem[];
@@ -139,8 +141,18 @@ export function ConfigPanel({
   onDeleteOverlay,
   onSelectOverlay,
 }: ConfigPanelProps) {
+  const { state, addVideoSegment, updateVideoSegment, removeVideoSegment } =
+    useStudio();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const selected = overlays.find((o) => o.id === selectedId) || null;
+
+  // Active segment for contextual editing
+  const activeSegment =
+    state.videoSegments.find(
+      (seg) =>
+        state.currentTime >= seg.startTime &&
+        state.currentTime < seg.startTime + seg.duration,
+    ) || state.videoSegments[0];
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -153,6 +165,15 @@ export function ConfigPanel({
     };
     reader.readAsDataURL(file);
     e.target.value = "";
+  };
+
+  const handleAddClip = () => {
+    if (activeSegment) {
+      const { id: _id, startTime: _startTime, ...blueprint } = activeSegment;
+      addVideoSegment({
+        ...blueprint,
+      });
+    }
   };
 
   return (
@@ -186,6 +207,13 @@ export function ConfigPanel({
             <span className="text-[10px] font-bold uppercase">Sticker</span>
           </button>
         </div>
+        <button
+          onClick={handleAddClip}
+          className="w-full mt-2 py-2 rounded-lg bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+        >
+          <ImagePlus size={14} />
+          Add Video Segment
+        </button>
         <input
           ref={fileInputRef}
           type="file"
@@ -533,22 +561,67 @@ export function ConfigPanel({
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center py-12">
-            <div className="w-12 h-12 rounded-full bg-secondary/30 flex items-center justify-center mb-3">
-              <Type size={20} className="text-muted-foreground/40" />
-            </div>
-            <p className="text-sm text-muted-foreground/60">
-              Select an element to edit
-            </p>
-            <p className="text-xs text-muted-foreground/40 mt-1 mb-6">
-              or add a new one above
-            </p>
+          <div className="space-y-8 h-full">
+            {/* Active Clip Management */}
+            {activeSegment && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">
+                    Clip Properties
+                  </p>
+                  {state.videoSegments.length > 1 && (
+                    <button
+                      onClick={() => removeVideoSegment(activeSegment.id)}
+                      className="p-1.5 rounded-md hover:bg-destructive/10 text-destructive"
+                      title="Delete Clip"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Clip Volume */}
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-bold uppercase text-muted-foreground">
+                      Clip Volume
+                    </label>
+                    <span className="text-xs font-mono text-muted-foreground">
+                      {Math.round((activeSegment.volume || 1) * 100)}%
+                    </span>
+                  </div>
+                  <Slider
+                    min={0}
+                    max={1.5}
+                    step={0.05}
+                    value={activeSegment.volume || 1}
+                    onValueChange={(val) =>
+                      updateVideoSegment(activeSegment.id, { volume: val })
+                    }
+                  />
+                </div>
+
+                {/* Cinematic Filters */}
+                <div className="space-y-4 pt-4 border-t border-border/10">
+                  <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest">
+                    Cinematic Filters
+                  </p>
+                  <FilterGallery />
+                </div>
+              </div>
+            )}
 
             <div className="w-full border-t border-border/20 pt-6">
               <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest mb-4">
-                Quick Transitions
+                Global Transitions
               </p>
               <TransitionGallery />
+            </div>
+
+            <div className="flex flex-col items-center justify-center pt-8 opacity-40">
+              <p className="text-[10px] font-bold uppercase tracking-tighter">
+                Select an element to edit properties
+              </p>
             </div>
           </div>
         )}

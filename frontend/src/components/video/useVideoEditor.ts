@@ -29,7 +29,8 @@ export function useVideoEditor({
 }: UseVideoEditorArgs) {
   const { 
     state, 
-    updateVideo, 
+    addVideoSegment,
+    updateVideoSegment, 
     addOverlay, 
     updateOverlay: studioUpdateOverlay, 
     removeOverlay: studioRemoveOverlay,
@@ -69,10 +70,12 @@ export function useVideoEditor({
 
   useEffect(() => {
     if (isOpen && initialSettings) {
-      updateVideo({
-        trimStart: initialSettings.trim_start || 0,
-        trimEnd: initialSettings.trim_end || state.video.duration,
-      });
+      if (state.videoSegments.length > 0) {
+        updateVideoSegment(state.videoSegments[0].id, {
+          trimStart: initialSettings.trim_start || 0,
+          trimEnd: initialSettings.trim_end || state.videoSegments[0].originalDuration,
+        });
+      }
       // Import existing overlays into studio
       initialSettings.overlays.forEach(ov => addOverlay(ov));
     }
@@ -109,47 +112,45 @@ export function useVideoEditor({
 
   // ── Playback handlers ──
 
+  const activeSegment = state.videoSegments.find(
+    seg => state.currentTime >= seg.startTime && state.currentTime < (seg.startTime + seg.duration)
+  ) || state.videoSegments[0];
+
   const handleLoadedMetadata = useCallback(() => {
-    if (videoRef.current) {
+    if (videoRef.current && state.videoSegments.length === 1) {
       const dur = videoRef.current.duration;
-      updateVideo({
+      updateVideoSegment(state.videoSegments[0].id, {
         duration: dur,
+        originalDuration: dur,
         trimEnd: initialSettings?.trim_end ?? dur,
         trimStart: initialSettings?.trim_start ?? 0,
       });
     }
-  }, [initialSettings]);
+  }, [initialSettings, state.videoSegments.length, updateVideoSegment]);
 
   const handleTimeUpdate = useCallback(() => {
     if (videoRef.current) {
-      const curr = videoRef.current.currentTime;
-      studioSetCurrentTime(curr);
-      if (state.video.trimEnd > 0 && curr > state.video.trimEnd) {
-        videoRef.current.currentTime = state.video.trimStart;
+      const videoTime = videoRef.current.currentTime;
+      if (activeSegment) {
+        const absoluteTime = activeSegment.startTime + (videoTime - activeSegment.trimStart);
+        studioSetCurrentTime(absoluteTime);
       }
     }
-  }, [state.video.trimStart, state.video.trimEnd, studioSetCurrentTime]);
+  }, [activeSegment, studioSetCurrentTime]);
 
   const togglePlay = useCallback(() => {
     if (!videoRef.current) return;
     if (state.isPlaying) {
       videoRef.current.pause();
     } else {
-      if (
-        state.video.trimEnd > 0 &&
-        (videoRef.current.currentTime < state.video.trimStart ||
-          videoRef.current.currentTime >= state.video.trimEnd)
-      ) {
-        videoRef.current.currentTime = state.video.trimStart;
-      }
       videoRef.current.play();
     }
     studioTogglePlayback();
-  }, [state.isPlaying, state.video.trimStart, state.video.trimEnd, studioTogglePlayback]);
+  }, [state.isPlaying, studioTogglePlayback]);
 
-  const handleTrimChange = useCallback((start: number, end: number) => {
-    updateVideo({ trimStart: start, trimEnd: end });
-  }, [updateVideo]);
+  const handleTrimChange = useCallback((id: string, start: number, end: number) => {
+    updateVideoSegment(id, { trimStart: start, trimEnd: end, duration: end - start });
+  }, [updateVideoSegment]);
 
   // ── Overlay CRUD ──
 
@@ -229,12 +230,12 @@ export function useVideoEditor({
 
   const handleSave = useCallback(() => {
     onSave(video.id, {
-      trim_start: state.video.trimStart,
-      trim_end: state.video.trimEnd,
       overlays: state.overlays,
-    });
+      // The backend needs to know about multiple segments now
+      video_segments: state.videoSegments, 
+    } as any);
     onClose();
-  }, [video.id, state.video.trimStart, state.video.trimEnd, state.overlays, onSave, onClose]);
+  }, [video.id, state.videoSegments, state.overlays, onSave, onClose]);
 
   const pctToPx = useCallback(
     (pct: number, dimension: number) => (pct / 100) * dimension,
@@ -244,25 +245,26 @@ export function useVideoEditor({
   // Video Source with Proxy Logic
   // If URL is external (not our storage), route through proxy to bypass CORS
   const videoSrc = (() => {
-    const rawUrl = video.previewUrl || video.url;
+    const rawUrl = activeSegment?.url || video.previewUrl || video.url;
     if (!rawUrl) return "";
     
-    // Check if it's a relative path or our own domain (safe)
     if (rawUrl.startsWith("/") || rawUrl.includes("localhost") || rawUrl.includes("creati.in")) {
       return rawUrl;
     }
 
-    // It's external (e.g. Facebook, Instagram, AWS S3 direct), use proxy
-    // Assuming backend is at /api relative to frontend or configured base URL
-    // Since we are inside the app, we can use relative path if proxy set up in Vite
-    // But backend is on port 8080 usually. Let's assume standard API path.
-    // Ideally use an env var or a helper for API base URL.
-    // For now, hardcode or use relative if proxy is set up.
-    // Let's assume relative /api/proxy/video works via Vite proxy or direct if CORS allowed.
-    // Wait, backend is on 8080. Frontend on 5173.
-    // We added Access-Control-Allow-Origin: * to proxy response, so direct call to 8080 is fine.
-    const baseUrl = "http://localhost:8080"; // TODO: Use env
+    const baseUrl = "http://localhost:8080"; 
     return `${baseUrl}/api/proxy/video?url=${encodeURIComponent(rawUrl)}`;
+  })();
+
+  const filterStyle = (() => {
+    if (!activeSegment?.filter) return {};
+    switch (activeSegment.filter) {
+      case "noir": return { filter: "grayscale(1) contrast(1.2) brightness(0.9)" };
+      case "sepia": return { filter: "sepia(1) contrast(1.1)" };
+      case "vivid": return { filter: "saturate(1.8) contrast(1.1)" };
+      case "cinematic": return { filter: "contrast(1.2) brightness(0.9) saturate(1.1) sepia(0.1)" };
+      default: return {};
+    }
   })();
 
   return {
@@ -275,15 +277,18 @@ export function useVideoEditor({
     // Playback
     isPlaying: state.isPlaying,
     setIsPlaying: studioSetIsPlaying,
-    duration: state.video.duration,
+    duration: state.totalDuration,
     currentTime: state.currentTime,
     togglePlay,
     handleLoadedMetadata,
     handleTimeUpdate,
-    // Trim
-    trimStart: state.video.trimStart,
-    trimEnd: state.video.trimEnd,
+    // Segments
+    activeSegment,
+    videoSegments: state.videoSegments,
+    addVideoSegment,
+    updateVideoSegment,
     handleTrimChange,
+    filterStyle,
     // Overlays
     overlays: state.overlays,
     selectedId: state.selectedElementId,

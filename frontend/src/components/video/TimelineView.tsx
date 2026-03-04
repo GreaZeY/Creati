@@ -7,7 +7,7 @@ export const TimelineView: React.FC = () => {
   const { state, setCurrentTime } = useStudio();
   const timelineRef = useRef<HTMLDivElement>(null);
 
-  const duration = state.video.duration || 60;
+  const duration = state.totalDuration || 60;
   const pixelsPerSecond = 20;
   const width = duration * pixelsPerSecond;
 
@@ -62,18 +62,27 @@ export const TimelineView: React.FC = () => {
             </span>
           </div>
           <div className="flex-1 relative h-full flex items-center">
-            <div
-              className="relative h-8 mx-2 rounded bg-primary/10 border border-primary/20 overflow-hidden"
-              style={{
-                left: `${state.video.trimStart * pixelsPerSecond}px`,
-                width: `${(state.video.trimEnd - state.video.trimStart) * pixelsPerSecond}px`,
-              }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent" />
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[8px] font-bold truncate opacity-60 uppercase tracking-tighter">
-                {state.video.url.split("/").pop()}
-              </span>
-            </div>
+            {state.videoSegments.map((seg) => (
+              <div
+                key={seg.id}
+                className="absolute h-8 rounded bg-primary/20 border border-primary/40 overflow-hidden group/clip"
+                style={{
+                  left: `${seg.startTime * pixelsPerSecond}px`,
+                  width: `${seg.duration * pixelsPerSecond}px`,
+                }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent" />
+                <div className="absolute inset-y-0 left-0 w-1 bg-primary/40" />
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[9px] font-black truncate opacity-60 uppercase tracking-tighter">
+                  {seg.url.split("/").pop()}
+                </span>
+                {seg.filter && (
+                  <div className="absolute right-1 top-1 text-[7px] bg-primary/20 px-1 rounded font-bold uppercase">
+                    {seg.filter}
+                  </div>
+                )}
+              </div>
+            ))}
 
             {/* Transition Markers */}
             {state.transitions.map((trans) => (

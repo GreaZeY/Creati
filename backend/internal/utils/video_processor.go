@@ -16,11 +16,21 @@ func NewVideoProcessor() *VideoProcessor {
 
 // ProcessingSettings defines the edits to be applied
 type ProcessingSettings struct {
-	TrimStart   *float64           `json:"trim_start"`
-	TrimEnd     *float64           `json:"trim_end"`
-	Overlays    []OverlayConfig    `json:"overlays"`
-	AudioTracks []AudioTrackConfig `json:"audio_tracks"`
-	Transitions []TransitionConfig `json:"transitions"`
+	Segments    []VideoSegmentConfig `json:"video_segments"`
+	AudioTracks []AudioTrackConfig   `json:"audio_tracks"`
+	Transitions []TransitionConfig   `json:"transitions"`
+	Overlays    []OverlayConfig      `json:"overlays"`
+}
+
+// VideoSegmentConfig defines a clip in the sequence
+type VideoSegmentConfig struct {
+	URL       string  `json:"url"`
+	StartTime float64 `json:"start_time"`
+	Duration  float64 `json:"duration"`
+	TrimStart float64 `json:"trim_start"`
+	TrimEnd   float64 `json:"trim_end"`
+	Volume    float64 `json:"volume"`
+	Filter    string  `json:"filter"` // "noir", "cinematic", etc.
 }
 
 // AudioTrackConfig defines background music properties
@@ -62,12 +72,21 @@ func (vp *VideoProcessor) Trim(ctx context.Context, inputPath string, start, end
 
 // OverlayConfig defines the text or image overlay properties
 type OverlayConfig struct {
-	Type  string `json:"type"` // "text" or "image" (for now just text is planned)
-	Text  string `json:"text"`
-	X     string `json:"x"` // FFmpeg syntax e.g. "(w-text_w)/2"
-	Y     string `json:"y"`
-	Size  int    `json:"size"`
-	Color string `json:"color"`
+	Type              string  `json:"type"` // "text", "sticker", "image"
+	Text              string  `json:"text,omitempty"`
+	Source            string  `json:"src,omitempty"`
+	X                 float64 `json:"x"` // Percentage 0-100
+	Y                 float64 `json:"y"` // Percentage 0-100
+	Width             float64 `json:"width"`
+	Height            float64 `json:"height"`
+	Rotation          float64 `json:"rotation"`
+	Size              int     `json:"fontSize,omitempty"`
+	Color             string  `json:"fontColor,omitempty"`
+	BGColor           string  `json:"bgColor,omitempty"`
+	FontFamily        string  `json:"fontFamily,omitempty"`
+	AnimationIn       string  `json:"animationIn,omitempty"`
+	AnimationOut      string  `json:"animationOut,omitempty"`
+	AnimationDuration float64 `json:"animationDuration,omitempty"`
 }
 
 // ApplyOverlays adds text overlays to the video.
@@ -217,32 +236,56 @@ func (vp *VideoProcessor) MixAudio(ctx context.Context, inputPath string, tracks
 }
 
 // ProcessCreativeProject applies all edits in a single pass where possible
-func (vp *VideoProcessor) ProcessCreativeProject(ctx context.Context, inputPath string, settings ProcessingSettings) (string, error) {
-	outputPath := inputPath + "_studio.mp4"
-
-	stream := ffmpeg.Input(inputPath)
-
-	// 1. Trim
-	if settings.TrimStart != nil || settings.TrimEnd != nil {
-		start := 0.0
-		if settings.TrimStart != nil {
-			start = *settings.TrimStart
-		}
-		stream = stream.Filter("trim", ffmpeg.Args{}, ffmpeg.KwArgs{"start": start})
-		if settings.TrimEnd != nil {
-			stream = stream.Filter("atrim", ffmpeg.Args{}, ffmpeg.KwArgs{"end": *settings.TrimEnd})
-		}
-		stream = stream.Filter("setpts", ffmpeg.Args{"PTS-STARTPTS"})
+func (vp *VideoProcessor) ProcessCreativeProject(ctx context.Context, outputPath string, settings ProcessingSettings) (string, error) {
+	if len(settings.Segments) == 0 {
+		return "", fmt.Errorf("no video segments provided")
 	}
 
-	// 2. Overlays (Visual)
+	// 1. Process each segment (Trim + Filter)
+	var segmentStreams []*ffmpeg.Stream
+	for i, seg := range settings.Segments {
+		s := ffmpeg.Input(seg.URL, ffmpeg.KwArgs{"ss": seg.TrimStart}).
+			Filter("trim", ffmpeg.Args{}, ffmpeg.KwArgs{"duration": seg.Duration}).
+			Filter("setpts", ffmpeg.Args{"PTS-STARTPTS"})
+
+		// Apply Color Filters
+		switch seg.Filter {
+		case "noir":
+			s = s.Filter("colorchannelmixer", ffmpeg.Args{".3:.4:.3:0:.3:.4:.3:0:.3:.4:.3"})
+		case "sepia":
+			s = s.Filter("colorchannelmixer", ffmpeg.Args{".393:.769:.189:0:.349:.686:.168:0:.272:.534:.131"})
+		case "vivid":
+			s = s.Filter("eq", ffmpeg.Args{}, ffmpeg.KwArgs{"saturation": 1.5})
+		case "cinematic":
+			s = s.Filter("eq", ffmpeg.Args{}, ffmpeg.KwArgs{"contrast": 1.1, "brightness": -0.05})
+		}
+
+		segmentStreams = append(segmentStreams, s)
+		_ = i
+	}
+
+	// 2. Concatenate Segments
+	// Note: In a complex filtergraph, we'd use 'concat'
+	// For MVP simplicity and reliability, we'll build a filter string if needed
+	// or use sequence processing.
+	var finalVideoStream *ffmpeg.Stream
+	if len(segmentStreams) > 1 {
+		// This is a simplification; real concat requires matching formats
+		finalVideoStream = ffmpeg.Filter(segmentStreams, "concat", ffmpeg.Args{fmt.Sprintf("n=%d:v=1:a=0", len(segmentStreams))})
+	} else {
+		finalVideoStream = segmentStreams[0]
+	}
+
+	// 3. Overlays (Visual)
 	for _, overlay := range settings.Overlays {
 		if overlay.Type == "text" {
 			fontPath := "C:/Windows/Fonts/arial.ttf"
-			stream = stream.Filter("drawtext", ffmpeg.Args{}, ffmpeg.KwArgs{
+			// Convert percentage X/Y to FFmpeg coordinates
+			// This requires knowing video dimensions, for now using placeholders
+			finalVideoStream = finalVideoStream.Filter("drawtext", ffmpeg.Args{}, ffmpeg.KwArgs{
 				"text":      overlay.Text,
-				"x":         overlay.X,
-				"y":         overlay.Y,
+				"x":         fmt.Sprintf("(w*%f/100)", overlay.X),
+				"y":         fmt.Sprintf("(h*%f/100)", overlay.Y),
 				"fontfile":  fontPath,
 				"fontsize":  overlay.Size,
 				"fontcolor": overlay.Color,
@@ -250,23 +293,20 @@ func (vp *VideoProcessor) ProcessCreativeProject(ctx context.Context, inputPath 
 		}
 	}
 
-	// 3. Audio Construction
-	// We'll use a multi-input approach here
-	allInputs := []*ffmpeg.Stream{stream}
-	for _, t := range settings.AudioTracks {
-		allInputs = append(allInputs, ffmpeg.Input(t.URL))
-	}
+	// 4. Audio Mixing
+	// Merge original audio from segments and mix with background tracks
+	// ... (Complex mixing logic)
 
 	// Final Render
-	err := ffmpeg.Output(allInputs, outputPath, ffmpeg.KwArgs{
-		"c:v": "libx264",
-		"crf": 18,
-		"c:a": "aac",
-	}).OverWriteOutput().Run()
+	err := finalVideoStream.
+		Output(outputPath, ffmpeg.KwArgs{
+			"c:v":      "libx264",
+			"crf":      18,
+			"preset":   "medium",
+			"movflags": "+faststart",
+		}).
+		OverWriteOutput().
+		Run()
 
-	if err != nil {
-		return "", err
-	}
-
-	return outputPath, nil
+	return outputPath, err
 }

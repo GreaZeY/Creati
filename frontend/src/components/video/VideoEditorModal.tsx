@@ -105,7 +105,8 @@ function VideoEditorContent({
                 <video
                   ref={editor.videoRef}
                   src={editor.videoSrc}
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-contain transition-all duration-300 ease-in-out"
+                  style={editor.filterStyle}
                   onLoadedMetadata={editor.handleLoadedMetadata}
                   onTimeUpdate={editor.handleTimeUpdate}
                   onEnded={() => editor.setIsPlaying(false)}
