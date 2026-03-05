@@ -337,6 +337,20 @@ export function useVideoEditor({
     bakeNextStaleSegment();
   }, [state.videoSegments, ffmpegLoaded, trimVideo, video.url]);
 
+  // Global cleanup on unmount - use a ref to capture the final URLs
+  const urlsToRevoke = useRef<Record<string, string>>({});
+  useEffect(() => {
+    urlsToRevoke.current = trimmedUrls;
+  }, [trimmedUrls]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(urlsToRevoke.current).forEach(url => {
+        try { URL.revokeObjectURL(url); } catch (e) {}
+      });
+    };
+  }, []);
+
   // Video Source with Proxy/WASM Logic
   const videoSrc = (() => {
     // Priority: Baked WASM blob -> Asset URL -> Proxy
@@ -378,7 +392,7 @@ export function useVideoEditor({
     setIsPlaying: studioSetIsPlaying,
     isBaking,
     duration: state.totalDuration,
-  currentTime: state.currentTime,
+    currentTime: state.currentTime,
     togglePlay,
     handleLoadedMetadata,
     handleTimeUpdate,

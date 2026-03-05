@@ -58,7 +58,9 @@ export function useFfmpeg() {
         "-t", duration.toString(),
         "-c:v", "libx264",
         "-preset", "ultrafast",
-        "-c:a", "aac",
+        "-map", "0:v:0",   // Map first video stream
+        "-map", "0:a?",     // Map audio ONLY if it exists
+        "-c:a", "aac",     // Re-encode audio to aac (stable in browser)
         outputName
       ]);
 
