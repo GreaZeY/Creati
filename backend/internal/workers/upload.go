@@ -93,7 +93,7 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 	if err == nil && len(settingsJSON) > 0 {
 		_ = json.Unmarshal(settingsJSON, &settings)
 		// Check if empty settings
-		if settings != nil && settings.TrimStart == nil && settings.TrimEnd == nil && len(settings.Overlays) == 0 {
+		if settings != nil && len(settings.Segments) == 0 && len(settings.Overlays) == 0 {
 			settings = nil
 		}
 	}
@@ -179,13 +179,17 @@ func (w *UploadWorker) Process(ctx context.Context, payload []byte) error {
 		vp := utils.NewVideoProcessor()
 
 		// Trim
-		if settings.TrimStart != nil && settings.TrimEnd != nil {
-			trimmedPath, err := vp.Trim(ctx, currentPath, *settings.TrimStart, *settings.TrimEnd)
-			if err != nil {
-				return w.fail(ctx, job, payload, fmt.Errorf("trim failed: %w", err))
+		if len(settings.Segments) > 0 {
+			seg := settings.Segments[0]
+			// Only trim if bounds are specified and within valid range
+			if seg.TrimEnd > seg.TrimStart {
+				trimmedPath, err := vp.Trim(ctx, currentPath, seg.TrimStart, seg.TrimEnd)
+				if err != nil {
+					return w.fail(ctx, job, payload, fmt.Errorf("trim failed: %w", err))
+				}
+				intermediateFiles = append(intermediateFiles, trimmedPath)
+				currentPath = trimmedPath
 			}
-			intermediateFiles = append(intermediateFiles, trimmedPath)
-			currentPath = trimmedPath
 		}
 
 		// Overlays

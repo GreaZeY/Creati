@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"strings"
+
 	"creati.in/creati/backend/internal/utils"
 	"github.com/gofiber/fiber/v2"
 )
@@ -76,6 +78,21 @@ func (h *OrgHandler) GetPublicBranding(c *fiber.Ctx) error {
 	`, host).Scan(&name, &logoURL, &primaryColor)
 
 	if err == sql.ErrNoRows {
+		// Fallback for development: use the first organization if accessed via localhost/ngrok
+		if host == "localhost" || host == "127.0.0.1" || strings.Contains(host, "ngrok-free.dev") {
+			err = h.db.QueryRow(`SELECT name, logo_url, primary_color FROM organizations LIMIT 1`).Scan(&name, &logoURL, &primaryColor)
+			if err == nil {
+				return c.JSON(fiber.Map{
+					"success": true,
+					"data": fiber.Map{
+						"name":         name,
+						"logoUrl":      logoURL.String,
+						"primaryColor": primaryColor.String,
+					},
+				})
+			}
+		}
+
 		return c.JSON(fiber.Map{
 			"success": false,
 			"message": "no custom branding found for this domain",

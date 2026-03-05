@@ -16,7 +16,11 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
-    allowedHosts:["polysemous-nonconjunctively-kecia.ngrok-free.dev"]
+    allowedHosts:["polysemous-nonconjunctively-kecia.ngrok-free.dev"],
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
   },
   resolve: {
     alias: {

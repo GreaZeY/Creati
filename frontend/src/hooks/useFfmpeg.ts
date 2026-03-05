@@ -8,46 +8,78 @@ export function useFfmpeg() {
   const [progress, setProgress] = useState(0);
 
   const load = useCallback(async () => {
+    console.log("[FFmpeg] Initializing... Cross-Origin Isolated:", window.crossOriginIsolated);
+    
+    if (!window.crossOriginIsolated) {
+      console.warn("[FFmpeg] NOT in a Cross-Origin Isolated environment. SharedArrayBuffer might be missing, and high-performance WASM will likely fail.");
+    }
+
     const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
     const ffmpeg = ffmpegRef.current;
     
     ffmpeg.on("progress", ({ progress }) => {
+      console.log(`[FFmpeg] Progress: ${Math.round(progress * 100)}%`);
       setProgress(progress);
     });
 
-    await ffmpeg.load({
-      coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-      wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-    });
-    setLoaded(true);
+    try {
+      await ffmpeg.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+      });
+      console.log("[FFmpeg] Loaded successfully");
+      setLoaded(true);
+    } catch (err) {
+      console.error("[FFmpeg] Load failed:", err);
+    }
   }, []);
 
   const trimVideo = useCallback(async (url: string, start: number, duration: number) => {
-    if (!loaded) await load();
+    console.log(`[FFmpeg] Trimming: ${url} (start: ${start}s, duration: ${duration}s)`);
+    if (!loaded) {
+      console.log("[FFmpeg] Not loaded, loading now...");
+      await load();
+    }
     
     const ffmpeg = ffmpegRef.current;
     const inputName = "input.mp4";
-    const outputName = "output.mp4";
+    const outputName = `trim_${Date.now()}.mp4`; // Unique name to avoid collisions
 
-    await ffmpeg.writeFile(inputName, await fetchFile(url));
+    try {
+      console.log("[FFmpeg] Writing file...");
+      await ffmpeg.writeFile(inputName, await fetchFile(url));
 
-    // Simple trim: -ss (start), -t (duration), -c copy (fast, no re-encoding)
-    // Note: -ss before -i is faster but might be less accurate (keyframe based).
-    // Using -ss after -i for better accuracy in preview.
-    await ffmpeg.exec([
-      "-i", inputName,
-      "-ss", start.toString(),
-      "-t", duration.toString(),
-      "-c", "copy",
-      outputName
-    ]);
+      console.log("[FFmpeg] Executing command...");
+      // Using -preset ultrafast and -c:v libx264 for better compatibility than -c copy
+      // although -c copy is faster, it can be inaccurate if -ss is not on keyframe
+      await ffmpeg.exec([
+        "-ss", start.toString(),
+        "-i", inputName,
+        "-t", duration.toString(),
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-c:a", "aac",
+        outputName
+      ]);
 
-    const data = await ffmpeg.readFile(outputName);
-    // Use .slice().buffer to ensure we have a standard ArrayBuffer if SharedArrayBuffer is used
-    const blob = new Blob([(data as Uint8Array).slice().buffer], { type: "video/mp4" });
-    return URL.createObjectURL(blob);
+      console.log("[FFmpeg] Reading result...");
+      const data = await ffmpeg.readFile(outputName);
+      // Use .slice().buffer to ensure we have a standard ArrayBuffer if SharedArrayBuffer is used
+      const blob = new Blob([(data as Uint8Array).slice().buffer], { type: "video/mp4" });
+      const blobUrl = URL.createObjectURL(blob);
+      console.log("[FFmpeg] Trim complete:", blobUrl);
+      
+      // Cleanup: delete files from virtual FS to save memory
+      await ffmpeg.deleteFile(inputName);
+      await ffmpeg.deleteFile(outputName);
+
+      return blobUrl;
+    } catch (err) {
+      console.error("[FFmpeg] Trim execution failed:", err);
+      throw err;
+    }
   }, [loaded, load]);
-
+ 
   return {
     loaded,
     load,

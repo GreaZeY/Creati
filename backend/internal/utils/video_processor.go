@@ -115,8 +115,8 @@ func (vp *VideoProcessor) ApplyOverlays(ctx context.Context, inputPath string, o
 			// Use generic Filter method as specific wrappers might vary
 			stream = stream.Filter("drawtext", ffmpeg.Args{}, ffmpeg.KwArgs{
 				"text":      overlay.Text,
-				"x":         overlay.X,
-				"y":         overlay.Y,
+				"x":         fmt.Sprintf("(w*%f/100)", overlay.X),
+				"y":         fmt.Sprintf("(h*%f/100)", overlay.Y),
 				"fontfile":  fontPath,
 				"fontsize":  overlay.Size,
 				"fontcolor": overlay.Color,
@@ -137,6 +137,42 @@ func (vp *VideoProcessor) ApplyOverlays(ctx context.Context, inputPath string, o
 
 	if err != nil {
 		return "", fmt.Errorf("ffmpeg overlay failed: %w", err)
+	}
+
+	return outputPath, nil
+}
+
+// OverlaySubtitles adds a single text overlay at the bottom center.
+func (vp *VideoProcessor) OverlaySubtitles(ctx context.Context, inputPath string, text string) (string, error) {
+	if text == "" {
+		return inputPath, nil
+	}
+
+	outputPath := inputPath + "_subtitle.mp4"
+	fontPath := "C:/Windows/Fonts/arial.ttf"
+
+	err := ffmpeg.Input(inputPath).
+		Filter("drawtext", ffmpeg.Args{}, ffmpeg.KwArgs{
+			"text":        text,
+			"x":           "(w-text_w)/2",
+			"y":           "h-100", // 100px from bottom
+			"fontfile":    fontPath,
+			"fontsize":    48,
+			"fontcolor":   "white",
+			"shadowcolor": "black",
+			"shadowx":     2,
+			"shadowy":     2,
+		}).
+		Output(outputPath, ffmpeg.KwArgs{
+			"c:v":    "libx264",
+			"preset": "ultrafast",
+			"c:a":    "copy",
+		}).
+		OverWriteOutput().
+		Run()
+
+	if err != nil {
+		return "", fmt.Errorf("ffmpeg subtitles failed: %w", err)
 	}
 
 	return outputPath, nil

@@ -53,6 +53,7 @@ export function useVideoEditor({
 
   // Local state for baked/trimmed blob URLs to solve "original video" issue
   const [trimmedUrls, setTrimmedUrls] = useState<Record<string, string>>({});
+  const [isBaking, setIsBaking] = useState(false);
 
   // Container dimensions for pixel-based positioning
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
@@ -119,7 +120,6 @@ export function useVideoEditor({
   const activeSegment = state.videoSegments.find(
     seg => state.currentTime >= seg.startTime && state.currentTime < (seg.startTime + seg.duration)
   ) || state.videoSegments[0];
-
   // ── Synchronization ──
 
   // Forced synchronization between timeline and video element (Live Preview)
@@ -127,13 +127,18 @@ export function useVideoEditor({
     if (!videoRef.current || state.isPlaying) return;
 
     if (activeSegment) {
-      const internalTime = activeSegment.trimStart + (state.currentTime - activeSegment.startTime);
+      const isBaked = !!trimmedUrls[activeSegment.id];
+      // If baked, the blob starts at 0. If original, it starts at trimStart.
+      const internalTime = isBaked 
+        ? (state.currentTime - activeSegment.startTime)
+        : activeSegment.trimStart + (state.currentTime - activeSegment.startTime);
+        
       // Only seek if the difference is significant to avoid flutter
       if (Math.abs(videoRef.current.currentTime - internalTime) > 0.05) {
-        videoRef.current.currentTime = internalTime;
+        videoRef.current.currentTime = Math.max(0, internalTime);
       }
     }
-  }, [state.currentTime, activeSegment, state.isPlaying]);
+  }, [state.currentTime, activeSegment, state.isPlaying, trimmedUrls]);
 
   // ── Playback handlers ──
 
@@ -146,43 +151,52 @@ export function useVideoEditor({
         trimEnd: initialSettings?.trim_end ?? dur,
         trimStart: initialSettings?.trim_start ?? 0,
       });
-      // Initial seek to trimStart
-      videoRef.current.currentTime = initialSettings?.trim_start ?? 0;
+      // Initial seek
+      const isBaked = !!trimmedUrls[state.videoSegments[0].id];
+      videoRef.current.currentTime = isBaked ? 0 : (initialSettings?.trim_start ?? 0);
     }
-  }, [initialSettings, state.videoSegments.length, updateVideoSegment]);
+  }, [initialSettings, state.videoSegments.length, updateVideoSegment, trimmedUrls]);
 
   const handleTimeUpdate = useCallback(() => {
     if (videoRef.current && state.isPlaying) {
       const videoTime = videoRef.current.currentTime;
       if (activeSegment) {
+        const isBaked = !!trimmedUrls[activeSegment.id];
+        const clipEnd = isBaked ? activeSegment.duration : activeSegment.trimEnd;
+
         // Boundary Guard: Stop if we reach trimEnd
-        if (videoTime >= activeSegment.trimEnd) {
+        if (videoTime >= clipEnd) {
           videoRef.current.pause();
           studioSetIsPlaying(false);
-          // Potential: Auto-jump to next segment here
           return;
         }
 
-        const absoluteTime = activeSegment.startTime + (videoTime - activeSegment.trimStart);
+        const absoluteTime = isBaked
+          ? activeSegment.startTime + videoTime
+          : activeSegment.startTime + (videoTime - activeSegment.trimStart);
+          
         studioSetCurrentTime(absoluteTime);
       }
     }
-  }, [activeSegment, state.isPlaying, studioSetIsPlaying, studioSetCurrentTime]);
+  }, [activeSegment, state.isPlaying, studioSetIsPlaying, studioSetCurrentTime, trimmedUrls]);
 
   const togglePlay = useCallback(() => {
     if (!videoRef.current) return;
     if (state.isPlaying) {
       videoRef.current.pause();
     } else {
-      // If we are at the end part of a segment trim, reset to start of trim
+      const isBaked = !!trimmedUrls[activeSegment?.id || ""];
       const currentInternalTime = videoRef.current.currentTime;
-      if (activeSegment && (currentInternalTime >= activeSegment.trimEnd || currentInternalTime < activeSegment.trimStart)) {
-        videoRef.current.currentTime = activeSegment.trimStart;
+      const startLimit = isBaked ? 0 : (activeSegment?.trimStart || 0);
+      const endLimit = isBaked ? (activeSegment?.duration || 0) : (activeSegment?.trimEnd || 0);
+
+      if (activeSegment && (currentInternalTime >= endLimit || currentInternalTime < startLimit)) {
+        videoRef.current.currentTime = startLimit;
       }
       videoRef.current.play();
     }
     studioTogglePlayback();
-  }, [state.isPlaying, activeSegment, studioTogglePlayback]);
+  }, [state.isPlaying, activeSegment, studioTogglePlayback, trimmedUrls]);
 
   const handleTrimChange = useCallback((id: string, start: number, end: number) => {
     updateVideoSegment(id, { trimStart: start, trimEnd: end, duration: end - start });
@@ -279,24 +293,48 @@ export function useVideoEditor({
   );
 
   // ── Baking (WASM Trimming) ──
+  
+  // Cache to track which bounds are currently baked
+  const bakedBoundsRef = useRef<Record<string, { start: number; duration: number }>>({});
+
   useEffect(() => {
     if (!ffmpegLoaded) return;
 
-    state.videoSegments.forEach(async (seg) => {
-      // If we don't have a trimmed URL yet, or if it's stale (this is a simplified check)
-      // In a real app we'd check if trimStart/trimEnd changed
-      if (!trimmedUrls[seg.id]) {
-        try {
-          const url = seg.url || video.url;
-          if (url) {
-            const trimmedUrl = await trimVideo(url, seg.trimStart, seg.duration);
-            setTrimmedUrls(prev => ({ ...prev, [seg.id]: trimmedUrl }));
+    const bakeNextStaleSegment = async () => {
+      for (const seg of state.videoSegments) {
+        const currentBounds = bakedBoundsRef.current[seg.id];
+        const hasChanged = !currentBounds || 
+                          currentBounds.start !== seg.trimStart || 
+                          currentBounds.duration !== seg.duration;
+
+        if (hasChanged) {
+          setIsBaking(true);
+          try {
+            const url = seg.url || video.url;
+            if (url) {
+              const trimmedUrl = await trimVideo(url, seg.trimStart, seg.duration);
+              
+              // Cleanup old blob URL to prevent memory leaks
+              if (trimmedUrls[seg.id]) {
+                URL.revokeObjectURL(trimmedUrls[seg.id]);
+              }
+
+              setTrimmedUrls(prev => ({ ...prev, [seg.id]: trimmedUrl }));
+              bakedBoundsRef.current[seg.id] = { start: seg.trimStart, duration: seg.duration };
+              
+              // Only bake one at a time to not overwhelm the UI
+              setIsBaking(false);
+              break; 
+            }
+          } catch (err) {
+            console.error("FFmpeg trim failed:", err);
+            setIsBaking(false);
           }
-        } catch (err) {
-          console.error("FFmpeg trim failed:", err);
         }
       }
-    });
+    };
+
+    bakeNextStaleSegment();
   }, [state.videoSegments, ffmpegLoaded, trimVideo, video.url]);
 
   // Video Source with Proxy/WASM Logic
@@ -338,8 +376,9 @@ export function useVideoEditor({
     // Playback
     isPlaying: state.isPlaying,
     setIsPlaying: studioSetIsPlaying,
+    isBaking,
     duration: state.totalDuration,
-    currentTime: state.currentTime,
+  currentTime: state.currentTime,
     togglePlay,
     handleLoadedMetadata,
     handleTimeUpdate,

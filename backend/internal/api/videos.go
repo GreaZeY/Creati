@@ -3,6 +3,7 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -83,7 +84,7 @@ func (h *VideosHandler) ListVideos(c *fiber.Ctx) error {
 	}
 
 	query := `
-		SELECT v.id, v.title, v.description, v.s3_url, v.status, v.created_at, v.is_short,
+		SELECT v.id, v.title, COALESCE(v.description, ''), v.s3_url, v.status, v.created_at, v.is_short,
 		       COALESCE(
 		           (SELECT CASE 
 		               WHEN EXISTS (SELECT 1 FROM video_platform_jobs WHERE video_id = v.id AND status = 'failed') THEN 'failed'
@@ -108,6 +109,7 @@ func (h *VideosHandler) ListVideos(c *fiber.Ctx) error {
 	rows, err := h.db.Query(query, args...)
 
 	if err != nil {
+		fmt.Printf("[DEBUG] ListVideos Query Error: %v | Query: %s | Args: %v\n", err, query, args)
 		return utils.ErrorResponse(c, fiber.StatusInternalServerError, "Failed to fetch videos", err)
 	}
 	defer rows.Close()

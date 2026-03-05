@@ -137,6 +137,20 @@ function VideoEditorContent({
                     onUpdate={editor.updateOverlay}
                   />
                 )}
+                {/* Baking Overlay */}
+                {editor.isBaking && (
+                  <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                    <div className="flex flex-col items-center text-center">
+                      <span className="text-white font-bold tracking-wider text-sm uppercase">
+                        Processing High-Fidelity Preview
+                      </span>
+                      <span className="text-white/60 text-xs">
+                        Generating the frame-accurate cut...
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Float Controls */}
