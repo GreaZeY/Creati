@@ -2,12 +2,15 @@ package commands
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"os/signal"
+	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -19,7 +22,7 @@ var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start frontend and backend",
 	Long:  `Starts both frontend and backend services with prefixed colored logs`,
-	Run:   runStart,
+	RunE:  runStart,
 }
 
 func init() {
@@ -27,99 +30,118 @@ func init() {
 	rootCmd.AddCommand(startCmd)
 }
 
-func runStart(cmd *cobra.Command, args []string) {
+func runStart(cmd *cobra.Command, args []string) error {
 	cfg := GetConfig()
-
-	var backendCmd, frontendCmd *exec.Cmd
+	backendCommand := cfg.ProdConfig.BackendCommand
+	frontendCommand := cfg.ProdConfig.FrontendCommand
 
 	if cfg.IsDev() {
 		UISuccess("Starting in DEV mode...")
-
-		// Start Docker sidecars (Redis, PG) using shared logic
-		StartServices(true)
-
-		if workerOnly {
-			UIInfo("Starting WORKER ONLY...")
-			backendCmd = exec.Command("cmd", "/C", "cd backend && set RUN_MODE=worker && "+cfg.DevConfig.BackendCommand)
-		} else {
-			backendCmd = exec.Command("cmd", "/C", "cd backend && "+cfg.DevConfig.BackendCommand)
-			frontendCmd = exec.Command("cmd", "/C", "cd "+cfg.FrontendPath+" && "+cfg.DevConfig.FrontendCommand)
+		backendCommand = cfg.DevConfig.BackendCommand
+		frontendCommand = cfg.DevConfig.FrontendCommand
+		if err := StartServices(); err != nil {
+			return err
 		}
+		defer func() {
+			if err := StopServices(); err != nil {
+				UIWarning("Failed to stop services: %v", err)
+			}
+		}()
 	} else {
 		UIInfo("Starting PRODUCTION mode...")
-		if workerOnly {
-			UIInfo("Starting WORKER ONLY...")
-			backendCmd = exec.Command("cmd", "/C", "cd backend && set RUN_MODE=worker && "+cfg.ProdConfig.BackendCommand)
-		} else {
-			backendCmd = exec.Command("cmd", "/C", "cd backend && "+cfg.ProdConfig.BackendCommand)
-			frontendCmd = exec.Command("cmd", "/C", "cd "+cfg.FrontendPath+" && "+cfg.ProdConfig.FrontendCommand)
-		}
 	}
 
-	// Pipes
-	var backendStdout, backendStderr io.ReadCloser
-	var frontendStdout, frontendStderr io.ReadCloser
-
-	backendStdout, _ = backendCmd.StdoutPipe()
-	backendStderr, _ = backendCmd.StderrPipe()
-
-	if frontendCmd != nil {
-		frontendStdout, _ = frontendCmd.StdoutPipe()
-		frontendStderr, _ = frontendCmd.StderrPipe()
+	backendCmd := shellCommand(backendCommand, cfg.BackendPath)
+	commands := []*exec.Cmd{backendCmd}
+	if workerOnly {
+		UIInfo("Starting WORKER ONLY...")
+		backendCmd.Env = append(backendCmd.Environ(), "RUN_MODE=worker")
+	} else {
+		commands = append(commands, shellCommand(frontendCommand, cfg.FrontendPath))
 	}
 
-	// Start processes
-	if err := backendCmd.Start(); err != nil {
-		UIError("Failed to start server: %v", err)
-		return
-	}
+	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return runProcesses(ctx, commands...)
+}
 
-	if frontendCmd != nil {
-		if err := frontendCmd.Start(); err != nil {
-			UIError("Failed to start client: %v", err)
-			backendCmd.Process.Kill()
-			return
-		}
-	}
+func runProcesses(ctx context.Context, commands ...*exec.Cmd) error {
+	exits := make(chan error, len(commands))
+	var started []*exec.Cmd
+	pending := 0
 
-	// Colors
-	backendColor := color.New(color.FgGreen).SprintFunc()
-	frontendColor := color.New(color.FgCyan).SprintFunc()
-
-	// Stream logs
-	go streamLogs(backendStdout, backendColor("[server]"))
-	go streamLogs(backendStderr, backendColor("[server]"))
-
-	if frontendCmd != nil {
-		go streamLogs(frontendStdout, frontendColor("[client]"))
-		go streamLogs(frontendStderr, frontendColor("[client]"))
-	}
-
-	// Handle graceful shutdown
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		<-sigChan
-		fmt.Println("\n🛑 Shutting down...")
-
-		if backendCmd != nil && backendCmd.Process != nil {
-			backendCmd.Process.Signal(syscall.SIGTERM)
-		}
-		if frontendCmd != nil && frontendCmd.Process != nil {
-			frontendCmd.Process.Signal(syscall.SIGTERM)
+	defer func() {
+		for _, process := range started {
+			if err := stopProcess(process, false); err != nil {
+				UIWarning("Failed to stop process: %v", err)
+			}
 		}
 
-		if cfg.IsDev() {
-			StopServices()
+		timer := time.NewTimer(5 * time.Second)
+		defer timer.Stop()
+		for pending > 0 {
+			select {
+			case <-exits:
+				pending--
+			case <-timer.C:
+				for _, process := range started {
+					if err := stopProcess(process, true); err != nil {
+						UIWarning("Failed to kill process: %v", err)
+					}
+				}
+			}
+		}
+		// A shell may exit before descendants that ignored SIGTERM.
+		if runtime.GOOS != "windows" {
+			for _, process := range started {
+				if err := stopProcess(process, true); err != nil {
+					UIWarning("Failed to stop descendants: %v", err)
+				}
+			}
 		}
 	}()
 
-	// Wait for processes
-	backendCmd.Wait()
-	if frontendCmd != nil {
-		frontendCmd.Wait()
+	for i, process := range commands {
+		configureProcess(process)
+		stdout, err := process.StdoutPipe()
+		if err != nil {
+			return err
+		}
+		stderr, err := process.StderrPipe()
+		if err != nil {
+			stdout.Close()
+			return err
+		}
+		if err := process.Start(); err != nil {
+			stdout.Close()
+			stderr.Close()
+			return fmt.Errorf("start process in %s: %w", process.Dir, err)
+		}
+		started = append(started, process)
+		pending++
+
+		prefix := color.GreenString("[server]")
+		if i > 0 {
+			prefix = color.CyanString("[client]")
+		}
+		go streamLogs(stdout, prefix)
+		go streamLogs(stderr, prefix)
+		go func() { exits <- process.Wait() }()
 	}
+
+	for pending > 0 {
+		select {
+		case <-ctx.Done():
+			UIInfo("Shutting down...")
+			return nil
+		case err := <-exits:
+			pending--
+			if err != nil {
+				return fmt.Errorf("service exited: %w", err)
+			}
+		}
+	}
+	return nil
 }
 
 // streamLogs reads from a pipe and prints with prefix

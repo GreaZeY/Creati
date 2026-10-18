@@ -80,7 +80,7 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	// Initialize Cache Client independently
 	cacheRedisURL := os.Getenv("REDIS_CACHE_URL")
 	if cacheRedisURL == "" {
-		cacheRedisURL = "localhost:6379"
+		cacheRedisURL = "localhost:6381"
 	}
 	cacheOpt, _ := redis.ParseURL(cacheRedisURL)
 	if cacheOpt == nil {

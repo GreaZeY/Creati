@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 
@@ -75,22 +76,8 @@ func (s *StorageService) GetProvider(ctx context.Context, orgID int) (storage.St
 				// Parse creds for custom S3
 				// For now, reuse default if it's S3, or ideally create new S3 provider with these creds
 				return s.defaultProvider, nil
-			case "gdrive":
-				var config struct {
-					Credentials []byte `json:"creds"`
-					FolderID    string `json:"folder_id"`
-				}
-				if err := json.Unmarshal(creds, &config); err == nil {
-					return storage.NewGoogleDriveProvider(config.Credentials, config.FolderID)
-				}
-			case "dropbox":
-				var config struct {
-					Token string `json:"token"`
-					Path  string `json:"path"`
-				}
-				if err := json.Unmarshal(creds, &config); err == nil {
-					return storage.NewDropboxProvider(config.Token, config.Path), nil
-				}
+			case "gdrive", "dropbox":
+				return nil, fmt.Errorf("storage provider %q is not implemented", providerType)
 			}
 		}
 	}

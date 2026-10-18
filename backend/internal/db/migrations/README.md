@@ -11,6 +11,21 @@ This directory contains the database schema initialization file for the Creati a
 
 ## Schema Initialization
 
+Subscription compatibility: `14_subscription_schema.sql` upgrades the legacy
+`plan_name` column to `plan`, preserving values, and adds `billing_cycle`,
+`razorpay_subscription_id`, and `updated_at` for the current authentication and
+billing handlers. It is safe to reapply. Fresh installs receive these fields
+from `00_init_schema.sql`.
+
+The registration integration test uses disposable schemas in PostgreSQL. Run it
+with an explicitly configured test database (credentials stay in the environment):
+
+```bash
+CREATI_TEST_DATABASE_URL="$DATABASE_URL" go test ./internal/api -run TestRegistrationSubscriptionSchema
+```
+
+Run from `backend/`; the selected database user must be able to create schemas.
+
 To initialize a fresh database:
 
 ```bash

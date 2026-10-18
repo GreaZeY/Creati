@@ -1,9 +1,9 @@
 package commands
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -16,16 +16,16 @@ var servicesCmd = &cobra.Command{
 var servicesUpCmd = &cobra.Command{
 	Use:   "up",
 	Short: "Start all infrastructure services",
-	Run: func(cmd *cobra.Command, args []string) {
-		StartServices(false)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return StartServices()
 	},
 }
 
 var servicesDownCmd = &cobra.Command{
 	Use:   "down",
 	Short: "Stop all infrastructure services",
-	Run: func(cmd *cobra.Command, args []string) {
-		StopServices()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return StopServices()
 	},
 }
 
@@ -35,37 +35,35 @@ func init() {
 	rootCmd.AddCommand(servicesCmd)
 }
 
-// StartServices brings up the docker-compose stack
-func StartServices(checkRunning bool) {
-	if checkRunning {
-		// Quick check if containers are already up
-		out, err := exec.Command("docker-compose", "ps", "--quiet").Output()
-		if err == nil && len(strings.TrimSpace(string(out))) > 0 {
-			UIInfo("Sidecar services are already running.")
-			return
-		}
+func composeCommand(args ...string) *exec.Cmd {
+	if exec.Command("docker", "compose", "version").Run() == nil {
+		return exec.Command("docker", append([]string{"compose"}, args...)...)
 	}
+	return exec.Command("docker-compose", args...)
+}
 
+// StartServices brings up the Compose stack; up is idempotent and starts missing services.
+func StartServices() error {
 	UIInfo("Starting sidecar services (Docker)...")
-	dockerUp := exec.Command("docker-compose", "up", "-d")
+	dockerUp := composeCommand("up", "-d")
 	dockerUp.Stdout = os.Stdout
 	dockerUp.Stderr = os.Stderr
 	if err := dockerUp.Run(); err != nil {
-		UIError("Failed to start Docker services. Make sure Docker is running.")
-	} else {
-		UISuccess("Services are up")
+		return fmt.Errorf("start Docker services (check Docker and Compose are installed and running): %w", err)
 	}
+	UISuccess("Services are up")
+	return nil
 }
 
 // StopServices brings down the docker-compose stack
-func StopServices() {
+func StopServices() error {
 	UIInfo("Stopping sidecar services...")
-	dockerDown := exec.Command("docker-compose", "down")
+	dockerDown := composeCommand("down")
 	dockerDown.Stdout = os.Stdout
 	dockerDown.Stderr = os.Stderr
 	if err := dockerDown.Run(); err != nil {
-		UIError("Failed to stop services: %v", err)
-	} else {
-		UISuccess("Services are stopped")
+		return fmt.Errorf("stop Docker services: %w", err)
 	}
+	UISuccess("Services are stopped")
+	return nil
 }

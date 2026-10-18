@@ -2,10 +2,11 @@ package commands
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -46,7 +47,8 @@ func runDoctor(cmd *cobra.Command, args []string) {
 		{".env files present", checkEnvFiles},
 	}
 
-	fmt.Println("🏥 Running health checks...\n")
+	fmt.Println("🏥 Running health checks...")
+	fmt.Println()
 
 	passed := 0
 	for _, check := range checks {
@@ -78,35 +80,32 @@ func checkNode() bool {
 }
 
 func checkNpm() bool {
-	cmd := exec.Command("npm", "--version")
+	cmd := shellCommand("npm --version", "")
 	return cmd.Run() == nil
 }
 
 func checkFrontendDeps() bool {
-	_, err := os.Stat("frontend/node_modules")
+	_, err := os.Stat(filepath.Join(GetConfig().FrontendPath, "node_modules"))
 	return err == nil
 }
 
 func checkBackendDeps() bool {
 	cmd := exec.Command("go", "list", "-m")
-	cmd.Dir = "backend"
+	cmd.Dir = GetConfig().BackendPath
 	return cmd.Run() == nil
 }
 
 func checkPort(port int) bool {
-	cmd := exec.Command("netstat", "-ano")
-	output, err := cmd.Output()
+	listener, err := net.Listen("tcp", net.JoinHostPort("", strconv.Itoa(port)))
 	if err != nil {
-		return true // Assume available if netstat fails
+		return false
 	}
-
-	portStr := ":" + strconv.Itoa(port)
-	return !strings.Contains(string(output), portStr)
+	return listener.Close() == nil
 }
 
 func checkEnvFiles() bool {
 	files := []string{
-		"backend/.env",
+		filepath.Join(GetConfig().BackendPath, ".env"),
 	}
 
 	for _, file := range files {

@@ -355,11 +355,14 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     stripe_subscription_id VARCHAR(255) UNIQUE,
-    plan_name VARCHAR(100) NOT NULL,
+    plan VARCHAR(100) NOT NULL DEFAULT 'free',
+    billing_cycle VARCHAR(20) NOT NULL DEFAULT 'monthly',
+    razorpay_subscription_id VARCHAR(255) UNIQUE,
     status VARCHAR(50) DEFAULT 'active',
     current_period_start TIMESTAMP,
     current_period_end TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Payments

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/fatih/color"
 	"github.com/joho/godotenv"
@@ -31,18 +32,17 @@ var queueClearCmd = &cobra.Command{
 var queueUpCmd = &cobra.Command{
 	Use:   "up",
 	Short: "Start Redis queue service (Docker)",
-	Run: func(cmd *cobra.Command, args []string) {
-		// We could start just redis, but StartServices(true) is safer to ensure stack health
-		StartServices(true)
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return StartServices()
 	},
 }
 
 var queueDownCmd = &cobra.Command{
 	Use:   "down",
 	Short: "Stop Redis queue service (Docker)",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// StopServices brings down the whole stack which includes redis
-		StopServices()
+		return StopServices()
 	},
 }
 
@@ -55,7 +55,7 @@ func init() {
 }
 
 func getRedisClient() (*redis.Client, string) {
-	_ = godotenv.Load("backend/.env")
+	_ = godotenv.Load(filepath.Join(GetConfig().BackendPath, ".env"))
 	redisURL := os.Getenv("REDIS_QUEUE_URL")
 	if redisURL == "" {
 		redisURL = "localhost:6380"

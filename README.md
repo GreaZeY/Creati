@@ -153,7 +153,8 @@ Backend will run at `http://localhost:8080`
 
 ```bash
 DATABASE_URL=postgresql://user:password@localhost:5432/creati
-REDIS_URL=redis://localhost:6379
+REDIS_CACHE_URL=redis://localhost:6381
+REDIS_QUEUE_URL=redis://localhost:6380
 AWS_REGION=us-east-1
 AWS_ACCESS_KEY_ID=your_key
 AWS_SECRET_ACCESS_KEY=your_secret

@@ -29,7 +29,7 @@ func init() {
 }
 
 func runLogsClear(cmd *cobra.Command, args []string) {
-	logsDir := "backend/logs"
+	logsDir := filepath.Join(GetConfig().BackendPath, "logs")
 
 	// Remove all log files
 	files, err := filepath.Glob(filepath.Join(logsDir, "*.log"))

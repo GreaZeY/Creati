@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -39,8 +40,8 @@ var rootCmd = &cobra.Command{
 	Use:   "creati",
 	Short: "Creati CLI",
 	Long:  `CLI for managing Creati workflow`,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		loadConfig()
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		return loadConfig()
 	},
 }
 
@@ -51,18 +52,33 @@ func Execute() error {
 
 // Commands self-register via their own init() functions
 
-// loadConfig reads creati.yaml
-func loadConfig() {
-	data, err := os.ReadFile("creati.yaml")
+// loadConfig finds the nearest project and anchors all relative paths to it.
+func loadConfig() error {
+	cwd, err := os.Getwd()
 	if err != nil {
-		fmt.Println("❌ Failed to read creati.yaml:", err)
-		os.Exit(1)
+		return fmt.Errorf("get working directory: %w", err)
 	}
 
-	config = &Config{}
-	if err := yaml.Unmarshal(data, config); err != nil {
-		fmt.Println("❌ Failed to parse creati.yaml:", err)
-		os.Exit(1)
+	for dir := cwd; ; dir = filepath.Dir(dir) {
+		path := filepath.Join(dir, "creati.yaml")
+		data, err := os.ReadFile(path)
+		if err == nil {
+			cfg := &Config{}
+			if err := yaml.Unmarshal(data, cfg); err != nil {
+				return fmt.Errorf("parse %s: %w", path, err)
+			}
+			if err := os.Chdir(dir); err != nil {
+				return fmt.Errorf("enter project root %s: %w", dir, err)
+			}
+			config = cfg
+			return nil
+		}
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("read %s: %w", path, err)
+		}
+		if filepath.Dir(dir) == dir {
+			return fmt.Errorf("creati.yaml not found in %s or its parent directories", cwd)
+		}
 	}
 }
 
