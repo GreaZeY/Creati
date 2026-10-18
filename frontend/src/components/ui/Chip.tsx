@@ -11,6 +11,8 @@ export interface ChipProps {
   className?: string;
   variant?: "default" | "outline" | "ghost";
   size?: "sm" | "md";
+  disabled?: boolean;
+  "aria-label"?: string;
 }
 
 export function Chip({
@@ -22,13 +24,17 @@ export function Chip({
   className,
   variant = "outline",
   size = "md",
+  disabled,
+  "aria-label": ariaLabel,
 }: ChipProps) {
   return (
     <button
       type="button"
+      disabled={disabled}
+      aria-label={ariaLabel}
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-2 rounded-full transition-all duration-200",
+        "inline-flex items-center gap-2 rounded-full transition-all duration-200 disabled:pointer-events-none disabled:opacity-50",
         size === "sm" ? "h-7 px-2.5 text-[10px]" : "h-8 px-3 text-xs",
         variant === "outline" && [
           "border font-semibold",

@@ -14,6 +14,7 @@ import {
   User as UserIcon,
   FileText,
   Sparkles,
+  Radio,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { label: "Post", icon: MessageSquare, href: "/create/post" },
   { label: "Push Video", icon: Video, href: "/push" },
   { label: "Creative Lab", icon: Sparkles, href: "/creative-lab" },
+  { label: "YouTube Live", icon: Radio, href: "/youtube-live" },
   { label: "Queue", icon: List, href: "/queued" },
   { label: "Calendar", icon: CalendarIcon, href: "/calendar" },
   { label: "Platforms", icon: Link2, href: "/platforms" },

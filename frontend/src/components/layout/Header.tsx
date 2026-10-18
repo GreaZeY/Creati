@@ -9,11 +9,11 @@ export function Header() {
   const { user } = useAuth();
 
   return (
-    <header className="h-[3.5rem] flex items-center justify-between px-8 z-10 sticky top-0 bg-transparent font-sans">
+    <header className="h-[3.5rem] flex shrink-0 items-center justify-between px-4 md:px-8 z-10 sticky top-0 bg-transparent font-sans">
       <div className="flex items-center gap-6">
         <WorkspaceSwitcher />
         <div className="w-px h-6 bg-slate-200 dark:bg-white/10 hidden md:block" />
-        <Breadcrumbs />
+        <div className="hidden md:block"><Breadcrumbs /></div>
       </div>
 
       <div className="flex items-center gap-6">

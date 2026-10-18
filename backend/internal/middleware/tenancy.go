@@ -52,12 +52,12 @@ func TenancyMiddleware(db *sql.DB) fiber.Handler {
 		// 2. Security Check & Org Discovery
 		var orgID int
 		query := `
-			SELECT tm.org_id
-			FROM team_members tm
-			JOIN clients cl ON cl.org_id = tm.org_id
-			WHERE tm.user_id = $1 AND cl.id = $2 AND tm.status = 'active'
+			SELECT cl.org_id
+			FROM clients cl JOIN organizations o ON o.id = cl.org_id
+			LEFT JOIN team_members tm ON tm.org_id = o.id AND tm.user_id = $1 AND tm.status = 'active'
+			WHERE cl.id = $2 AND (o.owner_id = $1 OR tm.user_id IS NOT NULL)
 		`
-		err = db.QueryRow(query, userID, workspaceID).Scan(&orgID)
+		err = db.QueryRowContext(c.UserContext(), query, userID, workspaceID).Scan(&orgID)
 		if err == sql.ErrNoRows {
 			return utils.ErrorResponse(c, fiber.StatusForbidden, "access denied to this workspace")
 		}

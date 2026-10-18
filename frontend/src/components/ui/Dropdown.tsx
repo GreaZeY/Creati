@@ -35,6 +35,8 @@ export interface DropdownProps<T = any> {
     onClick: () => void;
   };
   className?: string;
+  disabled?: boolean;
+  "aria-label"?: string;
 }
 
 export function Dropdown<T = any>({
@@ -50,6 +52,8 @@ export function Dropdown<T = any>({
   renderItem,
   footerAction,
   className,
+  disabled = false,
+  "aria-label": ariaLabel,
 }: DropdownProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<DropdownItem<T> | null>(
@@ -106,6 +110,10 @@ export function Dropdown<T = any>({
     toggle: () => void,
   ) => (
     <button
+      id={id}
+      type="button"
+      disabled={disabled}
+      aria-label={ariaLabel}
       onClick={toggle}
       className="w-full h-11 flex items-center justify-between px-4 rounded-xl bg-background hover:bg-muted border border-border/50 transition-all group"
     >

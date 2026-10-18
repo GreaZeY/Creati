@@ -11,6 +11,14 @@ This directory contains the database schema initialization file for the Creati a
 
 ## Schema Initialization
 
+`16_youtube_live_preferences.sql` adds per-user/workspace YouTube Live defaults
+with separate unique indexes for personal and workspace settings. It is additive
+and repeatable. Fresh initialization includes this table as well.
+
+`15_youtube_live.sql` adds scoped YouTube Live drafts and expiring OAuth state.
+It is additive and repeatable; existing users, subscriptions, and content are not
+modified. Fresh initialization also includes these tables in `00_init_schema.sql`.
+
 Subscription compatibility: `14_subscription_schema.sql` upgrades the legacy
 `plan_name` column to `plan`, preserving values, and adds `billing_cycle`,
 `razorpay_subscription_id`, and `updated_at` for the current authentication and

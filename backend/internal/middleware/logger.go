@@ -3,6 +3,7 @@ package middleware
 import (
 	"fmt"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"creati.in/creati/backend/internal/logger"
@@ -71,7 +72,8 @@ func RequestLogger(c *fiber.Ctx) error {
 	})
 
 	// Capture body for debugging non-GET requests that fail
-	if c.Method() != "GET" && status >= 400 {
+	sensitiveBody := strings.HasPrefix(c.Path(), "/api/youtube-live") || strings.HasPrefix(c.Path(), "/api/auth/") || strings.HasSuffix(c.Path(), "/callback")
+	if c.Method() != "GET" && status >= 400 && !sensitiveBody {
 		body := c.Body()
 		if len(body) > 0 {
 			// Limit body log size

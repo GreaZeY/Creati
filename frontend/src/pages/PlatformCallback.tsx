@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { PlatformLogo } from "@/components/platforms/PlatformLogo";
 import confetti from "canvas-confetti";
-import { useMutation } from "@tanstack/react-query";
-import { platformsAPI } from "@/lib/api";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api, platformsAPI } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 export const PlatformCallback = () => {
+  const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
   const { platform } = useParams();
   const navigate = useNavigate();
@@ -37,15 +38,20 @@ export const PlatformCallback = () => {
       if (!code || !platform) throw new Error("Missing code or platform info");
 
       // Call backend to exchange code for token
-      await platformsAPI.exchange(platform, code, state || "");
+      if (platform === "youtube" && state?.startsWith("live_")) {
+        await api.post("/youtube-live/connect/callback", { code, state });
+      } else {
+        await platformsAPI.exchange(platform, code, state || "");
+      }
     },
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["platforms"] });
+      void queryClient.invalidateQueries({ queryKey: ["platforms-count"] });
       if (intervalRef.current) clearInterval(intervalRef.current);
       setProgress(100);
     },
-    onError: (e: any) => {
+    onError: (e) => {
       if (intervalRef.current) clearInterval(intervalRef.current);
-      console.error("Error exchanging code for token", e);
       setError(e?.message || "Secure exchange failed. Please try again.");
     },
   });
@@ -56,7 +62,6 @@ export const PlatformCallback = () => {
   const errorMessage =
     error || exchangeMutation.error?.message || messageParam || "Unknown error";
 
-  console.error(exchangeMutation.isSuccess, exchangeMutation.isError);
   useEffect(() => {
     // Check for immediate URL errors on mount
     if (errorParam || errorDescParam) {
@@ -109,11 +114,11 @@ export const PlatformCallback = () => {
       });
 
       const redirectTimer = setTimeout(() => {
-        navigate("/platforms/connect");
+        navigate(state?.startsWith("live_") ? "/youtube-live" : "/platforms/connect");
       }, 2500);
       return () => clearTimeout(redirectTimer);
     }
-  }, [isSuccess, progress, navigate]);
+  }, [isSuccess, progress, navigate, state]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">

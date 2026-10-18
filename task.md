@@ -1,5 +1,57 @@
 # CLI support for Linux and Windows
 
+## YouTube Live producer implementation
+
+### Database preferences and stream reuse
+
+- Persist per-user/workspace channel, category, language, visibility, audience, and time zone in PostgreSQL; autofill new streams across browsers and remember edits automatically.
+- Reuse both Creati broadcasts and existing broadcasts from the connected YouTube channel. Copy editable metadata, relevant settings, and available thumbnails into a new draft; clear schedule, approval, and broadcast/stream IDs.
+- Preserve original broadcasts and source research dates; copied material must not be presented as newly researched. Use existing repository/API layers and shared UI controls.
+- Add an additive migration, validate ownership and settings, test persistence/isolation/reuse, and verify the frontend and mocked browser flows. Apply only the new migration after validation.
+
+Completed: PostgreSQL stores workspace-scoped defaults and the UI autosaves preference edits, reports save failures, and retries. New briefs retain saved settings and clear their schedule. Reuse supports Creati broadcasts and paginated YouTube history, imports editable details and available thumbnails, and creates an independent draft. Source events and research dates remain intact.
+
+Verification: backend race tests, build, and targeted vet passed; isolated PostgreSQL repository/HTTP tests passed for preferences, upserts, user/workspace isolation, reuse ownership, original-event preservation, and independent draft IDs. Frontend production build and focused lint passed. Mocked browser checks covered autofill after clearing browser storage, autosave/retry, both reuse sources, history pagination, thumbnail preview, a fresh schedule, approval with edited details, and mobile layout. Applied only migration 16 atomically to the configured database. Real YouTube account/history and thumbnail-server calls were not executed.
+
+### YouTube connection status follow-up
+
+- Use the existing workspace-scoped platform query to show the connected channel instead of an unconditional Connect button.
+- Distinguish loading, failed checks, disconnected accounts, and accounts requiring reconnection; retain connection management through the Platforms page.
+- Refresh cached platform accounts and counts after a successful OAuth exchange. Verify the production build, focused lint, and browser assertions for connection states.
+
+Completed: connected channels show their name and a Manage channels link; only disconnected accounts show Connect, and the selected account's `action_required` status shows Reconnect. Loading and failed checks do not prompt a new connection. Successful OAuth exchanges invalidate cached accounts and counts.
+
+Verification: production build and YouTube Live page lint passed. Mocked browser assertions passed for loading, connected, disconnected, reconnect-required, multiple-channel selection, and failed-check retry states. Combined lint still reports the pre-existing `react-hooks/set-state-in-effect` error in `PlatformCallback.tsx`, confirmed against its staged baseline. Real OAuth exchange was not performed.
+
+### UI consistency follow-up
+
+- Replace the oversized promotional header with the existing `PageHeader`.
+- Reuse shared cards, buttons, inputs, textareas, labels, dropdowns, and sliders across the producer and optional thumbnail composer.
+- Use the app's theme tokens and standard page spacing; remove duplicated page-specific control styles and decorative copy.
+- Replace the tags textarea with removable chips: add with Enter/comma, paste multiple tags, prevent duplicates, and enforce the existing 20-tag/400-character limits.
+- Preserve generation, draft persistence, thumbnail export, review, and approval behavior. Verify build, focused lint, and the rendered page at desktop/mobile sizes.
+
+Completed: the producer uses the existing compact `PageHeader`, `LensedCard`, form controls, dropdowns, sliders, switches, and chips. Removed the duplicate page stylesheet and separated the package editor from the page. Tags support Enter/comma, pasted lists, removal with the mouse or keyboard, duplicate prevention, limits, and committing pending input before saving.
+
+Verification: frontend production build and focused ESLint passed. Browser assertions covered tag editing, rejection without data loss, persistence, thumbnail adjustments/upload, and submitting edited tags through broadcast approval using mocked APIs. Desktop, light/dark themes, and 320–390px mobile layouts were checked. Real AI and YouTube calls were not made.
+
+Approved scope: implement `YOUTUBE_LIVE_PLAN.md` within the existing Go/Fiber and React application.
+
+User clarification: the primary experience is a short stream idea → mandatory real research → AI-prepared title, actual thumbnail image, description, and tags → minor edits → approval creates the broadcast for OBS. Move manual composition and detailed settings behind optional controls. Remember explicit channel/privacy/audience preferences, and never market an unresearched fallback as researched. Add an independently configured image-capable route; text-only Anthropic routing is insufficient for image output.
+
+- [x] Draft contracts, scoped PostgreSQL persistence, and migration.
+- [x] Anthropic-compatible package generation, required cited research, and manual prompt export.
+- [x] Producer UI, editable package, actual AI thumbnail generation, and optional local composition.
+- [x] Session-bound Live OAuth and channel authorization.
+- [x] Reviewed, resumable event creation and thumbnail upload, with auto-start disabled.
+- [x] Backend/provider/database tests, frontend build/lint, browser verification, and setup documentation.
+
+Verification: full backend race tests passed; PostgreSQL integration tests passed in disposable schemas for workspace/draft isolation, roles, one-time session-bound OAuth state, stale edit conflicts, idempotent creation, and the complete researched-package/image/approval flow. The additive migration was applied to the configured database. Frontend build and focused lint passed. Browser checks covered the simplified automatic workflow, minor edits, generated image display, approval, exports, research failure, light/dark themes, and desktop/narrow layouts. The running backend requires authentication for the feature endpoint.
+
+Remaining setup: provider variables are present in `backend/.env`; the user will supply text/research and image route settings and keys. Real model/search/image calls and creator-approved YouTube/OBS execution were not performed.
+
+Design: the existing app components, theme colors, compact page header, and spacing, with an editable brief on the left and the broadcast package/preview on the right. Generation and scheduling use explicit request states; the initial feature uses no background workers. Model usage is billed by the configured server route; this feature does not deduct Creati credits until a pricing policy exists.
+
 Status: CLI portability and project-root discovery fixes are complete.
 
 ## Scope

@@ -82,6 +82,8 @@ func (r *PlatformRepository) ListAccounts(
 	if clientID != nil {
 		query += " AND client_id = $2"
 		args = append(args, *clientID)
+	} else {
+		query += " AND client_id IS NULL"
 	}
 
 	rows, err := r.db.QueryContext(ctx, query, args...)

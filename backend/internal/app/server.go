@@ -67,8 +67,8 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     os.Getenv("FRONTEND_URL"),
 		AllowCredentials: true,
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-CSRF-Token",
-		AllowMethods:     "GET, POST, PUT, DELETE, OPTIONS",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-CSRF-Token, X-Workspace-ID",
+		AllowMethods:     "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
 
 	// Static storage (for local driver)
@@ -194,6 +194,9 @@ func RunServer(ctx context.Context, db *sql.DB) error {
 
 	// Apply TenancyMiddleware to all protected routes
 	protected.Use(middleware.TenancyMiddleware(db))
+
+	liveHandler := api.NewLiveHandler(db, storageService, cacheService)
+	liveHandler.Register(protected.Group("/youtube-live"))
 
 	protected.Get("/auth/me", authHandler.CheckAuth)
 	protected.Put("/auth/profile", authHandler.UpdateProfile)

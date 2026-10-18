@@ -218,6 +218,14 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 
 		targetPlatform = dbPlatform
 		emailHint := email.String
+		if targetPlatform == "youtube" {
+			var reconnectClient *int
+			if dbClientID.Valid {
+				value := int(dbClientID.Int64)
+				reconnectClient = &value
+			}
+			return h.secureYouTubeConnection(c, ctx.UserID, reconnectClient)
+		}
 
 		// Initialize service with correct platform
 		platformService, errSvc := services.GetPlatformService(targetPlatform, h.db)
@@ -230,6 +238,9 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 		authURL = platformService.GetAuthURLWithHint(state, "consent", emailHint)
 	} else {
 		// New connection
+		if targetPlatform == "youtube" {
+			return h.secureYouTubeConnection(c, ctx.UserID, ctx.ClientID)
+		}
 		platformService, errSvc := services.GetPlatformService(targetPlatform, h.db)
 		if errSvc != nil {
 			return utils.ErrorResponse(c, fiber.StatusBadRequest, errSvc.Error())
@@ -256,6 +267,9 @@ func (h *PlatformHandler) InitiateConnection(c *fiber.Ctx) error {
 // HandleCallback processes OAuth callback (JSON POST from frontend)
 func (h *PlatformHandler) HandleCallback(c *fiber.Ctx) error {
 	platform := c.Params("platform")
+	if platform == "youtube" {
+		return utils.ErrorResponse(c, fiber.StatusBadRequest, "Reconnect YouTube through the session-bound connection flow.")
+	}
 
 	var payload struct {
 		Code  string `json:"code"`

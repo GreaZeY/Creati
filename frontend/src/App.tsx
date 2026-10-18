@@ -119,6 +119,9 @@ const Invoices = lazy(() =>
 const CreativeLab = lazy(() =>
   import("./pages/CreativeLab").then((m) => ({ default: m.CreativeLab })),
 );
+const YouTubeLive = lazy(() =>
+  import("./pages/YouTubeLive").then((m) => ({ default: m.YouTubeLive })),
+);
 const AssetDrop = lazy(() =>
   import("./pages/AssetDrop").then((m) => ({ default: m.AssetDrop })),
 );
@@ -334,6 +337,10 @@ const router = createBrowserRouter([
                 <CreativeLab />
               </PageTransition>
             ),
+          },
+          {
+            path: "youtube-live",
+            element: <PageTransition><YouTubeLive /></PageTransition>,
           },
           {
             path: "settings",

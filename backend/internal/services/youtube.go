@@ -118,7 +118,7 @@ func (y *YouTubeService) getClient(ctx context.Context, accountID int) (*http.Cl
 	logger.Get("youtube").WithField("account_id", accountID).Debug("getClient called")
 	var encAccess, encRefresh string
 	var expiresAt sql.NullTime
-	err := y.db.QueryRow(
+	err := y.db.QueryRowContext(ctx,
 		"SELECT access_token, refresh_token, expires_at FROM platform_accounts WHERE id = $1", accountID,
 	).Scan(&encAccess, &encRefresh, &expiresAt)
 	if err != nil {
@@ -226,17 +226,20 @@ func (y *YouTubeService) GetAuthURLWithHint(state, prompt, loginHint string) str
 // Authenticate implements Platform interface
 // Exchanges OAuth code for tokens and stores them
 func (y *YouTubeService) Authenticate(code string, userID int, clientID *int) error {
+	return y.AuthenticateContext(context.Background(), code, userID, clientID)
+}
+
+func (y *YouTubeService) AuthenticateContext(ctx context.Context, code string, userID int, clientID *int) error {
 	config := *y.oauthConfig
 	config.RedirectURL = fmt.Sprintf("%s/platforms/youtube/callback", os.Getenv("FRONTEND_URL"))
 
 	// Exchange code for token
-	token, err := config.Exchange(context.Background(), code)
+	token, err := config.Exchange(ctx, code)
 	if err != nil {
 		return fmt.Errorf("oauth exchange failed: %w", err)
 	}
 
 	// Create service to fetch channel details
-	ctx := context.Background()
 	client := y.oauthConfig.Client(ctx, token)
 	service, err := youtube.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
@@ -244,7 +247,7 @@ func (y *YouTubeService) Authenticate(code string, userID int, clientID *int) er
 	}
 
 	// Get channel info (mine=true)
-	call := service.Channels.List([]string{"snippet"}).Mine(true)
+	call := service.Channels.List([]string{"snippet"}).Mine(true).Context(ctx)
 	conn, err := call.Do()
 	if err != nil {
 		return fmt.Errorf("failed to fetch channel info: %w", err)
@@ -271,7 +274,7 @@ func (y *YouTubeService) Authenticate(code string, userID int, clientID *int) er
 	oauth2Service, err := v2.NewService(ctx, option.WithHTTPClient(client))
 	var userEmail string
 	if err == nil {
-		userInfo, err := oauth2Service.Userinfo.Get().Do()
+		userInfo, err := oauth2Service.Userinfo.Get().Context(ctx).Do()
 		if err == nil {
 			userEmail = userInfo.Email
 		}
@@ -306,7 +309,7 @@ func (y *YouTubeService) Authenticate(code string, userID int, clientID *int) er
 		ExpiresAt:      &token.Expiry,
 	}
 
-	err = y.repo.UpsertAccount(context.Background(), account)
+	err = y.repo.UpsertAccount(ctx, account)
 	if err != nil {
 		return err
 	}

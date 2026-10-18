@@ -2,6 +2,8 @@
 
 A unified creator tool for uploading content to YouTube (and more platforms soon) from a single, beautiful interface.
 
+**YouTube Live producer:** describe your stream, review a researched title/thumbnail/description/tag package, then approve broadcast creation for OBS. See [setup and capabilities](docs/youtube-live/README.md).
+
 ---
 
 ## 🎯 What This Is

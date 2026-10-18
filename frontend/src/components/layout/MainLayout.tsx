@@ -33,9 +33,9 @@ export function MainLayout() {
       {/* Global Cinematic Noise Overlay */}
       <div className="fixed inset-0 z-[100] pointer-events-none bg-noise opacity-[0.02]" />
 
-      <Sidebar />
+      <div className={location.pathname === "/youtube-live" ? "hidden h-full md:flex" : "contents"}><Sidebar /></div>
 
-      <div className="flex-1 flex flex-col h-screen transition-all duration-300 overflow-hidden relative z-10">
+      <div className="min-w-0 flex-1 flex flex-col h-screen transition-all duration-300 overflow-hidden relative z-10">
         <Header />
         <main className="flex-1 flex flex-col overflow-hidden relative">
           <AnimatePresence mode="wait">
